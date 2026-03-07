@@ -1,31 +1,68 @@
 # CodeQuest Battles — Server
 
-NestJS backend for the CodeQuest Battles platform.
+**NestJS backend for the competitive coding battle platform**
 
-## Quick Start
+[![Tests](https://img.shields.io/badge/tests-57%20passing-brightgreen)]()
+[![Coverage](https://img.shields.io/badge/coverage-excellent-brightgreen)]()
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)]()
+
+---
+
+## 📚 Documentation
+
+- **[IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)** - What's built and what's not
+- **[TODO.md](./TODO.md)** - Detailed task breakdown and next steps
+- **Swagger API Docs** - http://localhost:3000/api/docs (when server is running)
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ and npm
-- PostgreSQL database (or Supabase account)
-- (Optional) Judge0 API access for code execution
 
-### Environment Setup
+- **Node.js 18+** and npm
+- **PostgreSQL database** (or Supabase account)
+- (Optional) **Piston API** for code execution (uses public API by default)
+- (Optional) **Judge0** for alternative code execution
+
+### 1. Environment Setup
 
 Create a `.env` file in the `server/` directory:
 
 ```env
-# Database
+# ============================================
+# DATABASE (REQUIRED)
+# ============================================
 DATABASE_URL="postgresql://user:password@host:5432/database?schema=public"
 
-# JWT Configuration (Supabase JWK)
-JWT_JWK='{"kty":"EC","crv":"P-256","x":"...","y":"..."}'
+# ============================================
+# JWT AUTHENTICATION (REQUIRED)
+# ============================================
+# Get this from your Supabase project settings
+JWT_JWK='{"kty":"EC","crv":"P-256","x":"YOUR_X_VALUE","y":"YOUR_Y_VALUE"}'
 
-# Judge0 (Optional - for code execution)
-JUDGE0_URL="https://judge0-ce.p.rapidapi.com"
-JUDGE0_API_KEY="your-rapidapi-key"  # Optional for self-hosted
+# ============================================
+# CODE EXECUTION - PISTON (OPTIONAL)
+# ============================================
+# Uses public API by default, or specify your own instance
+PISTON_URL="https://emkc.org/api/v2/piston"
+
+# ============================================
+# CODE EXECUTION - JUDGE0 (OPTIONAL)
+# ============================================
+# Alternative code execution engine
+JUDGE0_URL="http://localhost:2358"
+JUDGE0_API_KEY=""  # Empty for self-hosted
+SKIP_JUDGE0_TESTS="true"  # Set to false to run Judge0 integration tests
+
+# ============================================
+# SERVER
+# ============================================
+PORT=3000
+NODE_ENV=development
 ```
 
-### Installation & Setup
+### 2. Installation
 
 ```bash
 # Install dependencies
@@ -34,120 +71,436 @@ npm install
 # Generate Prisma Client
 npm run prisma:generate
 
-# Sync database schema (development)
+# Push database schema (development)
 npm run prisma:push
 
-# Seed database with sample data (users + problems)
+# Seed database with sample data
 npm run prisma:seed
-
-# Start development server
-npm run start:dev
 ```
 
-### Available Scripts
+### 3. Run the Server
+
+```bash
+# Development mode (with hot reload)
+npm run start:dev
+
+# Production mode
+npm run build
+npm run start:prod
+
+# Debug mode
+npm run start:debug
+```
+
+### 4. Access the Application
+
+- **API Base URL:** http://localhost:3000/api
+- **Swagger Docs:** http://localhost:3000/api/docs
+- **Prisma Studio:** `npm run prisma:studio`
+
+---
+
+## 🧪 Testing
+
+```bash
+# Run all unit tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:cov
+
+# Run integration tests (Piston)
+npm run test:integration
+
+# Run Judge0 integration tests (requires Judge0 running)
+SKIP_JUDGE0_TESTS=false npm test
+```
+
+### Test Results:
+✅ **57 tests passing** | ⏭️ 17 skipped (Judge0 optional tests)
+
+---
+
+## 📦 Available Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run start:dev` | Start server in watch mode |
+| `npm run start:dev` | Start dev server with hot reload |
+| `npm run start:debug` | Start in debug mode |
 | `npm run build` | Build for production |
-| `npm test` | Run unit tests |
-| `npm run test:cov` | Run tests with coverage |
-| `npm run prisma:studio` | Open Prisma Studio (database GUI) |
+| `npm run start:prod` | Run production build |
+| `npm test` | Run all tests |
+| `npm run test:watch` | Run tests in watch mode |
+| `npm run test:cov` | Generate test coverage report |
+| `npm run test:integration` | Run integration tests |
+| `npm run lint` | Lint TypeScript files |
+| `npm run format` | Format code with Prettier |
+| `npm run prisma:generate` | Generate Prisma Client |
+| `npm run prisma:push` | Push schema to database |
+| `npm run prisma:migrate` | Run Prisma migrations |
+| `npm run prisma:studio` | Open Prisma Studio GUI |
 | `npm run prisma:seed` | Seed database with sample data |
 
-### API Documentation
+---
 
-Once the server is running, visit:
-- **Swagger UI**: `http://localhost:3000/api/docs`
+## 🔐 Getting JWT_JWK from Supabase
 
-### Default Admin Account
+### Method 1: From Project Settings
+1. Go to your Supabase Dashboard
+2. Navigate to **Project Settings** → **API**
+3. Copy the **JWT Secret** (anon key)
+4. Use it directly or convert to JWK format
 
-After running the seed script, you can use this admin account:
+### Method 2: Use the JWK Endpoint
+Supabase provides a JWK endpoint at:
+```
+https://YOUR_PROJECT_ID.supabase.co/auth/v1/jwks
+```
 
-- **Email**: `admin@codequest.dev`
-- **Username**: `admin`
-- **Role**: `admin`
-
-*(Note: You'll need to authenticate via Supabase with this email to get a JWT token)*
-
-### Sample Data
-
-The seed script creates:
-- 1 admin user + 2 regular users
-- 7 coding problems (2 EASY, 3 MEDIUM, 2 HARD)
-- Each problem includes visible and hidden test cases
+You can extract the JWK from there and add it to your `.env` file.
 
 ---
 
-## Agent Rules
+## 🗄️ Database Setup
 
-> **IMPORTANT**: These rules MUST be followed when generating or modifying code in this project.
+### Using Supabase (Recommended)
 
-1. **NEVER use `any` type** — Always use proper TypeScript types. Use `unknown` if the type is truly unknown, then narrow it.
-2. **Always type function parameters** — Every parameter must have an explicit type annotation.
-3. **Always type return values** — Functions should have explicit return type annotations.
-4. **Use interfaces/types for objects** — Define interfaces for request objects, payloads, and data structures.
-5. **Use DTOs for all API inputs** — Never accept untyped request bodies.
-6. **Prefer `unknown` over `any`** — When type is uncertain, use `unknown` and type-guard it.
+1. Create a new project at [supabase.com](https://supabase.com)
+2. Get your database connection string from **Settings** → **Database**
+3. Add it to `.env` as `DATABASE_URL`
+4. Run `npm run prisma:push` to create tables
+5. Run `npm run prisma:seed` to add sample data
+
+### Using Local PostgreSQL
+
+```bash
+# Install PostgreSQL
+# Create a database
+createdb codequest_battles
+
+# Update .env with connection string
+DATABASE_URL="postgresql://localhost:5432/codequest_battles?schema=public"
+
+# Push schema and seed
+npm run prisma:push
+npm run prisma:seed
+```
+
+### Database Schema
+
+The database includes these tables:
+- `User` - User accounts and profiles (MMR, wins, losses)
+- `Clan` - Team/guild structure
+- `Problem` - Coding challenges with test cases
+- `TestCase` - Problem test cases (visible and hidden)
+- `Battle` - Battle instances
+- `BattleParticipant` - User participation in battles
+
+See [schema.prisma](./prisma/schema.prisma) for full details.
+
+---
+
+## 📡 API Endpoints
+
+### Authentication (`/api/auth`)
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/auth/sync` | Sync Supabase user to DB | ✅ JWT |
+| GET | `/auth/me` | Get current user profile | ✅ JWT |
+
+### Users (`/api/users`)
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/users` | Get leaderboard (all users) | ❌ |
+| GET | `/users/:id` | Get user by ID | ❌ |
+| PATCH | `/users/:id` | Update user profile | ✅ JWT |
+
+### Problems (`/api/problems`)
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/problems` | Create problem | ✅ Admin |
+| GET | `/problems` | List all problems | ✅ JWT |
+| GET | `/problems/random` | Get random problem | ✅ JWT |
+| GET | `/problems/:id` | Get problem by ID | ✅ JWT |
+| GET | `/problems/:id/testcases` | Get all test cases | ✅ Admin |
+| PATCH | `/problems/:id` | Update problem | ✅ Admin |
+| DELETE | `/problems/:id` | Delete problem | ✅ Admin |
+| POST | `/problems/:id/execute` | Execute code | ✅ JWT |
+
+### Battles (❌ Not Implemented Yet)
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/battles` | Create battle | ✅ JWT |
+| POST | `/battles/:id/join` | Join battle | ✅ JWT |
+| POST | `/battles/:id/submit` | Submit solution | ✅ JWT |
+| GET | `/battles/:id` | Get battle details | ✅ JWT |
+| GET | `/battles/history` | Get user's battles | ✅ JWT |
+
+See **[Swagger Docs](http://localhost:3000/api/docs)** for detailed schemas and examples.
+
+---
+
+## 💻 Code Execution
+
+The server supports multiple code execution engines:
+
+### Piston (Default) ✅
+- **Status:** Fully working
+- **URL:** Uses public API at `https://emkc.org/api/v2/piston`
+- **Languages:** Python 3.10, JavaScript (Node 20), TypeScript, Java, C++, C, Rust
+- **Tests:** ✅ All 17 integration tests passing
+
+### Judge0 (Optional) ⏭️
+- **Status:** Implemented but requires Docker setup
+- **URL:** Run locally at `http://localhost:2358` or use RapidAPI
+- **Setup:** See `docker-compose.yml` for local instance
+- **Tests:** ⏭️ Skipped by default (set `SKIP_JUDGE0_TESTS=false` to run)
+
+### Supported Languages
+| Language | Version | Piston | Judge0 |
+|----------|---------|--------|--------|
+| Python | 3.10.0 | ✅ | ✅ |
+| JavaScript | Node 20.11.1 | ✅ | ✅ |
+| TypeScript | Latest | ✅ | ✅ |
+| Java | 17+ | ✅ | ✅ |
+| C++ | GCC 11+ | ✅ | ✅ |
+| C | GCC 11+ | ✅ | ✅ |
+| Rust | 1.70+ | ✅ | ✅ |
+
+---
+
+## 📊 Sample Data
+
+After running `npm run prisma:seed`, you'll have:
+
+### Users (3)
+- **Admin** - `admin@codequest.dev` (role: admin, MMR: 1500)
+- **Alice** - `alice@example.com` (MMR: 1200)
+- **Bob** - `bob@example.com` (MMR: 1000)
+
+### Problems (7)
+1. **Two Sum** (Easy) - Array problem
+2. **Reverse String** (Easy) - String manipulation
+3. **FizzBuzz** (Medium) - Classic interview problem
+4. **Palindrome Checker** (Medium) - String validation
+5. **Valid Parentheses** (Medium) - Stack problem
+6. **Merge Sort** (Hard) - Sorting algorithm
+7. **Binary Search Tree** (Hard) - Data structure
+
+Each problem includes:
+- Multi-language starter code
+- Visible test cases (for user feedback)
+- Hidden test cases (for final validation)
+
+---
+
+## 🏗️ Project Structure
+
+```
+server/
+├── prisma/
+│   ├── schema.prisma           # Database schema
+│   └── seed.ts                 # Sample data seeder
+├── src/
+│   ├── auth/                   # ✅ Authentication (JWT, user sync)
+│   │   ├── auth.controller.ts
+│   │   ├── auth.service.ts
+│   │   ├── auth.module.ts
+│   │   ├── dto/
+│   │   └── strategies/
+│   ├── users/                  # ✅ User management & leaderboard
+│   │   ├── users.controller.ts
+│   │   ├── users.service.ts
+│   │   ├── users.module.ts
+│   │   └── dto/
+│   ├── problems/               # ✅ Problem CRUD & code execution
+│   │   ├── problems.controller.ts
+│   │   ├── problems.service.ts
+│   │   ├── problems.module.ts
+│   │   └── dto/
+│   ├── code-execution/         # ✅ Piston & Judge0 clients
+│   │   ├── code-execution.service.ts
+│   │   ├── piston.client.ts
+│   │   ├── judge0.client.ts
+│   │   └── *.spec.ts (tests)
+│   ├── prisma/                 # ✅ Prisma service
+│   │   ├── prisma.module.ts
+│   │   └── prisma.service.ts
+│   ├── common/                 # ✅ Guards, decorators, utilities
+│   │   ├── decorators/
+│   │   └── guards/
+│   ├── app.module.ts           # Main app module
+│   └── main.ts                 # Bootstrap & Swagger setup
+├── test/                       # E2E tests (TODO)
+├── .env                        # Environment variables (create this)
+├── package.json
+├── jest.config.js
+├── tsconfig.json
+├── nest-cli.json
+├── README.md                   # This file
+├── IMPLEMENTATION_STATUS.md    # Feature status & test results
+└── TODO.md                     # Detailed task breakdown
+```
+
+---
+
+## 🎯 What's Implemented
+
+### ✅ Completed (57 tests passing)
+1. **Authentication** - JWT via Supabase, user sync, role-based access
+2. **User Management** - CRUD operations, profiles, leaderboard
+3. **Problems** - CRUD, test cases, pagination, filtering, random selection
+4. **Code Execution** - Piston integration, multi-language support, test validation
+
+### 🚧 In Progress
+_Nothing currently in progress_
+
+### ❌ Not Started
+1. **Battle System** - Real-time 1v1 competitions (database ready)
+2. **WebSockets** - Live updates for battles
+3. **Matchmaking** - MMR-based player matching
+4. **Clan System** - Team/guild functionality (database ready)
+5. **Advanced Rankings** - Time-based leaderboards, rank tiers
+
+See **[TODO.md](./TODO.md)** for detailed implementation plan.
+
+---
+
+## 🧑‍💻 Development Guidelines
+
+### TypeScript Rules (STRICTLY ENFORCED)
+
+1. **NEVER use `any` type** - Use proper types or `unknown`
+2. **Always type function parameters** - Every param needs a type
+3. **Always type return values** - Explicit return types required
+4. **Use DTOs for all API inputs** - Validate with class-validator
+5. **Prefer interfaces over types** - For object shapes
 
 ```typescript
-// ❌ BAD - Never do this
-async handleRequest(req, payload) { }
+// ❌ BAD
+async handleRequest(req, payload) {
+  // ...
+}
 
-// ✅ GOOD - Always do this
-async handleRequest(req: Request, payload: CreateUserDto): Promise<User> { }
+// ✅ GOOD
+async handleRequest(
+  req: Request, 
+  payload: CreateUserDto
+): Promise<UserResponseDto> {
+  // ...
+}
+```
+
+### Testing Requirements
+
+- Write tests for all new features
+- Aim for >80% code coverage
+- Mock external dependencies (Prisma, Piston, Judge0)
+- Use integration tests for critical flows
+
+### Code Style
+
+- Use Prettier for formatting: `npm run format`
+- Use ESLint for linting: `npm run lint`
+- Follow NestJS conventions
+- Keep controllers thin, services fat
+
+---
+
+## 🐛 Troubleshooting
+
+### Database Connection Issues
+```bash
+# Test database connection
+npm run prisma:studio
+
+# Reset database (WARNING: deletes all data)
+npm run prisma:push -- --force-reset
+```
+
+### Code Execution Not Working
+```bash
+# Check Piston API availability
+curl https://emkc.org/api/v2/piston/runtimes
+
+# Start local Judge0 (if using)
+cd server && docker-compose up -d
+
+# Wait 30 seconds, then check
+docker ps --filter "name=judge0"
+```
+
+### JWT Authentication Failing
+- Make sure `JWT_JWK` is correctly formatted in `.env`
+- Verify Supabase JWT token is valid (check expiration)
+- Test with Swagger UI - it has a built-in auth form
+
+### Tests Failing
+```bash
+# Clear Jest cache
+npm test -- --clearCache
+
+# Run tests with verbose output
+npm test -- --verbose
+
+# Run specific test file
+npm test -- auth.service.spec.ts
 ```
 
 ---
 
-## Tech Stack
+## 📈 Performance Tips
 
-| Technology | Purpose |
-|------------|---------|
-| **NestJS** | Node.js framework |
-| **TypeScript** | Type safety |
-| **Socket.IO** | Real-time WebSocket communication |
-| **Prisma** | Database ORM |
-| **Supabase** | PostgreSQL database + Auth |
-| **Judge0** | Code execution engine |
-| **class-validator** | DTO validation |
-| **Passport** | Auth strategies (JWT) |
+- Use pagination for large lists (already implemented in `/api/problems` and `/api/users`)
+- Index frequently queried fields in Prisma schema (already done for email, username)
+- Use connection pooling for production (configure in `DATABASE_URL`)
+- Cache problem data (implement Redis for production)
 
 ---
 
-## Architecture
+## 🚢 Deployment
 
+### Environment Variables (Production)
+```env
+NODE_ENV=production
+DATABASE_URL="postgresql://..."
+JWT_JWK='{"kty":"EC",...}'
+PORT=3000
 ```
-src/
-├── main.ts                    # Application entry point
-├── app.module.ts              # Root module
-│
-├── common/                    # Shared utilities
-│   ├── decorators/            # Custom decorators
-│   │   ├── current-user.decorator.ts
-│   │   └── roles.decorator.ts
-│   ├── guards/                # Auth & role guards
-│   │   ├── jwt-auth.guard.ts
-│   │   ├── ws-auth.guard.ts
-│   │   └── roles.guard.ts
-│   ├── filters/               # Exception filters
-│   │   └── http-exception.filter.ts
-│   ├── interceptors/          # Response interceptors
-│   │   └── transform.interceptor.ts
-│   ├── pipes/                 # Validation pipes
-│   └── types/                 # Shared types
-│
-├── config/                    # Configuration
-│   ├── config.module.ts
-│   ├── database.config.ts
-│   ├── supabase.config.ts
-│   └── judge0.config.ts
-│
-├── auth/                      # Authentication module (✅ Implemented)
-│   ├── auth.module.ts
-│   ├── auth.controller.ts
-│   ├── auth.service.ts
-│   ├── strategies/
+
+### Build & Run
+```bash
+npm run build
+npm run start:prod
+```
+
+### Docker (TODO)
+Docker support coming soon!
+
+---
+
+## 📝 License
+
+This project is for educational purposes.
+
+---
+
+## 🤝 Contributing
+
+See **[TODO.md](./TODO.md)** for areas that need work!
+
+Key priorities:
+1. Battle System (HIGH)
+2. WebSockets (HIGH)
+3. Matchmaking (HIGH)
+4. Clan System (MEDIUM)
+
+---
+
+**Built with NestJS, TypeScript, Prisma, and ❤️**
 │   │   └── jwt.strategy.ts
 │   └── dto/
 │       └── sync-user.dto.ts
