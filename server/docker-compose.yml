@@ -1,0 +1,12 @@
+# Code Execution via Piston API
+# Piston supports cgroups v2 (modern Linux systems)
+
+services:
+  piston-api:
+    image: ghcr.io/engineer-man/piston
+    container_name: piston-api
+    network_mode: host
+    privileged: true
+    restart: always
+    tmpfs:
+      - /piston/jobs:exec,size=256m

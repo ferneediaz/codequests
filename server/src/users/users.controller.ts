@@ -1,0 +1,123 @@
+import { 
+  Controller, 
+  Get, 
+  Patch, 
+  Param, 
+  Body, 
+  Query,
+  UseGuards,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
+import { Request } from 'express';
+import { AuthGuard } from '@nestjs/passport';
+import { 
+  ApiTags, 
+  ApiOperation, 
+  ApiResponse, 
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
+import { UsersService } from './users.service';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UserResponseDto } from './dto/user-response.dto';
+
+@ApiTags('users')
+@Controller('users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  /**
+   * Get all users (paginated, sorted by MMR)
+   */
+  @Get()
+  @ApiOperation({ summary: 'Get all users (leaderboard)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
+  @ApiQuery({ name: 'offset', required: false, type: Number, example: 0 })
+  @ApiResponse({ status: 200, description: 'List of users' })
+  findAll(
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.usersService.findAll({
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
+  }
+
+  /**
+   * Get user by ID
+   */
+  @Get(':id')
+  @ApiOperation({ summary: 'Get user by ID' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'User found', type: UserResponseDto })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  findOne(@Param('id') id: string) {
+    return this.usersService.findOne(id);
+  }
+
+  /**
+   * Get user by username
+   */
+  @Get('username/:username')
+  @ApiOperation({ summary: 'Get user by username' })
+  @ApiParam({ name: 'username', description: 'Username', example: 'codemaster42' })
+  @ApiResponse({ status: 200, description: 'User found' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  findByUsername(@Param('username') username: string) {
+    return this.usersService.findByUsername(username);
+  }
+
+  /**
+   * Update user profile (authenticated, own profile only)
+   */
+  @Patch(':id')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update user profile' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'User updated' })
+  @ApiResponse({ status: 403, description: 'Cannot update other users' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    // Users can only update their own profile
+    if (req.user.id !== id) {
+      throw new ForbiddenException('You can only update your own profile');
+    }
+    return this.usersService.update(id, updateUserDto);
+  }
+
+  /**
+   * Get user's match history
+   */
+  @Get(':id/history')
+  @ApiOperation({ summary: 'Get user match history' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiResponse({ status: 200, description: 'Match history' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  getHistory(
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.usersService.getMatchHistory(id, limit ? parseInt(limit, 10) : undefined);
+  }
+
+  /**
+   * Get user stats (MMR, win rate, tier)
+   */
+  @Get(':id/stats')
+  @ApiOperation({ summary: 'Get user stats' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'User stats' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  getStats(@Param('id') id: string) {
+    return this.usersService.getStats(id);
+  }
+}

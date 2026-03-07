@@ -1,0 +1,140 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTH
+// ============================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  avatarUrl String?
+  role      String   @default("user") // "user" or "admin"
+
+  // Stats
+  mmr    Int @default(1000)
+  wins   Int @default(0)
+  losses Int @default(0)
+
+  // Clan membership
+  clanId String?
+  clan   Clan?   @relation(fields: [clanId], references: [id])
+
+  // Battle participation
+  battles BattleParticipant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// CLANS
+// ============================================
+
+model Clan {
+  id      String @id @default(uuid())
+  name    String @unique
+  tag     String @unique // e.g., [ABC]
+  ownerId String
+
+  members User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// PROBLEMS
+// ============================================
+
+model Problem {
+  id          String     @id @default(uuid())
+  title       String
+  description String
+  difficulty  Difficulty @default(EASY)
+
+  // Starter code as JSON: { "javascript": "...", "python": "..." }
+  starterCode String @default("{}")
+
+  testCases TestCase[]
+  battles   Battle[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TestCase {
+  id        String  @id @default(uuid())
+  problemId String
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  input          String
+  expectedOutput String
+  isHidden       Boolean @default(false) // Hidden tests not shown to user
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+// ============================================
+// BATTLES
+// ============================================
+
+model Battle {
+  id   String     @id @default(uuid())
+  mode BattleMode @default(ONE_V_ONE)
+
+  problemId String
+  problem   Problem @relation(fields: [problemId], references: [id])
+
+  participants BattleParticipant[]
+
+  winnerId String?
+  status   BattleStatus @default(WAITING)
+
+  startedAt DateTime?
+  endedAt   DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model BattleParticipant {
+  id       String @id @default(uuid())
+  battleId String
+  battle   Battle @relation(fields: [battleId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  code        String?
+  language    String?
+  testsPassed Int       @default(0)
+  totalTests  Int       @default(0)
+  submittedAt DateTime?
+  mmrChange   Int?
+
+  @@unique([battleId, userId])
+}
+
+enum BattleMode {
+  ONE_V_ONE
+  BATTLE_ROYALE
+}
+
+enum BattleStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+}
