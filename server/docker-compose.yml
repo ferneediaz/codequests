@@ -1,12 +1,46 @@
-# Code Execution via Piston API
-# Piston supports cgroups v2 (modern Linux systems)
+# Piston Code Execution Engine
+# Works on modern Linux kernels with cgroups v2
+# https://github.com/engineer-man/piston
 
 services:
-  piston-api:
+  piston:
     image: ghcr.io/engineer-man/piston
-    container_name: piston-api
-    network_mode: host
+    container_name: piston
+    ports:
+      - "2000:2000"
     privileged: true
-    restart: always
     tmpfs:
-      - /piston/jobs:exec,size=256m
+      - /piston/jobs:exec,uid=1000,gid=1000
+    volumes:
+      - piston-packages:/piston/packages
+    environment:
+      - PISTON_RUN_TIMEOUT=3000
+      - PISTON_COMPILE_TIMEOUT=10000
+      - PISTON_OUTPUT_MAX_SIZE=1000000
+    restart: unless-stopped
+
+  # Package installer - installs runtimes on first run
+  piston-installer:
+    image: ghcr.io/engineer-man/piston
+    container_name: piston-installer
+    entrypoint: /bin/sh
+    command: |
+      -c "
+        echo 'Waiting for packages directory...'
+        sleep 5
+        cd /piston_api
+        echo 'Installing Python 3.12...'
+        node src/ppman/ppman_cli.js --install python=3.12.0 || true
+        echo 'Installing Node.js 20...'
+        node src/ppman/ppman_cli.js --install node=20.11.1 || true
+        echo 'Installing TypeScript 5...'
+        node src/ppman/ppman_cli.js --install typescript=5.0.3 || true
+        echo 'Installation complete!'
+      "
+    volumes:
+      - piston-packages:/piston/packages
+    depends_on:
+      - piston
+
+volumes:
+  piston-packages:

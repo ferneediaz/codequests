@@ -15,7 +15,6 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "test:judge0": "npx ts-node src/code-execution/test-judge0.ts",
     "test:integration": "jest --testPathPattern=integration",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

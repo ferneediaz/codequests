@@ -33,7 +33,7 @@ A competitive coding battle platform where players learn algorithms through real
 | **NestJS** | Node.js framework with TypeScript |
 | **Socket.IO** | WebSocket server for real-time battles |
 | **Prisma** | Database ORM |
-| **Judge0** | Sandboxed code execution engine |
+| **Piston** | Sandboxed code execution engine (Docker) |
 
 ### Database & Auth
 | Technology | Purpose |
@@ -56,7 +56,7 @@ A competitive coding battle platform where players learn algorithms through real
 │                     NESTJS BACKEND                          │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │   REST API  │  │  Socket.IO  │  │  Code Execution     │  │
-│  │  (Prisma)   │  │  Gateway    │  │  Service (Judge0)   │  │
+│  │  (Prisma)   │  │  Gateway    │  │  Service (Piston)   │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -81,7 +81,7 @@ A competitive coding battle platform where players learn algorithms through real
 | **Matchmaking** | MMR-based queue, battle royale lobbies |
 | **Battles** | Real-time game state, skill effects, code submission |
 | **Problems** | Coding problem CRUD, test cases |
-| **Code Execution** | Judge0 integration, result validation |
+| **Code Execution** | Piston integration, result validation |
 | **Rankings** | MMR calculations, leaderboards |
 
 ---
@@ -133,7 +133,7 @@ CodeQuest Battles uses a **freemium model** similar to GeoGuessr:
 - Node.js 20+
 - pnpm (recommended) or npm
 - Supabase account
-- Judge0 instance (local Docker or hosted)
+- Docker (for Piston code execution engine)
 
 ### Installation
 
@@ -165,7 +165,7 @@ VITE_API_URL=http://localhost:3000
 DATABASE_URL=your_supabase_postgres_connection_string
 SUPABASE_URL=your_supabase_url
 SUPABASE_SERVICE_KEY=your_supabase_service_role_key
-JUDGE0_URL=http://localhost:2358
+PISTON_URL=http://localhost:2000
 JWT_SECRET=your_jwt_secret
 ```
 
@@ -204,7 +204,7 @@ codequest_battles/
 │   │   ├── matchmaking/    # Matchmaking module
 │   │   ├── battles/        # Battles module (Socket.IO gateway)
 │   │   ├── problems/       # Problems module
-│   │   ├── code-execution/ # Judge0 integration
+│   │   ├── code-execution/ # Piston code execution
 │   │   └── rankings/       # Rankings module
 │   └── ...
 └── readme.md

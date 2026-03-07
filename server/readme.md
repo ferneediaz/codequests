@@ -2,7 +2,7 @@
 
 **NestJS backend for the competitive coding battle platform**
 
-[![Tests](https://img.shields.io/badge/tests-57%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-82%20passing-brightgreen)]()  
 [![Coverage](https://img.shields.io/badge/coverage-excellent-brightgreen)]()
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)]()
 
@@ -22,8 +22,7 @@
 
 - **Node.js 18+** and npm
 - **PostgreSQL database** (or Supabase account)
-- (Optional) **Piston API** for code execution (uses public API by default)
-- (Optional) **Judge0** for alternative code execution
+- **Docker & Docker Compose** for Piston code execution engine
 
 ### 1. Environment Setup
 
@@ -42,18 +41,13 @@ DATABASE_URL="postgresql://user:password@host:5432/database?schema=public"
 JWT_JWK='{"kty":"EC","crv":"P-256","x":"YOUR_X_VALUE","y":"YOUR_Y_VALUE"}'
 
 # ============================================
-# CODE EXECUTION - PISTON (OPTIONAL)
+# CODE EXECUTION - PISTON (REQUIRED)
 # ============================================
-# Uses public API by default, or specify your own instance
-PISTON_URL="https://emkc.org/api/v2/piston"
+# Local Piston instance (started with docker-compose)
+PISTON_URL="http://localhost:2000"
 
-# ============================================
-# CODE EXECUTION - JUDGE0 (OPTIONAL)
-# ============================================
-# Alternative code execution engine
-JUDGE0_URL="http://localhost:2358"
-JUDGE0_API_KEY=""  # Empty for self-hosted
-SKIP_JUDGE0_TESTS="true"  # Set to false to run Judge0 integration tests
+# Note: Start Piston with: docker-compose up -d
+# Piston provides secure sandboxed code execution for battles
 
 # ============================================
 # SERVER
@@ -78,7 +72,25 @@ npm run prisma:push
 npm run prisma:seed
 ```
 
-### 3. Run the Server
+### 3. Start Piston Code Execution Engine
+
+```bash
+# Start Piston with Docker Compose
+docker-compose up -d
+
+# Verify Piston is running
+curl http://localhost:2000/api/v2/runtimes
+
+# View logs
+docker-compose logs -f piston
+
+# Stop Piston
+docker-compose down
+```
+
+Piston will automatically install Python, Node.js, and TypeScript runtimes on first startup.
+
+### 4. Run the Server
 
 ```bash
 # Development mode (with hot reload)
@@ -92,7 +104,7 @@ npm run start:prod
 npm run start:debug
 ```
 
-### 4. Access the Application
+### 5. Access the Application
 
 - **API Base URL:** http://localhost:3000/api
 - **Swagger Docs:** http://localhost:3000/api/docs
@@ -114,13 +126,10 @@ npm run test:cov
 
 # Run integration tests (Piston)
 npm run test:integration
-
-# Run Judge0 integration tests (requires Judge0 running)
-SKIP_JUDGE0_TESTS=false npm test
 ```
 
 ### Test Results:
-✅ **57 tests passing** | ⏭️ 17 skipped (Judge0 optional tests)
+✅ **82 tests passing**
 
 ---
 
@@ -245,30 +254,25 @@ See **[Swagger Docs](http://localhost:3000/api/docs)** for detailed schemas and 
 
 ## 💻 Code Execution
 
-The server supports multiple code execution engines:
+The server uses Piston for code execution:
 
-### Piston (Default) ✅
+### Piston Code Execution Engine ✅
 - **Status:** Fully working
-- **URL:** Uses public API at `https://emkc.org/api/v2/piston`
-- **Languages:** Python 3.10, JavaScript (Node 20), TypeScript, Java, C++, C, Rust
-- **Tests:** ✅ All 17 integration tests passing
-
-### Judge0 (Optional) ⏭️
-- **Status:** Implemented but requires Docker setup
-- **URL:** Run locally at `http://localhost:2358` or use RapidAPI
-- **Setup:** See `docker-compose.yml` for local instance
-- **Tests:** ⏭️ Skipped by default (set `SKIP_JUDGE0_TESTS=false` to run)
+- **URL:** Local Docker instance at `http://localhost:2000`
+- **Languages:** Python 3.12, Node.js 20, TypeScript 5, Java, C++, C, Rust
+- **Tests:** ✅ All integration tests passing
+- **Setup:** See `docker-compose.yml` for configuration
 
 ### Supported Languages
-| Language | Version | Piston | Judge0 |
-|----------|---------|--------|--------|
-| Python | 3.10.0 | ✅ | ✅ |
-| JavaScript | Node 20.11.1 | ✅ | ✅ |
-| TypeScript | Latest | ✅ | ✅ |
-| Java | 17+ | ✅ | ✅ |
-| C++ | GCC 11+ | ✅ | ✅ |
-| C | GCC 11+ | ✅ | ✅ |
-| Rust | 1.70+ | ✅ | ✅ |
+| Language | Version | Piston |
+|----------|---------|--------|
+| Python | 3.12.0 | ✅ |
+| JavaScript | Node 20.11.1 | ✅ |
+| TypeScript | 5.0.3 | ✅ |
+| Java | 17+ | ✅ |
+| C++ | GCC 11+ | ✅ |
+| C | GCC 11+ | ✅ |
+| Rust | 1.70+ | ✅ |
 
 ---
 
@@ -321,10 +325,9 @@ server/
 │   │   ├── problems.service.ts
 │   │   ├── problems.module.ts
 │   │   └── dto/
-│   ├── code-execution/         # ✅ Piston & Judge0 clients
+│   ├── code-execution/         # ✅ Piston code execution
 │   │   ├── code-execution.service.ts
 │   │   ├── piston.client.ts
-│   │   ├── judge0.client.ts
 │   │   └── *.spec.ts (tests)
 │   ├── prisma/                 # ✅ Prisma service
 │   │   ├── prisma.module.ts
@@ -398,7 +401,7 @@ async handleRequest(
 
 - Write tests for all new features
 - Aim for >80% code coverage
-- Mock external dependencies (Prisma, Piston, Judge0)
+- Mock external dependencies (Prisma, Piston)
 - Use integration tests for critical flows
 
 ### Code Style
@@ -423,14 +426,14 @@ npm run prisma:push -- --force-reset
 
 ### Code Execution Not Working
 ```bash
-# Check Piston API availability
-curl https://emkc.org/api/v2/piston/runtimes
-
-# Start local Judge0 (if using)
+# Start Piston via Docker Compose
 cd server && docker-compose up -d
 
-# Wait 30 seconds, then check
-docker ps --filter "name=judge0"
+# Check Piston container status
+docker ps --filter "name=piston"
+
+# Check Piston health
+curl http://localhost:2000/api/v2/runtimes
 ```
 
 ### JWT Authentication Failing
@@ -525,7 +528,7 @@ Key priorities:
 ├── code-execution/            # Code execution module (✅ Implemented)
 │   ├── code-execution.module.ts
 │   ├── code-execution.service.ts
-│   └── judge0.client.ts
+│   └── piston.client.ts
 │
 ├── clans/                     # Clans module (🔜 TODO)
 │   ├── clans.module.ts
@@ -569,10 +572,10 @@ Key priorities:
 │       ├── problem.entity.ts
 │       └── test-case.entity.ts
 │
-├── code-execution/            # Judge0 integration
+├── code-execution/            # Piston integration
 │   ├── code-execution.module.ts
 │   ├── code-execution.service.ts
-│   ├── judge0.client.ts          # Judge0 API client
+│   ├── piston.client.ts          # Piston API client
 │   └── dto/
 │       └── execution-result.dto.ts
 │
@@ -649,10 +652,10 @@ export class BattlesGateway {
 - Random problem selection for battles
 
 ### Code Execution Module
-- Judge0 API integration
-- Submission queueing
-- Result polling
+- Piston API integration
+- Multi-language code execution
 - Test case validation
+- Error handling and timeouts
 
 ### Rankings Module
 - MMR calculation (Elo-based or Glicko-2)
@@ -808,9 +811,8 @@ SUPABASE_SERVICE_KEY=your-service-role-key
 # JWT (from Supabase)
 JWT_SECRET=your-supabase-jwt-secret
 
-# Judge0
-JUDGE0_URL=http://localhost:2358
-JUDGE0_API_KEY=optional-if-self-hosted
+# Piston Code Execution
+PISTON_URL=http://localhost:2000
 
 # App
 PORT=3000

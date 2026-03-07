@@ -110,7 +110,7 @@ export class CodeExecutionService {
     }
 
     /**
-     * Validate that language is supported
+     * Validate language is supported by Piston
      */
     private validateLanguage(language: string): void {
         const normalizedLanguage = language.toLowerCase();

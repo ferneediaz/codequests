@@ -31,6 +31,7 @@ export const createMockPrismaService = () => {
             findUnique: jest.fn(),
             findMany: jest.fn(),
             update: jest.fn(),
+            count: jest.fn(),
         },
         battleParticipant: {
             create: jest.fn(),

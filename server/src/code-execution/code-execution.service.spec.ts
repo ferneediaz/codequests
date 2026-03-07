@@ -16,6 +16,7 @@ describe('CodeExecutionService', () => {
     // Mock PistonClient
     const mockPiston = {
       executeCode: jest.fn(),
+      getRuntimes: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

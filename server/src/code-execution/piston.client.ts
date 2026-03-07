@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 
 /**
  * Piston API Client
- * Alternative to Judge0 with better cgroups v2 support
+ * Secure code execution engine using firejail sandboxing
+ * Works on modern Linux kernels with cgroups v2
  * https://github.com/engineer-man/piston
  */
 
@@ -58,7 +59,7 @@ export const PISTON_LANGUAGES: Record<string, { language: string; version: strin
 };
 
 /**
- * Result interface compatible with Judge0
+ * Result interface for code execution
  */
 export interface ExecutionResult {
     stdout: string | null;
@@ -78,8 +79,7 @@ export class PistonClient {
     private readonly baseUrl: string;
 
     constructor(private configService: ConfigService) {
-        // Use JUDGE0_URL for backwards compatibility, defaults to local Piston (port 2000 with host networking)
-        this.baseUrl = this.configService.get<string>('JUDGE0_URL') || 'http://localhost:2000';
+        this.baseUrl = this.configService.get<string>('PISTON_URL') || 'http://localhost:2000';
     }
 
     /**
@@ -94,7 +94,7 @@ export class PistonClient {
     }
 
     /**
-     * Execute code and return Judge0-compatible result
+     * Execute code and return execution result
      */
     async executeCode(
         sourceCode: string,
@@ -152,14 +152,14 @@ export class PistonClient {
 
         const result: PistonExecuteResponse = await response.json();
 
-        // Convert Piston response to Judge0-compatible format
-        return this.convertToJudge0Format(result, executionTime);
+        // Convert Piston response to standard format
+        return this.convertToStandardFormat(result, executionTime);
     }
 
     /**
-     * Convert Piston response to Judge0-compatible format
+     * Convert Piston response to standard ExecutionResult format
      */
-    private convertToJudge0Format(result: PistonExecuteResponse, time: string): ExecutionResult {
+    private convertToStandardFormat(result: PistonExecuteResponse, time: string): ExecutionResult {
         // Determine status based on execution result
         let status: { id: number; description: string };
 

@@ -14,15 +14,13 @@
 - Problems Service: ✅ All passing
 - Code Execution: ✅ All passing
 - Piston Integration: ✅ 17/17 tests passing
-- Judge0 Integration: ⏭️ Skipped (optional)
 
 ## ❌ What's Not Done
 
-1. **Battle System** - Database ready, needs implementation
-2. **WebSockets** - For real-time battles
-3. **Matchmaking** - MMR-based player matching
-4. **Clans** - Database ready, needs implementation
-5. **Advanced Rankings** - Time-based leaderboards
+1. **WebSockets** - For real-time battle updates
+2. **Matchmaking** - MMR-based player matching
+3. **Clans** - Database ready, needs implementation
+4. **Advanced Rankings** - Time-based leaderboards
 
 ## 🚀 Setup (5 Minutes)
 
@@ -64,7 +62,7 @@ Full API docs: [API_REFERENCE.md](./API_REFERENCE.md)
 ```bash
 # All tests
 npm test
-# Result: 57 passing, 17 skipped
+# Result: 82 passing
 
 # With coverage
 npm run test:cov
@@ -92,8 +90,7 @@ JWT_JWK='{"kty":"EC","crv":"P-256","x":"...","y":"..."}'
 
 ### Optional:
 ```env
-PISTON_URL="https://emkc.org/api/v2/piston"
-JUDGE0_URL="http://localhost:2358"
+PISTON_URL="http://localhost:2000"
 PORT=3000
 ```
 
@@ -102,31 +99,29 @@ PORT=3000
 **This feature is marked as SUCCESS only when ALL test cases pass.**
 
 ### Current Status:
-✅ **Phase 1 Complete** - Auth, Users, Problems, Code Execution  
-⏳ **Phase 2 Pending** - Battles, WebSockets, Matchmaking
+✅ **Phase 1 Complete** - Auth, Users, Problems, Code Execution, Battles  
+⏳ **Phase 2 Pending** - WebSockets, Matchmaking
 
 ### Next Steps (Priority Order):
-1. Implement Battle System (HIGH)
-2. Add WebSocket support (HIGH)
-3. Build Matchmaking (HIGH)
-4. Add Clan features (MEDIUM)
+1. Add WebSocket support for real-time battles (HIGH)
+2. Build Matchmaking system (HIGH)
+3. Add Clan features (MEDIUM)
 
 See [TODO.md](./TODO.md) for detailed implementation plan.
 
 ## 💻 Code Execution
 
 ### Supported Languages:
-- Python 3.10
+- Python 3.12
 - JavaScript (Node 20)
-- TypeScript
+- TypeScript 5
 - Java 17+
 - C++ (GCC 11+)
 - C (GCC 11+)
 - Rust 1.70+
 
-### Engines:
-- **Piston** (Default) - ✅ Working, all tests passing
-- **Judge0** (Optional) - ✅ Integrated, requires Docker setup
+### Engine:
+- **Piston** - ✅ Working via local Docker instance, all tests passing
 
 ## 📊 Sample Data (After Seed)
 

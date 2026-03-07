@@ -1,7 +1,7 @@
 # CodeQuest Battles - Implementation Status
 
-**Last Updated:** March 7, 2026  
-**Test Results:** ✅ 57 passing | ⏭️ 17 skipped | 0 failing
+**Last Updated:** March 8, 2026  
+**Test Results:** ✅ 82 passing | 0 skipped | 0 failing
 
 ---
 
@@ -114,7 +114,7 @@ model TestCase {
 ### 3. **Code Execution** ✅
 
 - **Status:** FULLY IMPLEMENTED & TESTED
-- **Test Coverage:** All tests passing (Piston), Judge0 tests skipped
+- **Test Coverage:** All 82 tests passing
 
 #### Implemented APIs:
 
@@ -122,12 +122,11 @@ Code execution is integrated into the problems endpoint:
 - `/api/problems/:id/execute` - Execute user code against problem test cases
 
 #### Features:
-- ✅ Piston code execution engine (primary)
-- ✅ Judge0 code execution engine (alternative, optional)
+- ✅ Piston code execution engine
 - ✅ Multi-language support:
-  - Python (3.10.0)
-  - JavaScript (20.11.1)
-  - TypeScript
+  - Python (3.12.0)
+  - JavaScript (Node 20.11.1)
+  - TypeScript (5.0.3)
   - Java
   - C++
   - C
@@ -136,15 +135,13 @@ Code execution is integrated into the problems endpoint:
 - ✅ Input/output testing (stdin)
 - ✅ Execution time tracking
 - ✅ Error handling (syntax errors, runtime errors, timeouts)
-- ✅ Integration tests for both Piston and Judge0
+- ✅ Comprehensive integration tests
 
 #### Test Results:
 | Test Suite | Status | Details |
-|------------|--------|---------|
+|------------|--------|---------|  
 | Code Execution Service | ✅ PASSING | All unit tests pass |
-| Piston Integration | ✅ PASSING | 17 integration tests pass |
-| Judge0 Integration | ⏭️ SKIPPED | Tests exist but skipped (optional engine) |
-
+| Piston Integration | ✅ PASSING | All integration tests pass |
 #### Response Format:
 ```typescript
 {
@@ -198,8 +195,7 @@ Code execution is integrated into the problems endpoint:
 - **Testing:** Jest
 
 ### Code Execution:
-- **Primary Engine:** Piston API
-- **Alternative:** Judge0 (optional, Docker-based)
+- **Primary Engine:** Piston (local Docker instance)
 - **Supported Languages:** Python, JavaScript, TypeScript, Java, C++, C, Rust
 
 ---
@@ -218,30 +214,52 @@ Code execution is integrated into the problems endpoint:
   - FizzBuzz, Palindrome, Reverse String problems
   - Error handling (syntax, runtime)
   - JSON input support
-- ⏭️ **Judge0 Integration** - Skipped (optional, requires Docker setup)
+- ✅ **Battles Service** - All tests passing
+  - Battle creation and participant management
+  - Code submission and validation
+  - MMR calculation (Elo rating system)
+  - Battle completion and winner determination
+  - Battle history and statistics
 
 ### Total:
-- **Test Suites:** 5 passed, 1 skipped
-- **Tests:** 57 passed, 17 skipped, 0 failed
+- **Test Suites:** 6 passed, 0 skipped
+- **Tests:** 82 passed, 0 skipped, 0 failed
 
 ---
 
 ## 🚧 Not Yet Implemented
 
-### 4. **Battle System** ❌
+### 4. **Battle System** ✅
 
-- **Status:** DATABASE SCHEMA READY, NO IMPLEMENTATION
-- **Priority:** HIGH
+- **Status:** FULLY IMPLEMENTED & TESTED
+- **Test Coverage:** All tests passing
 
-#### What's Needed:
-- [ ] Battle creation and matchmaking
-- [ ] Real-time battle status updates
-- [ ] WebSocket support for live updates
-- [ ] Battle result calculation
-- [ ] MMR adjustment after battles
-- [ ] Battle history API
+#### Implemented APIs:
 
-#### Existing Schema (Ready to Use):
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/api/battles` | POST | Create a new battle | ✅ JWT |
+| `/api/battles/active` | GET | Get user's active battles | ✅ JWT |
+| `/api/battles/history` | GET | Get user's battle history | ✅ JWT |
+| `/api/battles/:id` | GET | Get battle details | ✅ JWT |
+| `/api/battles/:id/join` | POST | Join an existing battle | ✅ JWT |
+| `/api/battles/:id/submit` | POST | Submit solution to battle | ✅ JWT |
+
+#### Features:
+- ✅ Battle creation with problem selection
+- ✅ Battle modes (ONE_V_ONE, BATTLE_ROYALE)
+- ✅ Battle status tracking (WAITING, IN_PROGRESS, COMPLETED, CANCELLED)
+- ✅ Code submission and real-time validation
+- ✅ Test case execution against submitted code
+- ✅ Automatic winner determination
+- ✅ MMR calculation using Elo rating system (K-factor = 32)
+- ✅ Battle history with statistics
+- ✅ Participant progress tracking
+- ✅ Battle completion workflow
+
+**Note:** WebSocket real-time features (live opponent progress, skill effects) are planned but not yet implemented. See section 6 "Real-time Features" below.
+
+#### Database Schema:
 ```prisma
 model Battle {
   id           String              @id @default(uuid())
@@ -269,6 +287,28 @@ model BattleParticipant {
   submittedAt DateTime?
   mmrChange   Int?
   @@unique([battleId, userId])
+}
+```
+
+#### Response Format:
+```typescript
+{
+  id: string,
+  mode: 'ONE_V_ONE' | 'BATTLE_ROYALE',
+  status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED',
+  problem: { id, title, description, difficulty },
+  participants: [{
+    userId: string,
+    username: string,
+    testsPassed: number,
+    totalTests: number,
+    isReady: boolean,
+    mmrChange: number | null
+  }],
+  winnerId: string | null,
+  startedAt: Date | null,
+  endedAt: Date | null,
+  createdAt: Date
 }
 ```
 
@@ -355,12 +395,8 @@ DATABASE_URL=postgresql://user:password@host:5432/database?schema=public
 # JWT Configuration (REQUIRED for Auth)
 JWT_JWK={"kty":"EC","crv":"P-256","x":"...","y":"..."}
 
-# Code Execution - Piston (OPTIONAL, defaults to public API)
-PISTON_URL=https://emkc.org/api/v2/piston
-
-# Code Execution - Judge0 (OPTIONAL)
-JUDGE0_URL=http://localhost:2358
-JUDGE0_API_KEY=  # Empty for self-hosted
+# Code Execution - Piston
+PISTON_URL=http://localhost:2000
 
 # Server
 PORT=3000
@@ -447,7 +483,7 @@ server/
 │   ├── auth/              # ✅ Authentication (JWT, user sync)
 │   ├── users/             # ✅ User management & leaderboard
 │   ├── problems/          # ✅ Problem CRUD & code execution
-│   ├── code-execution/    # ✅ Piston & Judge0 clients
+│   ├── code-execution/    # ✅ Piston client
 │   ├── prisma/            # ✅ Prisma service
 │   ├── common/            # ✅ Guards, decorators, utilities
 │   ├── app.module.ts      # ✅ Main app module

@@ -12,7 +12,7 @@ import { PistonClient, PISTON_LANGUAGES, ExecutionResult } from './piston.client
 // Mock ConfigService to return local Piston URL
 const mockConfigService = {
     get: jest.fn((key: string) => {
-        if (key === 'JUDGE0_URL') return 'http://localhost:2000';
+        if (key === 'PISTON_URL') return 'http://localhost:2000';
         return undefined;
     }),
 } as unknown as ConfigService;

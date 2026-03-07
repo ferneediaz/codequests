@@ -29,7 +29,6 @@
 
 - [x] **Code Execution** - Run and validate user code
   - [x] Piston API integration
-  - [x] Judge0 API integration (optional)
   - [x] Multi-language support (Python, JS, TS, Java, C++, C, Rust)
   - [x] Test case validation
   - [x] Error handling
@@ -254,7 +253,6 @@ Enhanced leaderboard features.
 ### Docker Compose Setup (Optional)
 - [ ] Add PostgreSQL service
 - [ ] Add Redis for queue management
-- [ ] Add Judge0 services (if using)
 - [ ] Production-ready docker-compose.yml
 
 ### Environment & Config
@@ -282,7 +280,6 @@ Enhanced leaderboard features.
 ### Tech Debt:
 - [ ] jest.config.js shows deprecation warnings (ts-jest globals config)
 - [ ] Some test output is verbose (could silence non-critical logs)
-- [ ] Judge0 integration tests always skipped (could make it configurable)
 
 ---
 

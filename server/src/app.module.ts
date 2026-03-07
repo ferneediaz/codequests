@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProblemsModule } from './problems/problems.module';
 import { CodeExecutionModule } from './code-execution/code-execution.module';
+import { BattlesModule } from './battles/battles.module';
 
 @Module({
     imports: [
@@ -22,13 +23,11 @@ import { CodeExecutionModule } from './code-execution/code-execution.module';
         UsersModule,
         ProblemsModule,
         CodeExecutionModule,
+        BattlesModule,
 
         // TODO: Add these modules as we build them
         // ClansModule,
-        // ProblemsModule,
         // MatchmakingModule,
-        // BattlesModule,
-        // CodeExecutionModule,
         // RankingsModule,
     ],
 })
