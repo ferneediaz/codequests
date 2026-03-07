@@ -1,15 +1,26 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+    IsString,
+    IsNotEmpty,
+    IsEnum,
+    IsOptional,
+    IsArray,
+    IsInt,
+    Min,
+    Max,
+    IsBoolean,
+    IsIn,
+} from 'class-validator';
 import { BattleMode } from '@prisma/client';
 
 export class CreateBattleDto {
-    @ApiProperty({
-        description: 'ID of the problem for this battle',
+    @ApiPropertyOptional({
+        description: 'ID of the problem for this battle (required for 1v1/battle royale)',
         example: 'problem-uuid-123',
     })
     @IsString()
-    @IsNotEmpty()
-    problemId: string;
+    @IsOptional()
+    problemId?: string;
 
     @ApiProperty({
         description: 'Battle mode',
@@ -19,4 +30,46 @@ export class CreateBattleDto {
     @IsEnum(BattleMode)
     @IsOptional()
     mode?: BattleMode;
+
+    // Team battle settings (for CLAN_VS_CLAN and GROUP modes)
+
+    @ApiPropertyOptional({
+        description: 'Team size for team battles (2, 3, or 5)',
+        example: 3,
+        enum: [2, 3, 5],
+    })
+    @IsInt()
+    @IsIn([2, 3, 5])
+    @IsOptional()
+    teamSize?: number;
+
+    @ApiPropertyOptional({
+        description: 'Time limit in minutes (default 5, max 120)',
+        example: 30,
+        minimum: 1,
+        maximum: 120,
+    })
+    @IsInt()
+    @Min(1)
+    @Max(120)
+    @IsOptional()
+    timeLimitMinutes?: number;
+
+    @ApiPropertyOptional({
+        description: 'Problem IDs for team battles. If empty, uses all available problems.',
+        example: ['problem-001', 'problem-002'],
+        type: [String],
+    })
+    @IsArray()
+    @IsString({ each: true })
+    @IsOptional()
+    problemIds?: string[];
+
+    @ApiPropertyOptional({
+        description: 'Auto-balance teams by MMR (default true for GROUP mode)',
+        default: true,
+    })
+    @IsBoolean()
+    @IsOptional()
+    autoBalance?: boolean;
 }

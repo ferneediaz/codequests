@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BattleMode, BattleStatus } from '@prisma/client';
 
 export class BattleParticipantResponseDto {
@@ -6,15 +6,18 @@ export class BattleParticipantResponseDto {
     id: string;
 
     @ApiProperty()
-    oderId: string;
+    userId: string;
 
     @ApiProperty()
     username: string;
 
-    @ApiProperty({ required: false })
+    @ApiPropertyOptional({ description: 'Team ID for team battles' })
+    teamId?: string;
+
+    @ApiPropertyOptional()
     code?: string;
 
-    @ApiProperty({ required: false })
+    @ApiPropertyOptional()
     language?: string;
 
     @ApiProperty()
@@ -23,11 +26,42 @@ export class BattleParticipantResponseDto {
     @ApiProperty()
     totalTests: number;
 
-    @ApiProperty({ required: false })
+    @ApiProperty({ description: 'Points earned in team battles' })
+    pointsEarned: number;
+
+    @ApiPropertyOptional()
     submittedAt?: Date;
 
-    @ApiProperty({ required: false })
+    @ApiPropertyOptional()
     mmrChange?: number;
+}
+
+export class ProblemPoolItemDto {
+    @ApiProperty()
+    id: string;
+
+    @ApiProperty()
+    problemId: string;
+
+    @ApiProperty()
+    title: string;
+
+    @ApiProperty({ enum: ['EASY', 'MEDIUM', 'HARD'] })
+    difficulty: string;
+
+    @ApiProperty({ description: 'Point value (Easy=2, Medium=5, Hard=10)' })
+    pointValue: number;
+}
+
+export class TeamScoreDto {
+    @ApiProperty({ description: 'Team identifier (team-1 or team-2)' })
+    teamId: string;
+
+    @ApiProperty({ description: 'Total points earned by team' })
+    totalPoints: number;
+
+    @ApiProperty({ type: [BattleParticipantResponseDto] })
+    members: BattleParticipantResponseDto[];
 }
 
 export class BattleResponseDto {
@@ -37,19 +71,31 @@ export class BattleResponseDto {
     @ApiProperty({ enum: BattleMode })
     mode: BattleMode;
 
-    @ApiProperty()
-    problemId: string;
+    @ApiPropertyOptional({ description: 'Problem ID (for single-problem battles)' })
+    problemId?: string;
 
-    @ApiProperty({ required: false })
+    @ApiPropertyOptional({ description: 'Team size for team battles' })
+    teamSize?: number;
+
+    @ApiProperty({ description: 'Time limit in minutes' })
+    timeLimitMinutes: number;
+
+    @ApiProperty({ description: 'Auto-balance teams by MMR' })
+    autoBalance: boolean;
+
+    @ApiPropertyOptional({ description: 'Winner user ID (for individual battles)' })
     winnerId?: string;
+
+    @ApiPropertyOptional({ description: 'Winning team ID (for team battles)' })
+    winningTeam?: string;
 
     @ApiProperty({ enum: BattleStatus })
     status: BattleStatus;
 
-    @ApiProperty({ required: false })
+    @ApiPropertyOptional()
     startedAt?: Date;
 
-    @ApiProperty({ required: false })
+    @ApiPropertyOptional()
     endedAt?: Date;
 
     @ApiProperty()
@@ -57,6 +103,12 @@ export class BattleResponseDto {
 
     @ApiProperty({ type: [BattleParticipantResponseDto] })
     participants: BattleParticipantResponseDto[];
+
+    @ApiPropertyOptional({ type: [ProblemPoolItemDto], description: 'Problem pool for team battles' })
+    problemPool?: ProblemPoolItemDto[];
+
+    @ApiPropertyOptional({ type: [TeamScoreDto], description: 'Team scores (for team battles)' })
+    teams?: TeamScoreDto[];
 }
 
 export class BattleHistoryResponseDto {

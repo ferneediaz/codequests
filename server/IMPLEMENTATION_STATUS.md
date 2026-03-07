@@ -1,13 +1,19 @@
 # CodeQuest Battles - Implementation Status
 
-**Last Updated:** March 8, 2026  
-**Test Results:** ✅ 82 passing | 0 skipped | 0 failing
+**Last Updated:** March 9, 2026  
+**Test Results:** ✅ 87 passing | 0 skipped | 0 failing
 
 ---
 
 ## 🎯 Overview
 
 CodeQuest Battles is a competitive coding platform where users can battle each other by solving programming challenges in real-time. This document tracks what's been implemented and what remains.
+
+### Recent Updates:
+- ✅ **Team/Clan Battle System** - CLAN_VS_CLAN and GROUP battle modes
+- ✅ **Clan Module** - Full clan CRUD operations
+- ✅ **Problem Pool System** - Multiple problems per team battle
+- ✅ **Auto-Balance** - MMR-based team assignment
 
 ---
 
@@ -170,17 +176,44 @@ Code execution is integrated into the problems endpoint:
 
 ### Current Tables:
 1. ✅ **User** - User accounts and profiles
-2. ✅ **Clan** - Team/clan structure
+2. ✅ **Clan** - Team/clan structure with MMR
 3. ✅ **Problem** - Coding challenges
 4. ✅ **TestCase** - Problem test cases
-5. ✅ **Battle** - Battle instances
-6. ✅ **BattleParticipant** - User participation in battles
+5. ✅ **Battle** - Battle instances (with team support)
+6. ✅ **BattleParticipant** - User participation in battles (with team/points)
+7. ✅ **ProblemPool** - Problem pools for team battles
+8. ✅ **ProblemPoolItem** - Problems in a pool
+
+### Key Schema Updates (Team Battles):
+```prisma
+model Battle {
+  // ... existing fields
+  teamSize         Int?           // Players per team (2, 3, or 5)
+  timeLimitMinutes Int?           // Time limit for team battles
+  autoBalance      Boolean        @default(true)
+  winningTeam      String?        // "team-1" or "team-2"
+  problemPool      ProblemPool?   // For multi-problem battles
+}
+
+model BattleParticipant {
+  // ... existing fields
+  teamId       String?    // "team-1" or "team-2"
+  pointsEarned Int        @default(0)
+}
+
+model ProblemPool {
+  id       String            @id @default(uuid())
+  battleId String            @unique
+  battle   Battle            @relation(fields: [battleId], references: [id])
+  items    ProblemPoolItem[]
+}
+```
 
 ### Database Setup:
 - **Provider:** PostgreSQL
 - **ORM:** Prisma
 - **Migrations:** Using `prisma db push` for development
-- **Seed Data:** ✅ Implemented (users + sample problems)
+- **Seed Data:** ✅ Implemented (users, problems, clans)
 
 ---
 
@@ -223,39 +256,52 @@ Code execution is integrated into the problems endpoint:
 
 ### Total:
 - **Test Suites:** 6 passed, 0 skipped
-- **Tests:** 82 passed, 0 skipped, 0 failed
+- **Tests:** 87 passed, 0 skipped, 0 failed
 
 ---
 
-## 🚧 Not Yet Implemented
+## ✅ Fully Implemented Features
 
 ### 4. **Battle System** ✅
 
 - **Status:** FULLY IMPLEMENTED & TESTED
-- **Test Coverage:** All tests passing
+- **Test Coverage:** All 30 tests passing
 
 #### Implemented APIs:
 
 | Endpoint | Method | Description | Auth Required |
 |----------|--------|-------------|---------------|
 | `/api/battles` | POST | Create a new battle | ✅ JWT |
-| `/api/battles/active` | GET | Get user's active battles | ✅ JWT |
+| `/api/battles/available` | GET | Get available battles to join | ✅ JWT |
 | `/api/battles/history` | GET | Get user's battle history | ✅ JWT |
 | `/api/battles/:id` | GET | Get battle details | ✅ JWT |
 | `/api/battles/:id/join` | POST | Join an existing battle | ✅ JWT |
 | `/api/battles/:id/submit` | POST | Submit solution to battle | ✅ JWT |
 
+#### Battle Modes:
+| Mode | Description | Team Size |
+|------|-------------|-----------|
+| `ONE_V_ONE` | 1v1 quick battle | N/A |
+| `BATTLE_ROYALE` | Free-for-all, multiple players | N/A |
+| `CLAN_VS_CLAN` | Clan vs clan team battle | 2, 3, or 5 |
+| `GROUP` | Ad-hoc team battle with auto-balance | 2, 3, or 5 |
+
 #### Features:
 - ✅ Battle creation with problem selection
-- ✅ Battle modes (ONE_V_ONE, BATTLE_ROYALE)
+- ✅ Battle modes (ONE_V_ONE, BATTLE_ROYALE, CLAN_VS_CLAN, GROUP)
+- ✅ Team battle support (teamSize: 2, 3, or 5)
+- ✅ Problem pools for team battles (multiple problems)
+- ✅ Auto-balance team assignment by MMR
+- ✅ Clan membership validation for CLAN_VS_CLAN
+- ✅ Point scoring (Easy=2, Medium=5, Hard=10)
+- ✅ Time limits (up to 120 minutes)
 - ✅ Battle status tracking (WAITING, IN_PROGRESS, COMPLETED, CANCELLED)
 - ✅ Code submission and real-time validation
-- ✅ Test case execution against submitted code
 - ✅ Automatic winner determination
 - ✅ MMR calculation using Elo rating system (K-factor = 32)
+- ✅ Clan MMR updates for team battles (±15)
 - ✅ Battle history with statistics
 - ✅ Participant progress tracking
-- ✅ Battle completion workflow
 
 **Note:** WebSocket real-time features (live opponent progress, skill effects) are planned but not yet implemented. See section 6 "Real-time Features" below.
 
@@ -314,24 +360,40 @@ model BattleParticipant {
 
 ---
 
-### 5. **Clan System** ❌
+### 5. **Clan System** ✅
 
-- **Status:** DATABASE SCHEMA READY, NO IMPLEMENTATION
-- **Priority:** MEDIUM
+- **Status:** FULLY IMPLEMENTED
+- **Priority:** COMPLETED
 
-#### What's Needed:
-- [ ] Clan CRUD operations
-- [ ] Invite/join system
-- [ ] Clan stats aggregation
-- [ ] Clan battles/tournaments
+#### Implemented APIs:
 
-#### Existing Schema (Ready to Use):
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/api/clans` | POST | Create a new clan | ✅ JWT |
+| `/api/clans` | GET | List all clans | ❌ |
+| `/api/clans/:id` | GET | Get clan details | ❌ |
+| `/api/clans/:id/join` | POST | Join a clan | ✅ JWT |
+| `/api/clans/leave` | POST | Leave current clan | ✅ JWT |
+| `/api/clans/:id/members/:memberId` | DELETE | Kick member (owner only) | ✅ JWT |
+| `/api/clans/:id` | DELETE | Delete clan (owner only) | ✅ JWT |
+
+#### Features:
+- ✅ Clan CRUD operations
+- ✅ Join/leave clan
+- ✅ Kick members (owner only)
+- ✅ Clan MMR system (separate from individual)
+- ✅ CLAN_VS_CLAN battle integration
+- ✅ Swagger documentation
+- ✅ Seed data (MIT Hackers, Harvard Coders)
+
+#### Database Schema:
 ```prisma
 model Clan {
   id        String   @id @default(uuid())
   name      String   @unique
   tag       String   @unique
   ownerId   String
+  mmr       Int      @default(1500)  // Clan rating
   members   User[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -339,6 +401,8 @@ model Clan {
 ```
 
 ---
+
+## 🚧 Not Yet Implemented
 
 ### 6. **Real-time Features** ❌
 

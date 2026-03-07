@@ -12,6 +12,7 @@ import {
     ForbiddenException,
 } from '@nestjs/common';
 import { BattleMode, BattleStatus, Difficulty } from '@prisma/client';
+import { CreateBattleDto } from './dto/create-battle.dto';
 
 describe('BattlesService', () => {
     let service: BattlesService;
@@ -29,6 +30,7 @@ describe('BattlesService', () => {
         losses: 3,
         role: 'user',
         clanId: null,
+        clan: null,
         createdAt: new Date(),
         updatedAt: new Date(),
     };
@@ -43,6 +45,7 @@ describe('BattlesService', () => {
         losses: 2,
         role: 'user',
         clanId: null,
+        clan: null,
         createdAt: new Date(),
         updatedAt: new Date(),
     };
@@ -78,6 +81,10 @@ describe('BattlesService', () => {
         mode: BattleMode.ONE_V_ONE,
         problemId: 'problem-1',
         winnerId: null,
+        winningTeam: null,
+        teamSize: null,
+        timeLimitMinutes: 5,
+        autoBalance: true,
         status: BattleStatus.WAITING,
         startedAt: null,
         endedAt: null,
@@ -126,10 +133,12 @@ describe('BattlesService', () => {
                         id: 'participant-1',
                         battleId: 'battle-1',
                         userId: mockUser1.id,
+                        teamId: null,
                         code: null,
                         language: null,
                         testsPassed: 0,
                         totalTests: 2,
+                        pointsEarned: 0,
                         submittedAt: null,
                         mmrChange: null,
                         user: mockUser1,
@@ -140,15 +149,18 @@ describe('BattlesService', () => {
                     title: mockProblem.title,
                     difficulty: mockProblem.difficulty,
                 },
+                problemPool: null,
             };
 
             prisma.battle.create.mockResolvedValue(createdBattle);
+            prisma.battle.findUnique.mockResolvedValue(createdBattle);
 
-            const result = await service.createBattle(
-                mockUser1.id,
-                mockProblem.id,
-                BattleMode.ONE_V_ONE,
-            );
+            const dto: CreateBattleDto = {
+                problemId: mockProblem.id,
+                mode: BattleMode.ONE_V_ONE,
+            };
+
+            const result = await service.createBattle(mockUser1.id, dto);
 
             expect(prisma.problem.findUnique).toHaveBeenCalledWith({
                 where: { id: mockProblem.id },
@@ -156,6 +168,7 @@ describe('BattlesService', () => {
             });
             expect(prisma.user.findUnique).toHaveBeenCalledWith({
                 where: { id: mockUser1.id },
+                include: { clan: true },
             });
             expect(prisma.battle.create).toHaveBeenCalled();
             expect(result.participants).toHaveLength(1);
@@ -164,19 +177,30 @@ describe('BattlesService', () => {
 
         it('should throw NotFoundException if problem does not exist', async () => {
             prisma.problem.findUnique.mockResolvedValue(null);
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
 
-            await expect(
-                service.createBattle(mockUser1.id, 'nonexistent', BattleMode.ONE_V_ONE),
-            ).rejects.toThrow(NotFoundException);
+            const dto: CreateBattleDto = {
+                problemId: 'nonexistent',
+                mode: BattleMode.ONE_V_ONE,
+            };
+
+            await expect(service.createBattle(mockUser1.id, dto)).rejects.toThrow(
+                NotFoundException,
+            );
         });
 
         it('should throw NotFoundException if user does not exist', async () => {
             prisma.problem.findUnique.mockResolvedValue(mockProblem);
             prisma.user.findUnique.mockResolvedValue(null);
 
-            await expect(
-                service.createBattle('nonexistent', mockProblem.id, BattleMode.ONE_V_ONE),
-            ).rejects.toThrow(NotFoundException);
+            const dto: CreateBattleDto = {
+                problemId: mockProblem.id,
+                mode: BattleMode.ONE_V_ONE,
+            };
+
+            await expect(service.createBattle('nonexistent', dto)).rejects.toThrow(
+                NotFoundException,
+            );
         });
     });
 
@@ -189,15 +213,19 @@ describe('BattlesService', () => {
                         id: 'participant-1',
                         battleId: 'battle-1',
                         userId: mockUser1.id,
+                        teamId: null,
                         code: null,
                         language: null,
                         testsPassed: 0,
                         totalTests: 2,
+                        pointsEarned: 0,
                         submittedAt: null,
                         mmrChange: null,
+                        user: { mmr: mockUser1.mmr, clanId: null },
                     },
                 ],
                 problem: mockProblem,
+                problemPool: null,
             };
 
             prisma.battle.findUnique.mockResolvedValue(battleWithOneParticipant);
@@ -216,11 +244,13 @@ describe('BattlesService', () => {
                         id: 'participant-2',
                         battleId: 'battle-1',
                         userId: mockUser2.id,
+                        teamId: null,
                         user: mockUser2,
                         code: null,
                         language: null,
                         testsPassed: 0,
                         totalTests: 2,
+                        pointsEarned: 0,
                         submittedAt: null,
                         mmrChange: null,
                     },
@@ -231,6 +261,7 @@ describe('BattlesService', () => {
                     difficulty: mockProblem.difficulty,
                     starterCode: mockProblem.starterCode,
                 },
+                problemPool: null,
             };
 
             prisma.battle.update.mockResolvedValue(updatedBattle);
@@ -256,6 +287,7 @@ describe('BattlesService', () => {
                 status: BattleStatus.IN_PROGRESS,
                 participants: [],
                 problem: mockProblem,
+                problemPool: null,
             };
 
             prisma.battle.findUnique.mockResolvedValue(inProgressBattle);
@@ -272,9 +304,11 @@ describe('BattlesService', () => {
                     {
                         id: 'participant-1',
                         userId: mockUser1.id,
+                        user: { mmr: mockUser1.mmr, clanId: null },
                     },
                 ],
                 problem: mockProblem,
+                problemPool: null,
             };
 
             prisma.battle.findUnique.mockResolvedValue(battleWithUser);
@@ -288,13 +322,15 @@ describe('BattlesService', () => {
             const fullBattle = {
                 ...mockBattle,
                 participants: [
-                    { id: 'p1', userId: 'user-a' },
-                    { id: 'p2', userId: 'user-b' },
+                    { id: 'p1', userId: 'user-a', user: { mmr: 1000, clanId: null } },
+                    { id: 'p2', userId: 'user-b', user: { mmr: 1000, clanId: null } },
                 ],
                 problem: mockProblem,
+                problemPool: null,
             };
 
             prisma.battle.findUnique.mockResolvedValue(fullBattle);
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
 
             await expect(
                 service.joinBattle(mockUser1.id, mockBattle.id),
@@ -307,10 +343,12 @@ describe('BattlesService', () => {
             id: 'participant-1',
             battleId: 'battle-1',
             userId: mockUser1.id,
+            teamId: null,
             code: null,
             language: null,
             testsPassed: 0,
             totalTests: 2,
+            pointsEarned: 0,
             submittedAt: null,
             mmrChange: null,
         };
@@ -321,6 +359,7 @@ describe('BattlesService', () => {
                 status: BattleStatus.IN_PROGRESS,
                 participants: [mockParticipant],
                 problem: mockProblem,
+                problemPool: null,
             };
 
             const battleAfterSubmission = {
@@ -358,6 +397,7 @@ describe('BattlesService', () => {
                 status: BattleStatus.IN_PROGRESS,
                 participants: [mockParticipant],
                 problem: mockProblem,
+                problemPool: null,
             };
 
             const afterSubmitSingleParticipant = {
@@ -444,6 +484,7 @@ describe('BattlesService', () => {
                 status: BattleStatus.WAITING,
                 participants: [mockParticipant],
                 problem: mockProblem,
+                problemPool: null,
             };
 
             prisma.battle.findUnique.mockResolvedValue(waitingBattle);
@@ -464,6 +505,7 @@ describe('BattlesService', () => {
                 status: BattleStatus.IN_PROGRESS,
                 participants: [mockParticipant],
                 problem: mockProblem,
+                problemPool: null,
             };
 
             prisma.battle.findUnique.mockResolvedValue(inProgressBattle);
@@ -488,18 +530,22 @@ describe('BattlesService', () => {
                     {
                         id: 'p1',
                         userId: mockUser1.id,
-                        user: mockUser1,
+                        teamId: null,
+                        user: { ...mockUser1, clan: null },
                         testsPassed: 2,
                         totalTests: 2,
+                        pointsEarned: 0,
                         submittedAt: new Date('2024-01-01T10:00:05'),
                         mmrChange: null,
                     },
                     {
                         id: 'p2',
                         userId: mockUser2.id,
-                        user: mockUser2,
+                        teamId: null,
+                        user: { ...mockUser2, clan: null },
                         testsPassed: 1,
                         totalTests: 2,
+                        pointsEarned: 0,
                         submittedAt: new Date('2024-01-01T10:00:03'),
                         mmrChange: null,
                     },
@@ -532,18 +578,22 @@ describe('BattlesService', () => {
                     {
                         id: 'p1',
                         userId: mockUser1.id,
-                        user: mockUser1,
+                        teamId: null,
+                        user: { ...mockUser1, clan: null },
                         testsPassed: 2,
                         totalTests: 2,
+                        pointsEarned: 0,
                         submittedAt: new Date('2024-01-01T10:00:10'), // Submitted later
                         mmrChange: null,
                     },
                     {
                         id: 'p2',
                         userId: mockUser2.id,
-                        user: mockUser2,
+                        teamId: null,
+                        user: { ...mockUser2, clan: null },
                         testsPassed: 2,
                         totalTests: 2,
+                        pointsEarned: 0,
                         submittedAt: new Date('2024-01-01T10:00:05'), // Submitted earlier - wins
                         mmrChange: null,
                     },
@@ -594,11 +644,14 @@ describe('BattlesService', () => {
         it('should return battle with participants and problem', async () => {
             const battleDetails = {
                 ...mockBattle,
+                problemPool: null,
                 participants: [
                     {
                         id: 'p1',
                         userId: mockUser1.id,
-                        user: mockUser1,
+                        teamId: null,
+                        pointsEarned: 0,
+                        user: { ...mockUser1, clan: null },
                         testsPassed: 0,
                         totalTests: 2,
                     },
@@ -635,7 +688,8 @@ describe('BattlesService', () => {
             const battles = [
                 {
                     ...mockBattle,
-                    participants: [{ userId: mockUser1.id, user: mockUser1 }],
+                    problemPool: null,
+                    participants: [{ userId: mockUser1.id, teamId: null, pointsEarned: 0, user: { ...mockUser1, clan: null } }],
                     problem: {
                         id: mockProblem.id,
                         title: mockProblem.title,
@@ -844,6 +898,258 @@ describe('BattlesService', () => {
 
             // Underdog winning should get more than 16 points
             expect(winnerMmrChange).toBeGreaterThan(16);
+        });
+    });
+
+    describe('CLAN_VS_CLAN mode', () => {
+        const mockClan1 = { id: 'clan-1', name: 'Team Alpha', mmr: 1500 };
+        const mockClan2 = { id: 'clan-2', name: 'Team Beta', mmr: 1500 };
+
+        const mockUserWithClan1 = {
+            ...mockUser1,
+            clanId: mockClan1.id,
+            clan: mockClan1,
+        };
+
+        const mockUserWithClan2 = {
+            ...mockUser2,
+            clanId: mockClan2.id,
+            clan: mockClan2,
+        };
+
+        it('should create a CLAN_VS_CLAN battle with team size', async () => {
+            const clanBattle = {
+                ...mockBattle,
+                mode: BattleMode.CLAN_VS_CLAN,
+                teamSize: 3,
+                timeLimitMinutes: 30,
+                participants: [
+                    {
+                        id: 'participant-1',
+                        userId: mockUserWithClan1.id,
+                        teamId: 'team-1',
+                        pointsEarned: 0,
+                        user: mockUserWithClan1,
+                    },
+                ],
+                problem: null,
+                problemPool: {
+                    id: 'pool-1',
+                    items: [{ problemId: mockProblem.id, problem: mockProblem }],
+                },
+            };
+
+            prisma.user.findUnique.mockResolvedValue(mockUserWithClan1);
+            prisma.problem.findMany.mockResolvedValue([mockProblem]);
+            prisma.problemPool.create.mockResolvedValue({ id: 'pool-1' });
+            prisma.battle.create.mockResolvedValue(clanBattle);
+            prisma.battle.findUnique.mockResolvedValue(clanBattle);
+
+            const dto: CreateBattleDto = {
+                mode: BattleMode.CLAN_VS_CLAN,
+                teamSize: 3,
+                timeLimitMinutes: 30,
+            };
+
+            const result = await service.createBattle(mockUserWithClan1.id, dto);
+
+            expect(result.mode).toBe(BattleMode.CLAN_VS_CLAN);
+            expect(prisma.battle.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        mode: BattleMode.CLAN_VS_CLAN,
+                        teamSize: 3,
+                        timeLimitMinutes: 30,
+                    }),
+                }),
+            );
+        });
+
+        it('should reject user without clan from joining CLAN_VS_CLAN battle', async () => {
+            const clanBattle = {
+                ...mockBattle,
+                mode: BattleMode.CLAN_VS_CLAN,
+                teamSize: 2,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: mockUserWithClan1.id,
+                        teamId: 'team-1',
+                        user: { mmr: 1000, clanId: mockClan1.id },
+                    },
+                ],
+                problem: mockProblem,
+                problemPool: null,
+            };
+
+            prisma.battle.findUnique.mockResolvedValue(clanBattle);
+            prisma.user.findUnique.mockResolvedValue({ ...mockUser2, clanId: null });
+
+            await expect(
+                service.joinBattle(mockUser2.id, clanBattle.id),
+            ).rejects.toThrow(BadRequestException);
+        });
+
+        it('should assign correct team based on clan membership', async () => {
+            const clanBattle = {
+                ...mockBattle,
+                mode: BattleMode.CLAN_VS_CLAN,
+                teamSize: 2,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: mockUserWithClan1.id,
+                        teamId: 'team-1',
+                        user: { mmr: 1000, clanId: mockClan1.id },
+                    },
+                ],
+                problem: mockProblem,
+                problemPool: null,
+            };
+
+            const updatedBattle = {
+                ...clanBattle,
+                participants: [
+                    ...clanBattle.participants,
+                    {
+                        id: 'p2',
+                        userId: mockUserWithClan2.id,
+                        teamId: 'team-2',
+                        user: { mmr: 1100, clanId: mockClan2.id },
+                    },
+                ],
+            };
+
+            prisma.battle.findUnique.mockResolvedValue(clanBattle);
+            prisma.user.findUnique.mockResolvedValue(mockUserWithClan2);
+            prisma.battle.update.mockResolvedValue(updatedBattle);
+
+            const result = await service.joinBattle(mockUserWithClan2.id, clanBattle.id);
+
+            // Second participant from different clan should be on team-2
+            expect(prisma.battle.update).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        participants: {
+                            create: expect.objectContaining({
+                                teamId: 'team-2',
+                            }),
+                        },
+                    }),
+                }),
+            );
+        });
+    });
+
+    describe('GROUP mode', () => {
+        it('should create a GROUP battle with problem pool', async () => {
+            const mockProblems = [
+                { ...mockProblem, id: 'problem-1' },
+                { ...mockProblem, id: 'problem-2', difficulty: Difficulty.MEDIUM },
+                { ...mockProblem, id: 'problem-3', difficulty: Difficulty.HARD },
+            ];
+
+            const groupBattle = {
+                ...mockBattle,
+                mode: BattleMode.GROUP,
+                teamSize: 2,
+                timeLimitMinutes: 60,
+                autoBalance: true,
+                participants: [
+                    {
+                        id: 'participant-1',
+                        userId: mockUser1.id,
+                        teamId: null,
+                        pointsEarned: 0,
+                        user: { ...mockUser1, clan: null },
+                    },
+                ],
+                problem: null,
+                problemPool: {
+                    id: 'pool-1',
+                    items: mockProblems.map((p) => ({
+                        problemId: p.id,
+                        problem: p,
+                    })),
+                },
+            };
+
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            prisma.problem.findMany.mockResolvedValue(mockProblems);
+            prisma.battle.create.mockResolvedValue(groupBattle);
+            prisma.battle.findUnique.mockResolvedValue(groupBattle);
+
+            const dto: CreateBattleDto = {
+                mode: BattleMode.GROUP,
+                teamSize: 2,
+                timeLimitMinutes: 60,
+                autoBalance: true,
+                problemIds: ['problem-1', 'problem-2', 'problem-3'],
+            };
+
+            const result = await service.createBattle(mockUser1.id, dto);
+
+            expect(result.mode).toBe(BattleMode.GROUP);
+            expect(prisma.problem.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: { in: dto.problemIds } },
+                }),
+            );
+        });
+
+        it('should use auto-balance for team assignment in GROUP mode', async () => {
+            const groupBattle = {
+                ...mockBattle,
+                mode: BattleMode.GROUP,
+                teamSize: 2,
+                autoBalance: true,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: 'user-a',
+                        teamId: 'team-1',
+                        user: { mmr: 1200, clanId: null },
+                    },
+                    {
+                        id: 'p2',
+                        userId: 'user-b',
+                        teamId: 'team-2',
+                        user: { mmr: 1100, clanId: null },
+                    },
+                ],
+                problem: mockProblem,
+                problemPool: null,
+            };
+
+            // New user - balance logic should assign to team with lower total MMR
+            const newUser = { ...mockUser1, id: 'user-c', mmr: 1150, clanId: null };
+            const updatedBattle = {
+                ...groupBattle,
+                participants: [
+                    ...groupBattle.participants,
+                    { id: 'p3', userId: newUser.id, teamId: 'team-2' },
+                ],
+            };
+
+            prisma.battle.findUnique.mockResolvedValue(groupBattle);
+            prisma.user.findUnique.mockResolvedValue(newUser);
+            prisma.battle.update.mockResolvedValue(updatedBattle);
+
+            await service.joinBattle(newUser.id, groupBattle.id);
+
+            // Team 1 has 1200, team 2 has 1100.
+            // Auto-balance assigns to team with lower MMR total (team-2)
+            expect(prisma.battle.update).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        participants: {
+                            create: expect.objectContaining({
+                                teamId: 'team-2',
+                            }),
+                        },
+                    }),
+                }),
+            );
         });
     });
 });

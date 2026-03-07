@@ -47,6 +47,9 @@ model Clan {
   tag     String @unique // e.g., [ABC]
   ownerId String
 
+  // Clan MMR for clan vs clan battles
+  mmr Int @default(1000)
+
   members User[]
 
   createdAt DateTime @default(now())
@@ -68,6 +71,7 @@ model Problem {
 
   testCases TestCase[]
   battles   Battle[]
+  poolItems ProblemPoolItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -97,13 +101,23 @@ model Battle {
   id   String     @id @default(uuid())
   mode BattleMode @default(ONE_V_ONE)
 
-  problemId String
-  problem   Problem @relation(fields: [problemId], references: [id])
+  // For single-problem battles (1v1, battle royale)
+  problemId String?
+  problem   Problem? @relation(fields: [problemId], references: [id])
+
+  // For multi-problem team battles (clan vs clan, group)
+  problemPool ProblemPool?
+
+  // Team battle settings
+  teamSize         Int?             // 2, 3, or 5 for team battles
+  timeLimitMinutes Int     @default(5)
+  autoBalance      Boolean @default(true) // Auto-assign teams by MMR
 
   participants BattleParticipant[]
 
-  winnerId String?
-  status   BattleStatus @default(WAITING)
+  winnerId    String? // For individual battles
+  winningTeam String? // For team battles (team identifier)
+  status      BattleStatus @default(WAITING)
 
   startedAt DateTime?
   endedAt   DateTime?
@@ -118,12 +132,21 @@ model BattleParticipant {
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
+  // Team assignment for team battles
+  teamId String? // "team-1" or "team-2" for team battles
+
+  // Submission data
   code        String?
   language    String?
   testsPassed Int       @default(0)
   totalTests  Int       @default(0)
   submittedAt DateTime?
-  mmrChange   Int?
+
+  // Scoring for team battles
+  pointsEarned Int @default(0) // Sum of points from solved problems
+
+  // MMR change after battle
+  mmrChange Int?
 
   @@unique([battleId, userId])
 }
@@ -131,10 +154,36 @@ model BattleParticipant {
 enum BattleMode {
   ONE_V_ONE
   BATTLE_ROYALE
+  CLAN_VS_CLAN
+  GROUP
 }
 
 enum BattleStatus {
   WAITING
   IN_PROGRESS
   COMPLETED
+}
+
+// ============================================
+// PROBLEM POOLS (for team battles)
+// ============================================
+
+model ProblemPool {
+  id       String @id @default(uuid())
+  battleId String @unique
+  battle   Battle @relation(fields: [battleId], references: [id], onDelete: Cascade)
+
+  items ProblemPoolItem[]
+}
+
+model ProblemPoolItem {
+  id            String      @id @default(uuid())
+  problemPoolId String
+  problemPool   ProblemPool @relation(fields: [problemPoolId], references: [id], onDelete: Cascade)
+
+  problemId String
+  problem   Problem @relation(fields: [problemId], references: [id])
+
+  // Point value based on difficulty (Easy=2, Medium=5, Hard=10)
+  pointValue Int
 }

@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class SubmitSolutionDto {
     @ApiProperty({
@@ -17,4 +17,12 @@ export class SubmitSolutionDto {
     @IsString()
     @IsNotEmpty()
     language: string;
+
+    @ApiPropertyOptional({
+        description: 'Problem ID (required for team battles to specify which problem)',
+        example: 'problem-uuid-123',
+    })
+    @IsString()
+    @IsOptional()
+    problemId?: string;
 }

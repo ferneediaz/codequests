@@ -38,6 +38,10 @@ export const createMockPrismaService = () => {
             findMany: jest.fn(),
             update: jest.fn(),
         },
+        problemPool: {
+            create: jest.fn(),
+            findUnique: jest.fn(),
+        },
         clan: {
             create: jest.fn(),
             findUnique: jest.fn(),

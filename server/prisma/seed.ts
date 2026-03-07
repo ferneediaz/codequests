@@ -54,6 +54,44 @@ async function main() {
 
     console.log(`✅ Created ${users.length} sample users`);
 
+    // Create sample clans
+    const clan1 = await prisma.clan.upsert({
+        where: { tag: 'MIT' },
+        update: {},
+        create: {
+            id: 'clan-seed-001',
+            name: 'MIT Hackers',
+            tag: 'MIT',
+            ownerId: 'user-seed-001', // alice owns this clan
+            mmr: 1200,
+        },
+    });
+
+    const clan2 = await prisma.clan.upsert({
+        where: { tag: 'HVD' },
+        update: {},
+        create: {
+            id: 'clan-seed-002',
+            name: 'Harvard Coders',
+            tag: 'HVD',
+            ownerId: 'user-seed-002', // bob owns this clan
+            mmr: 1100,
+        },
+    });
+
+    // Assign users to clans
+    await prisma.user.update({
+        where: { id: 'user-seed-001' },
+        data: { clanId: clan1.id },
+    });
+
+    await prisma.user.update({
+        where: { id: 'user-seed-002' },
+        data: { clanId: clan2.id },
+    });
+
+    console.log(`✅ Created clans: ${clan1.name} [${clan1.tag}], ${clan2.name} [${clan2.tag}]`);
+
     // Create sample problems
     const problems = [
         {

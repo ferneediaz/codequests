@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ProblemsModule } from './problems/problems.module';
 import { CodeExecutionModule } from './code-execution/code-execution.module';
 import { BattlesModule } from './battles/battles.module';
+import { ClansModule } from './clans/clans.module';
 
 @Module({
     imports: [
@@ -24,9 +25,9 @@ import { BattlesModule } from './battles/battles.module';
         ProblemsModule,
         CodeExecutionModule,
         BattlesModule,
+        ClansModule,
 
         // TODO: Add these modules as we build them
-        // ClansModule,
         // MatchmakingModule,
         // RankingsModule,
     ],

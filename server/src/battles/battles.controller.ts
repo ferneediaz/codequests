@@ -49,11 +49,7 @@ export class BattlesController {
         @Req() req: AuthRequest,
         @Body() createBattleDto: CreateBattleDto,
     ) {
-        return this.battlesService.createBattle(
-            req.user.sub,
-            createBattleDto.problemId,
-            createBattleDto.mode,
-        );
+        return this.battlesService.createBattle(req.user.sub, createBattleDto);
     }
 
     @Get('available')
@@ -145,6 +141,7 @@ export class BattlesController {
             req.user.sub,
             submitDto.code,
             submitDto.language,
+            submitDto.problemId,
         );
     }
 
