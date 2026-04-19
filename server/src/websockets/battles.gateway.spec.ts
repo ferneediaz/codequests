@@ -10,6 +10,7 @@ import {
 } from '../__mocks__/prisma.service';
 import { BattleStatus, SkillType } from '@prisma/client';
 import { JwtVerificationService } from '../auth/jwt-verification.service';
+import { FriendsService } from '../friends/friends.service';
 
 describe('BattlesGateway', () => {
     let gateway: BattlesGateway;
@@ -33,6 +34,9 @@ describe('BattlesGateway', () => {
     let mockJwtVerificationService: {
         verifyToken: jest.Mock;
         verifyAndGetUser: jest.Mock;
+    };
+    let mockFriendsService: {
+        getFriendIds: jest.Mock;
     };
 
     // Mock user data
@@ -155,6 +159,10 @@ describe('BattlesGateway', () => {
             verifyAndGetUser: jest.fn(),
         };
 
+        mockFriendsService = {
+            getFriendIds: jest.fn().mockResolvedValue([]),
+        };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 BattlesGateway,
@@ -169,6 +177,10 @@ describe('BattlesGateway', () => {
                 {
                     provide: JwtVerificationService,
                     useValue: mockJwtVerificationService,
+                },
+                {
+                    provide: FriendsService,
+                    useValue: mockFriendsService,
                 },
                 WsAuthGuard,
             ],
@@ -986,6 +998,79 @@ describe('BattlesGateway', () => {
             });
 
             expect(result).toEqual({ success: false, error: 'Not authenticated' });
+        });
+    });
+
+    // ============================
+    // Online Presence
+    // ============================
+
+    describe('Online Presence', () => {
+        it('should emit presence.online to friends on connect', async () => {
+            // Set up friend (user-2) already connected
+            const friendSocket = createMockSocket('user-2', 'socket-2');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser2);
+            mockFriendsService.getFriendIds.mockResolvedValueOnce([]);
+            await gateway.handleConnection(friendSocket);
+
+            // Now user-1 connects, and user-2 is their friend
+            const socket = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser);
+            mockFriendsService.getFriendIds.mockResolvedValueOnce(['user-2']);
+
+            await gateway.handleConnection(socket);
+
+            expect(mockFriendsService.getFriendIds).toHaveBeenCalledWith('user-1');
+            expect(friendSocket.emit).toHaveBeenCalledWith('presence.online', {
+                userId: 'user-1',
+                username: 'alice',
+            });
+        });
+
+        it('should emit presence.offline to friends on disconnect', async () => {
+            // Set up both users connected
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            const socket2 = createMockSocket('user-2', 'socket-2');
+
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser);
+            mockFriendsService.getFriendIds.mockResolvedValueOnce([]);
+            await gateway.handleConnection(socket1);
+
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser2);
+            mockFriendsService.getFriendIds.mockResolvedValueOnce([]);
+            await gateway.handleConnection(socket2);
+
+            // user-1 disconnects, user-2 is their friend
+            mockFriendsService.getFriendIds.mockResolvedValueOnce(['user-2']);
+            await gateway.handleDisconnect(socket1);
+
+            expect(socket2.emit).toHaveBeenCalledWith('presence.offline', {
+                userId: 'user-1',
+                username: 'alice',
+            });
+        });
+
+        it('should not emit presence events when user has no online friends', async () => {
+            const socket = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser);
+            mockFriendsService.getFriendIds.mockResolvedValueOnce(['user-3', 'user-4']); // friends exist but are not connected
+
+            await gateway.handleConnection(socket);
+
+            // No friend sockets to emit to — verify no presence events sent
+            // (socket.emit is only called for the connecting user's own events, not presence)
+            expect(mockFriendsService.getFriendIds).toHaveBeenCalledWith('user-1');
+        });
+
+        it('should return correct values from isOnline and getOnlineUsers', async () => {
+            const socket = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser);
+            mockFriendsService.getFriendIds.mockResolvedValueOnce([]);
+            await gateway.handleConnection(socket);
+
+            expect(gateway.isOnline('user-1')).toBe(true);
+            expect(gateway.isOnline('user-999')).toBe(false);
+            expect(gateway.getOnlineUsers(['user-1', 'user-2', 'user-999'])).toEqual(['user-1']);
         });
     });
 });

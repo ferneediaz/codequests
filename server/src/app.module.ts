@@ -11,6 +11,7 @@ import { WebsocketsModule } from './websockets/websockets.module';
 import { MatchmakingModule } from './matchmaking/matchmaking.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { SeasonsModule } from './seasons/seasons.module';
+import { FriendsModule } from './friends/friends.module';
 
 @Module({
     imports: [
@@ -34,6 +35,7 @@ import { SeasonsModule } from './seasons/seasons.module';
         MatchmakingModule,
         SubscriptionsModule,
         SeasonsModule,
+        FriendsModule,
 
         // TODO: Add these modules as we build them
         // RankingsModule,

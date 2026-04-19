@@ -48,6 +48,10 @@ model User {
   // Matchmaking
   matchmakingEntry MatchmakingEntry?
 
+  // Friends
+  sentFriendRequests     Friendship[] @relation("FriendshipRequester")
+  receivedFriendRequests Friendship[] @relation("FriendshipAddressee")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -334,4 +338,31 @@ model SeasonRecord {
   createdAt DateTime @default(now())
 
   @@unique([userId, seasonId])
+}
+
+// ============================================
+// FRIENDS
+// ============================================
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+model Friendship {
+  id String @id @default(uuid())
+
+  requesterId String
+  requester   User   @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+
+  addresseeId String
+  addressee   User   @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  status FriendshipStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([requesterId, addresseeId])
 }

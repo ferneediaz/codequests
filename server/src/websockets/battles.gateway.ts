@@ -9,11 +9,12 @@ import {
     MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger, UseGuards, Inject, forwardRef } from '@nestjs/common';
 import { WsAuthGuard } from './ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { BattlesService } from '../battles/battles.service';
 import { JwtVerificationService } from '../auth/jwt-verification.service';
+import { FriendsService } from '../friends/friends.service';
 import { BattleStatus, SkillType } from '@prisma/client';
 
 interface AuthenticatedSocket extends Socket {
@@ -96,6 +97,8 @@ export class BattlesGateway
         private readonly prisma: PrismaService,
         private readonly battlesService: BattlesService,
         private readonly jwtVerificationService: JwtVerificationService,
+        @Inject(forwardRef(() => FriendsService))
+        private readonly friendsService: FriendsService,
     ) {}
 
     afterInit(server: Server) {
@@ -135,6 +138,9 @@ export class BattlesGateway
 
             this.logger.log(`Client connected: ${client.id} (User: ${user.username})`);
 
+            // Notify friends about online status
+            await this.notifyFriendsPresence(user.id, user.username, true);
+
             // Auto-rejoin active battle rooms on reconnection
             await this.rejoinActiveBattles(client);
 
@@ -164,6 +170,9 @@ export class BattlesGateway
 
             // Remove from user mapping
             this.userSocketMap.delete(user.id);
+
+            // Notify friends about offline status
+            await this.notifyFriendsPresence(user.id, user.username, false);
         }
 
         // Remove from connected clients
@@ -527,6 +536,39 @@ export class BattlesGateway
             message: `${data.endedSeason.name} has ended! ${data.newSeason.name} has begun. All MMR has been reset to 1000.`,
             timestamp: new Date(),
         });
+    }
+
+    /**
+     * Check if a user is currently online
+     */
+    isOnline(userId: string): boolean {
+        return this.userSocketMap.has(userId);
+    }
+
+    /**
+     * Filter a list of user IDs to only those currently online
+     */
+    getOnlineUsers(userIds: string[]): string[] {
+        return userIds.filter((id) => this.userSocketMap.has(id));
+    }
+
+    /**
+     * Notify a user's friends about their online/offline status
+     */
+    private async notifyFriendsPresence(userId: string, username: string, online: boolean) {
+        try {
+            const friendIds = await this.friendsService.getFriendIds(userId);
+            const event = online ? 'presence.online' : 'presence.offline';
+
+            for (const friendId of friendIds) {
+                const friendSocket = this.getSocketByUserId(friendId);
+                if (friendSocket) {
+                    friendSocket.emit(event, { userId, username });
+                }
+            }
+        } catch (error) {
+            this.logger.error(`Error notifying friends presence: ${(error as Error).message}`);
+        }
     }
 
     /**
