@@ -153,7 +153,11 @@ model Battle {
   timeLimitMinutes Int     @default(5)
   autoBalance      Boolean @default(true) // Auto-assign teams by MMR
 
+  // Skills enabled for this battle (toggleable per game)
+  enabledSkills SkillType[] @default([])
+
   participants BattleParticipant[]
+  skillUses    BattleSkillUse[]
 
   winnerId    String? // For individual battles
   winningTeam String? // For team battles (team identifier)
@@ -162,6 +166,19 @@ model Battle {
   startedAt DateTime?
   endedAt   DateTime?
   createdAt DateTime  @default(now())
+}
+
+model BattleSkillUse {
+  id       String @id @default(uuid())
+  battleId String
+  battle   Battle @relation(fields: [battleId], references: [id], onDelete: Cascade)
+
+  userId       String    // The user who used the skill
+  targetUserId String    // The user targeted by the skill
+  skillType    SkillType
+  usedAt       DateTime  @default(now())
+
+  @@unique([battleId, userId, skillType]) // Each skill can only be used once per user per battle
 }
 
 model BattleParticipant {
@@ -202,6 +219,14 @@ enum BattleStatus {
   WAITING
   IN_PROGRESS
   COMPLETED
+}
+
+enum SkillType {
+  FREEZE       // Lock opponent's editor for 10 seconds
+  SCRAMBLE     // Shuffle opponent's code lines instantly
+  BLIND        // Hide opponent's test case results until next submission
+  TIME_STEAL   // Reduce opponent's remaining time by 60 seconds
+  FOG_OF_WAR   // Blur opponent's screen for 20 seconds
 }
 
 // ============================================

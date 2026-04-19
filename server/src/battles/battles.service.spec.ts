@@ -12,7 +12,7 @@ import {
     BadRequestException,
     ForbiddenException,
 } from '@nestjs/common';
-import { BattleMode, BattleStatus, Difficulty } from '@prisma/client';
+import { BattleMode, BattleStatus, Difficulty, SkillType } from '@prisma/client';
 import { CreateBattleDto } from './dto/create-battle.dto';
 
 describe('BattlesService', () => {
@@ -99,6 +99,7 @@ describe('BattlesService', () => {
         teamSize: null,
         timeLimitMinutes: 5,
         autoBalance: true,
+        enabledSkills: [] as SkillType[],
         status: BattleStatus.WAITING,
         startedAt: null,
         endedAt: null,
@@ -1603,6 +1604,310 @@ describe('BattlesService', () => {
                 (call) => call[0].where.id === trialUser.id,
             );
             expect(trialUserUpdate).toBeDefined();
+        });
+    });
+
+    // =========================================
+    // Skills System
+    // =========================================
+
+    describe('useSkill', () => {
+        const mockBattleWithSkills = {
+            ...mockBattle,
+            status: BattleStatus.IN_PROGRESS,
+            enabledSkills: [SkillType.FREEZE, SkillType.SCRAMBLE, SkillType.BLIND],
+            participants: [
+                {
+                    id: 'p1',
+                    battleId: 'battle-1',
+                    userId: 'user-1',
+                    teamId: null,
+                    code: null,
+                    language: null,
+                    testsPassed: 0,
+                    totalTests: 2,
+                    pointsEarned: 0,
+                    submittedAt: null,
+                    mmrChange: null,
+                },
+                {
+                    id: 'p2',
+                    battleId: 'battle-1',
+                    userId: 'user-2',
+                    teamId: null,
+                    code: null,
+                    language: null,
+                    testsPassed: 0,
+                    totalTests: 2,
+                    pointsEarned: 0,
+                    submittedAt: null,
+                    mmrChange: null,
+                },
+            ],
+            skillUses: [],
+        };
+
+        it('should successfully use a skill on an opponent', async () => {
+            prisma.battle.findUnique.mockResolvedValue(mockBattleWithSkills);
+
+            const mockSkillUse = {
+                id: 'su-1',
+                battleId: 'battle-1',
+                userId: 'user-1',
+                targetUserId: 'user-2',
+                skillType: SkillType.FREEZE,
+                usedAt: new Date(),
+            };
+            prisma.battleSkillUse.create.mockResolvedValue(mockSkillUse);
+
+            const result = await service.useSkill(
+                'battle-1',
+                'user-1',
+                'user-2',
+                SkillType.FREEZE,
+            );
+
+            expect(result).toEqual(mockSkillUse);
+            expect(prisma.battleSkillUse.create).toHaveBeenCalledWith({
+                data: {
+                    battleId: 'battle-1',
+                    userId: 'user-1',
+                    targetUserId: 'user-2',
+                    skillType: SkillType.FREEZE,
+                },
+            });
+        });
+
+        it('should throw NotFoundException if battle does not exist', async () => {
+            prisma.battle.findUnique.mockResolvedValue(null);
+
+            await expect(
+                service.useSkill('nonexistent', 'user-1', 'user-2', SkillType.FREEZE),
+            ).rejects.toThrow(NotFoundException);
+        });
+
+        it('should throw BadRequestException if battle is not in progress', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...mockBattleWithSkills,
+                status: BattleStatus.WAITING,
+            });
+
+            await expect(
+                service.useSkill('battle-1', 'user-1', 'user-2', SkillType.FREEZE),
+            ).rejects.toThrow(/not in progress/);
+        });
+
+        it('should throw BadRequestException if skill is not enabled for the battle', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...mockBattleWithSkills,
+                enabledSkills: [SkillType.SCRAMBLE], // FREEZE not enabled
+            });
+
+            await expect(
+                service.useSkill('battle-1', 'user-1', 'user-2', SkillType.FREEZE),
+            ).rejects.toThrow(/FREEZE is not enabled/);
+        });
+
+        it('should throw ForbiddenException if user is not a participant', async () => {
+            prisma.battle.findUnique.mockResolvedValue(mockBattleWithSkills);
+
+            await expect(
+                service.useSkill('battle-1', 'non-participant', 'user-2', SkillType.FREEZE),
+            ).rejects.toThrow(/not a participant/);
+        });
+
+        it('should throw BadRequestException if target is not a participant', async () => {
+            prisma.battle.findUnique.mockResolvedValue(mockBattleWithSkills);
+
+            await expect(
+                service.useSkill('battle-1', 'user-1', 'non-participant', SkillType.FREEZE),
+            ).rejects.toThrow(/Target is not a participant/);
+        });
+
+        it('should throw BadRequestException if user targets themselves', async () => {
+            prisma.battle.findUnique.mockResolvedValue(mockBattleWithSkills);
+
+            await expect(
+                service.useSkill('battle-1', 'user-1', 'user-1', SkillType.FREEZE),
+            ).rejects.toThrow(/cannot use a skill on yourself/);
+        });
+
+        it('should throw BadRequestException if skill already used by this user', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...mockBattleWithSkills,
+                skillUses: [
+                    {
+                        id: 'su-1',
+                        battleId: 'battle-1',
+                        userId: 'user-1',
+                        targetUserId: 'user-2',
+                        skillType: SkillType.FREEZE,
+                        usedAt: new Date(),
+                    },
+                ],
+            });
+
+            await expect(
+                service.useSkill('battle-1', 'user-1', 'user-2', SkillType.FREEZE),
+            ).rejects.toThrow(/already used FREEZE/);
+        });
+
+        it('should allow using a different skill after using one', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...mockBattleWithSkills,
+                skillUses: [
+                    {
+                        id: 'su-1',
+                        battleId: 'battle-1',
+                        userId: 'user-1',
+                        targetUserId: 'user-2',
+                        skillType: SkillType.FREEZE,
+                        usedAt: new Date(),
+                    },
+                ],
+            });
+
+            const mockSkillUse = {
+                id: 'su-2',
+                battleId: 'battle-1',
+                userId: 'user-1',
+                targetUserId: 'user-2',
+                skillType: SkillType.SCRAMBLE,
+                usedAt: new Date(),
+            };
+            prisma.battleSkillUse.create.mockResolvedValue(mockSkillUse);
+
+            const result = await service.useSkill(
+                'battle-1',
+                'user-1',
+                'user-2',
+                SkillType.SCRAMBLE,
+            );
+
+            expect(result).toEqual(mockSkillUse);
+        });
+
+        it('should allow a different user to use the same skill type', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...mockBattleWithSkills,
+                skillUses: [
+                    {
+                        id: 'su-1',
+                        battleId: 'battle-1',
+                        userId: 'user-1',
+                        targetUserId: 'user-2',
+                        skillType: SkillType.FREEZE,
+                        usedAt: new Date(),
+                    },
+                ],
+            });
+
+            const mockSkillUse = {
+                id: 'su-3',
+                battleId: 'battle-1',
+                userId: 'user-2',
+                targetUserId: 'user-1',
+                skillType: SkillType.FREEZE,
+                usedAt: new Date(),
+            };
+            prisma.battleSkillUse.create.mockResolvedValue(mockSkillUse);
+
+            const result = await service.useSkill(
+                'battle-1',
+                'user-2',
+                'user-1',
+                SkillType.FREEZE,
+            );
+
+            expect(result).toEqual(mockSkillUse);
+        });
+    });
+
+    describe('createBattle with skills', () => {
+        it('should create a battle with enabled skills', async () => {
+            prisma.problem.findUnique.mockResolvedValue(mockProblem);
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+
+            const createdBattle = {
+                ...mockBattle,
+                enabledSkills: [SkillType.FREEZE, SkillType.SCRAMBLE],
+                participants: [
+                    {
+                        id: 'p1',
+                        battleId: 'battle-1',
+                        userId: 'user-1',
+                        user: mockUser1,
+                        teamId: null,
+                        testsPassed: 0,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: null,
+                        mmrChange: null,
+                    },
+                ],
+                problem: mockProblem,
+                skillUses: [],
+            };
+
+            prisma.battle.create.mockResolvedValue(createdBattle);
+            prisma.battle.findUnique.mockResolvedValue(createdBattle);
+
+            const dto: CreateBattleDto = {
+                problemId: 'problem-1',
+                enabledSkills: [SkillType.FREEZE, SkillType.SCRAMBLE],
+            };
+
+            await service.createBattle('user-1', dto);
+
+            expect(prisma.battle.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        enabledSkills: [SkillType.FREEZE, SkillType.SCRAMBLE],
+                    }),
+                }),
+            );
+        });
+
+        it('should create a battle with empty skills by default', async () => {
+            prisma.problem.findUnique.mockResolvedValue(mockProblem);
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+
+            const createdBattle = {
+                ...mockBattle,
+                participants: [
+                    {
+                        id: 'p1',
+                        battleId: 'battle-1',
+                        userId: 'user-1',
+                        user: mockUser1,
+                        teamId: null,
+                        testsPassed: 0,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: null,
+                        mmrChange: null,
+                    },
+                ],
+                problem: mockProblem,
+                skillUses: [],
+            };
+
+            prisma.battle.create.mockResolvedValue(createdBattle);
+            prisma.battle.findUnique.mockResolvedValue(createdBattle);
+
+            const dto: CreateBattleDto = {
+                problemId: 'problem-1',
+            };
+
+            await service.createBattle('user-1', dto);
+
+            expect(prisma.battle.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        enabledSkills: [],
+                    }),
+                }),
+            );
         });
     });
 });

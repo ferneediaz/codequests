@@ -14,7 +14,7 @@ import { WsAuthGuard } from './ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { BattlesService } from '../battles/battles.service';
 import { JwtVerificationService } from '../auth/jwt-verification.service';
-import { BattleStatus } from '@prisma/client';
+import { BattleStatus, SkillType } from '@prisma/client';
 
 interface AuthenticatedSocket extends Socket {
     data: {
@@ -46,6 +46,21 @@ interface SubmissionData {
     totalTests: number;
     submittedAt: Date;
 }
+
+interface UseSkillPayload {
+    battleId: string;
+    targetUserId: string;
+    skillType: SkillType;
+}
+
+// Duration in seconds for each skill effect (0 = instant)
+const SKILL_DURATIONS: Record<SkillType, number> = {
+    FREEZE: 10,
+    SCRAMBLE: 0,
+    BLIND: 0,
+    TIME_STEAL: 0,
+    FOG_OF_WAR: 20,
+};
 
 @WebSocketGateway({
     cors: {
@@ -248,6 +263,55 @@ export class BattlesGateway
         this.logger.log(`User ${user.username} left battle room: ${battleId}`);
 
         return { success: true };
+    }
+
+    /**
+     * Handle skill usage in a battle
+     */
+    @UseGuards(WsAuthGuard)
+    @SubscribeMessage('skill.use')
+    async handleUseSkill(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() payload: UseSkillPayload,
+    ): Promise<RoomResult> {
+        const user = client.data.user;
+
+        if (!user) {
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        const { battleId, targetUserId, skillType } = payload;
+
+        try {
+            const skillUse = await this.battlesService.useSkill(
+                battleId,
+                user.id,
+                targetUserId,
+                skillType,
+            );
+
+            // Emit skill effect to the target user
+            const targetSocket = this.getSocketByUserId(targetUserId);
+            if (targetSocket) {
+                targetSocket.emit('skill.effect', {
+                    skillType,
+                    fromUserId: user.id,
+                    duration: SKILL_DURATIONS[skillType],
+                });
+            }
+
+            // Broadcast skill usage to the battle room
+            this.server.to(`battle:${battleId}`).emit('skill.used', {
+                userId: user.id,
+                skillType,
+                targetUserId,
+            });
+
+            return { success: true };
+        } catch (error) {
+            client.emit('error', { message: (error as Error).message });
+            return { success: false, error: (error as Error).message };
+        }
     }
 
     /**

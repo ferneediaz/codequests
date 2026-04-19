@@ -8,7 +8,7 @@ import {
     createMockPrismaService,
     MockPrismaService,
 } from '../__mocks__/prisma.service';
-import { BattleStatus } from '@prisma/client';
+import { BattleStatus, SkillType } from '@prisma/client';
 import { JwtVerificationService } from '../auth/jwt-verification.service';
 
 describe('BattlesGateway', () => {
@@ -20,6 +20,7 @@ describe('BattlesGateway', () => {
         submitSolution: jest.Mock;
         completeBattle: jest.Mock;
         createBattle: jest.Mock;
+        useSkill: jest.Mock;
     };
     let mockServer: {
         to: jest.Mock;
@@ -134,6 +135,7 @@ describe('BattlesGateway', () => {
             submitSolution: jest.fn(),
             completeBattle: jest.fn(),
             createBattle: jest.fn(),
+            useSkill: jest.fn(),
         };
 
         mockServer = {
@@ -600,6 +602,172 @@ describe('BattlesGateway', () => {
                     opponentId: 'user-2',
                 }),
             ).not.toThrow();
+        });
+    });
+
+    describe('Skill Usage', () => {
+        it('should emit skill.effect to target and skill.used to room on valid skill use', async () => {
+            // Connect both users
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            const socket2 = createMockSocket('user-2', 'socket-2');
+            mockJwtVerificationService.verifyAndGetUser
+                .mockResolvedValueOnce(mockUser)
+                .mockResolvedValueOnce(mockUser2);
+
+            await gateway.handleConnection(socket1);
+            await gateway.handleConnection(socket2);
+
+            // Mock successful skill use
+            const mockSkillUse = {
+                id: 'su-1',
+                battleId: 'battle-1',
+                userId: 'user-1',
+                targetUserId: 'user-2',
+                skillType: SkillType.FREEZE,
+                usedAt: new Date(),
+            };
+            mockBattlesService.useSkill.mockResolvedValue(mockSkillUse);
+
+            const result = await gateway.handleUseSkill(socket1, {
+                battleId: 'battle-1',
+                targetUserId: 'user-2',
+                skillType: SkillType.FREEZE,
+            });
+
+            expect(result).toEqual({ success: true });
+
+            // Should emit skill.effect to the target user
+            expect(socket2.emit).toHaveBeenCalledWith('skill.effect', {
+                skillType: SkillType.FREEZE,
+                fromUserId: 'user-1',
+                duration: 10,
+            });
+
+            // Should broadcast skill.used to the battle room
+            expect(mockServer.to).toHaveBeenCalledWith('battle:battle-1');
+            expect(mockServer.emit).toHaveBeenCalledWith('skill.used', {
+                userId: 'user-1',
+                skillType: SkillType.FREEZE,
+                targetUserId: 'user-2',
+            });
+        });
+
+        it('should return error when skill use fails validation', async () => {
+            const socket = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
+            await gateway.handleConnection(socket);
+
+            mockBattlesService.useSkill.mockRejectedValue(
+                new Error('Battle is not in progress'),
+            );
+
+            const result = await gateway.handleUseSkill(socket, {
+                battleId: 'battle-1',
+                targetUserId: 'user-2',
+                skillType: SkillType.FREEZE,
+            });
+
+            expect(result).toEqual({
+                success: false,
+                error: 'Battle is not in progress',
+            });
+            expect(socket.emit).toHaveBeenCalledWith('error', {
+                message: 'Battle is not in progress',
+            });
+        });
+
+        it('should return error when user is not authenticated', async () => {
+            const socket = createMockSocket();
+            socket.data = {}; // No user
+
+            const result = await gateway.handleUseSkill(socket, {
+                battleId: 'battle-1',
+                targetUserId: 'user-2',
+                skillType: SkillType.FREEZE,
+            });
+
+            expect(result).toEqual({
+                success: false,
+                error: 'Not authenticated',
+            });
+        });
+
+        it('should succeed and skip skill.effect when target is not connected', async () => {
+            // Only connect user-1, user-2 is NOT connected
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser);
+            await gateway.handleConnection(socket1);
+
+            const mockSkillUse = {
+                id: 'su-1',
+                battleId: 'battle-1',
+                userId: 'user-1',
+                targetUserId: 'user-2',
+                skillType: SkillType.FREEZE,
+                usedAt: new Date(),
+            };
+            mockBattlesService.useSkill.mockResolvedValue(mockSkillUse);
+
+            const result = await gateway.handleUseSkill(socket1, {
+                battleId: 'battle-1',
+                targetUserId: 'user-2',
+                skillType: SkillType.FREEZE,
+            });
+
+            expect(result).toEqual({ success: true });
+
+            // Should still broadcast skill.used to the battle room
+            expect(mockServer.to).toHaveBeenCalledWith('battle:battle-1');
+            expect(mockServer.emit).toHaveBeenCalledWith('skill.used', {
+                userId: 'user-1',
+                skillType: SkillType.FREEZE,
+                targetUserId: 'user-2',
+            });
+
+            // No socket2 exists, so skill.effect should not have been emitted to anyone
+            // (socket1 should not receive skill.effect either)
+            const socket1SkillEffectCalls = socket1.emit.mock.calls.filter(
+                (call: any[]) => call[0] === 'skill.effect',
+            );
+            expect(socket1SkillEffectCalls).toHaveLength(0);
+        });
+
+        it.each([
+            { skill: SkillType.FREEZE, expectedDuration: 10 },
+            { skill: SkillType.SCRAMBLE, expectedDuration: 0 },
+            { skill: SkillType.BLIND, expectedDuration: 0 },
+            { skill: SkillType.TIME_STEAL, expectedDuration: 0 },
+            { skill: SkillType.FOG_OF_WAR, expectedDuration: 20 },
+        ])('should emit correct duration $expectedDuration for skill $skill', async ({ skill, expectedDuration }) => {
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            const socket2 = createMockSocket('user-2', 'socket-2');
+            mockJwtVerificationService.verifyAndGetUser
+                .mockResolvedValueOnce(mockUser)
+                .mockResolvedValueOnce(mockUser2);
+
+            await gateway.handleConnection(socket1);
+            await gateway.handleConnection(socket2);
+
+            mockBattlesService.useSkill.mockResolvedValue({
+                id: 'su-1',
+                battleId: 'battle-1',
+                userId: 'user-1',
+                targetUserId: 'user-2',
+                skillType: skill,
+                usedAt: new Date(),
+            });
+
+            await gateway.handleUseSkill(socket1, {
+                battleId: 'battle-1',
+                targetUserId: 'user-2',
+                skillType: skill,
+            });
+
+            expect(socket2.emit).toHaveBeenCalledWith('skill.effect', {
+                skillType: skill,
+                fromUserId: 'user-1',
+                duration: expectedDuration,
+            });
         });
     });
 });

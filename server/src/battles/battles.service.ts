@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
-import { BattleMode, BattleStatus, Difficulty } from '@prisma/client';
+import { BattleMode, BattleStatus, Difficulty, SkillType } from '@prisma/client';
 import { CreateBattleDto } from './dto/create-battle.dto';
 
 // K-factor for Elo calculation (higher = more volatile ratings)
@@ -119,6 +119,7 @@ export class BattlesService {
                 teamSize: isTeam ? dto.teamSize : null,
                 timeLimitMinutes: dto.timeLimitMinutes || 5,
                 autoBalance: dto.autoBalance ?? true,
+                enabledSkills: dto.enabledSkills || [],
                 status: BattleStatus.WAITING,
                 participants: {
                     create: {
@@ -774,6 +775,7 @@ export class BattlesService {
                         },
                     },
                 },
+                skillUses: true,
             },
         });
 
@@ -901,6 +903,82 @@ export class BattlesService {
         changes.set(player2.userId, change2);
 
         return changes;
+    }
+
+    /**
+     * Use a skill against an opponent in a battle
+     */
+    async useSkill(
+        battleId: string,
+        userId: string,
+        targetUserId: string,
+        skillType: SkillType,
+    ) {
+        // Get battle with participants and existing skill uses
+        const battle = await this.prisma.battle.findUnique({
+            where: { id: battleId },
+            include: {
+                participants: true,
+                skillUses: true,
+            },
+        });
+
+        if (!battle) {
+            throw new NotFoundException(`Battle with ID ${battleId} not found`);
+        }
+
+        // Battle must be in progress
+        if (battle.status !== BattleStatus.IN_PROGRESS) {
+            throw new BadRequestException('Battle is not in progress');
+        }
+
+        // Skill must be enabled for this battle
+        if (!battle.enabledSkills.includes(skillType)) {
+            throw new BadRequestException(
+                `Skill ${skillType} is not enabled for this battle`,
+            );
+        }
+
+        // User must be a participant
+        const userParticipant = battle.participants.find(
+            (p) => p.userId === userId,
+        );
+        if (!userParticipant) {
+            throw new ForbiddenException('You are not a participant in this battle');
+        }
+
+        // Target must be a participant
+        const targetParticipant = battle.participants.find(
+            (p) => p.userId === targetUserId,
+        );
+        if (!targetParticipant) {
+            throw new BadRequestException('Target is not a participant in this battle');
+        }
+
+        // Cannot target yourself
+        if (userId === targetUserId) {
+            throw new BadRequestException('You cannot use a skill on yourself');
+        }
+
+        // Each skill can only be used once per user per battle
+        const alreadyUsed = battle.skillUses.find(
+            (su) => su.userId === userId && su.skillType === skillType,
+        );
+        if (alreadyUsed) {
+            throw new BadRequestException(
+                `You have already used ${skillType} in this battle`,
+            );
+        }
+
+        // Record the skill use
+        return this.prisma.battleSkillUse.create({
+            data: {
+                battleId,
+                userId,
+                targetUserId,
+                skillType,
+            },
+        });
     }
 
     /**

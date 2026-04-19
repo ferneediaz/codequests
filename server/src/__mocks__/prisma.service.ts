@@ -71,6 +71,11 @@ export const createMockPrismaService = () => {
             upsert: jest.fn(),
             delete: jest.fn(),
         },
+        battleSkillUse: {
+            create: jest.fn(),
+            findFirst: jest.fn(),
+            findMany: jest.fn(),
+        },
         $transaction: jest.fn(),
         $connect: jest.fn(),
         $disconnect: jest.fn(),

@@ -11,7 +11,7 @@ import {
     IsBoolean,
     IsIn,
 } from 'class-validator';
-import { BattleMode } from '@prisma/client';
+import { BattleMode, SkillType } from '@prisma/client';
 
 export class CreateBattleDto {
     @ApiPropertyOptional({
@@ -72,4 +72,15 @@ export class CreateBattleDto {
     @IsBoolean()
     @IsOptional()
     autoBalance?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Skills enabled for this battle (each usable once per player)',
+        example: ['FREEZE', 'SCRAMBLE'],
+        enum: SkillType,
+        isArray: true,
+    })
+    @IsArray()
+    @IsEnum(SkillType, { each: true })
+    @IsOptional()
+    enabledSkills?: SkillType[];
 }

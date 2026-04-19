@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BattleMode, BattleStatus } from '@prisma/client';
+import { BattleMode, BattleStatus, SkillType } from '@prisma/client';
 
 export class BattleParticipantResponseDto {
     @ApiProperty()
@@ -64,6 +64,23 @@ export class TeamScoreDto {
     members: BattleParticipantResponseDto[];
 }
 
+export class SkillUseResponseDto {
+    @ApiProperty()
+    id: string;
+
+    @ApiProperty()
+    userId: string;
+
+    @ApiProperty()
+    targetUserId: string;
+
+    @ApiProperty({ enum: SkillType })
+    skillType: SkillType;
+
+    @ApiProperty()
+    usedAt: Date;
+}
+
 export class BattleResponseDto {
     @ApiProperty()
     id: string;
@@ -109,6 +126,12 @@ export class BattleResponseDto {
 
     @ApiPropertyOptional({ type: [TeamScoreDto], description: 'Team scores (for team battles)' })
     teams?: TeamScoreDto[];
+
+    @ApiPropertyOptional({ enum: SkillType, isArray: true, description: 'Skills enabled for this battle' })
+    enabledSkills?: SkillType[];
+
+    @ApiPropertyOptional({ type: [SkillUseResponseDto], description: 'Skills used during this battle' })
+    skillUses?: SkillUseResponseDto[];
 }
 
 export class BattleHistoryResponseDto {
