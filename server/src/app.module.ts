@@ -12,6 +12,7 @@ import { MatchmakingModule } from './matchmaking/matchmaking.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { SeasonsModule } from './seasons/seasons.module';
 import { FriendsModule } from './friends/friends.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
     imports: [
@@ -36,6 +37,7 @@ import { FriendsModule } from './friends/friends.module';
         SubscriptionsModule,
         SeasonsModule,
         FriendsModule,
+        ChatModule,
 
         // TODO: Add these modules as we build them
         // RankingsModule,

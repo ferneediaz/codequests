@@ -52,6 +52,9 @@ model User {
   sentFriendRequests     Friendship[] @relation("FriendshipRequester")
   receivedFriendRequests Friendship[] @relation("FriendshipAddressee")
 
+  // Chat
+  sentMessages Message[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -365,4 +368,42 @@ model Friendship {
   updatedAt DateTime @updatedAt
 
   @@unique([requesterId, addresseeId])
+}
+
+// ============================================
+// CHAT
+// ============================================
+
+enum ChatRoomType {
+  BATTLE
+  LOBBY
+  DM
+}
+
+enum ConversationType {
+  DM
+  GROUP
+}
+
+model Message {
+  id       String @id @default(uuid())
+  senderId String
+  sender   User   @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  content  String
+  roomType ChatRoomType
+  roomId   String // battleId, "lobby", or conversationId
+
+  createdAt DateTime @default(now())
+
+  @@index([roomType, roomId, createdAt])
+}
+
+model Conversation {
+  id             String           @id @default(uuid())
+  type           ConversationType @default(DM)
+  participantIds String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
