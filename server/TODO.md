@@ -101,8 +101,11 @@ Extended battle system with team modes!
   - [x] `kick(clanId, memberId, requesterId)` - Kick member
   - [x] `delete(clanId, requesterId)` - Delete clan
   - [x] `updateMmr(clanId, mmrChange)` - Update clan MMR
+  - [x] `getBattleHistory(clanId, page, limit)` - Get clan's battle history with win/loss/draw results
 - [x] REST endpoints with Swagger docs
+  - [x] `GET /clans/:id/battles` - Paginated battle history endpoint
 - [x] Seed data (MIT Hackers, Harvard Coders)
+- [x] Wins/losses tracking (incremented on battle completion)
 
 #### 2. Team Battle Modes ✅
 - [x] `CLAN_VS_CLAN` mode - Clan vs clan battles
@@ -125,11 +128,14 @@ Extended battle system with team modes!
 - [x] Separate clan MMR from individual MMR
 - [x] ±15 MMR change per clan battle
 - [x] Winner/loser clan MMR updates
+- [x] Wins/losses counters updated on battle completion
 
 #### 6. Tests ✅
 - [x] CLAN_VS_CLAN mode tests (3 tests)
 - [x] GROUP mode tests (2 tests)
-- [x] All 30 battles.service.spec.ts tests passing
+- [x] Clan battle history tests (5 tests in clans.service.spec.ts)
+- [x] All battles.service.spec.ts tests passing (31 tests - added clan wins/losses test)
+- [x] All clans.service.spec.ts tests passing (5 tests)
 
 ---
 
@@ -617,13 +623,13 @@ This means a 3-question battle has 3x the MMR at stake compared to a 1-question 
 
 ---
 
-## 📋 TODO - Rank Tiers (HIGH PRIORITY)
+## ✅ Rank Tiers - COMPLETED
 
 Humorous rank names with icons and colors.
 
-### Task Breakdown:
+### Completed:
 
-#### 1. Rank Definitions
+#### 1. Rank Definitions ✅
 | Rank | MMR Range | Icon | Color |
 |------|-----------|------|-------|
 | Bug | < 800 | 🐛 | `#22c55e` Green |
@@ -634,16 +640,19 @@ Humorous rank names with icons and colors.
 | 10x Dev | 1600–1899 | ⚡ | `#3b82f6` Diamond Blue |
 | Cracked | 1900+ | 💀 | `#ef4444` Red / Legendary glow |
 
-#### 2. Implementation
-- [ ] Create `getRankTier(mmr)` utility function returning `{ name, icon, color, minMmr, maxMmr }`
-- [ ] Add rank tier data to `GET /api/users/:id/stats` response
-- [ ] Add rank tier to user leaderboard response
-- [ ] Add rank tier to battle results (show both players' ranks)
-- [ ] **Success Criteria:** Rank tiers returned correctly in API ✅
+#### 2. Implementation ✅
+- [x] Create `getRankTier(mmr)` utility in `src/common/utils/rank-tiers.ts` returning `{ name, icon, color, minMmr, maxMmr }`
+- [x] Extract rank tier logic from UsersService into shared utilities
+- [x] Add `RankTierDto` in `src/common/dto/rank-tier.dto.ts` for Swagger documentation
+- [x] Add rank tier to user leaderboard response (`GET /api/users`)
+- [x] Add rank tier to user profile response (`GET /api/users/:id`)
+- [x] Add tier to battle details participants (with clan affiliation)
+- [x] **Success Criteria:** Rank tiers returned correctly in API ✅
 
-#### 3. Tests
-- [ ] Boundary tests for each tier (799 → Bug, 800 → Intern, 1900 → Cracked, etc.)
-- [ ] **Success Criteria:** All rank tier tests passing ✅
+#### 3. Tests ✅
+- [x] Boundary tests for each tier (799 → Bug, 800 → Intern, 1900 → Cracked, etc.)
+- [x] 18 rank tier tests passing (15 parameterized boundary tests + minMmr/maxMmr tests)
+- [x] **Success Criteria:** All rank tier tests passing ✅
 
 ---
 
@@ -914,22 +923,22 @@ Track daily activity for GitHub-style heatmap on profiles.
 
 ### Test Coverage Goals:
 - [x] Auth: All tests passing ✅ (7 tests)
-- [x] Users: All tests passing ✅ (15 tests)
-- [x] Problems: All tests passing ✅ (14 tests)
+- [x] Users: All tests passing ✅ (29 tests - includes 18 rank tier tests)
+- [x] Problems: All tests passing ✅ (15 tests)
 - [x] Code Execution: All tests passing ✅ (9 unit + 17 integration)
-- [x] **Battles: All tests passing ✅ (32 tests)**
-- [x] **WebSockets: All tests passing ✅ (24 tests)**
-- [x] **Matchmaking: All tests passing ✅ (26 tests)**
+- [x] **Battles: All tests passing ✅ (51 tests - includes clan wins/losses test)**
+- [x] **WebSockets: All tests passing ✅ (33 tests)**
+- [x] **Matchmaking: All tests passing ✅ (39 tests)**
 - [x] **WsAuthGuard: All tests passing ✅ (8 tests)**
-- [x] **Clans: Module implemented** ✅ (tests in battles.service.spec)
-- [ ] **Subscriptions: All tests passing** ⏳
-- [ ] **Skills: All tests passing** ⏳
+- [x] **Clans: All tests passing ✅ (5 tests in clans.service.spec.ts)**
+- [x] **Subscriptions: All tests passing ✅ (42 tests)**
+- [x] **Skills: All tests passing ✅** (tests in battles.service.spec + battles.gateway.spec)
+- [x] **Rank Tiers: All tests passing ✅** (18 tests in users.service.spec)
 - [ ] **Invites: All tests passing** ⏳
 - [ ] **MMR Scaling: All tests passing** ⏳
 - [ ] **Friends: All tests passing** ⏳
 - [ ] **Chat: All tests passing** ⏳
 - [ ] **Clan Challenges: All tests passing** ⏳
-- [ ] **Rank Tiers: All tests passing** ⏳
 - [ ] **Battle Royale Elimination: All tests passing** ⏳
 - [ ] **Achievements: All tests passing** ⏳
 - [ ] **Notifications: All tests passing** ⏳
@@ -1015,11 +1024,12 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [x] MMR system working
 - [x] **All tests passing** ✅
 
-### Phase 3: Monetization & Game Features
-- [ ] Subscription/Stripe module working
-- [ ] Skills system working (5 skills, single-use, toggleable per game)
+### Phase 3: Monetization & Game Features (IN PROGRESS)
+- [x] Subscription/Stripe module working ✅
+- [x] Skills system working (5 skills, single-use, toggleable per game) ✅
+- [x] Rank tiers implemented (Bug → Cracked) ✅
 - [ ] Direct invite system working (link + in-app)
-- [ ] Rank tiers implemented (Bug → Cracked)
+- [ ] MMR scaling system
 - [ ] **All tests passing**
 
 ### Phase 4: Social Features
