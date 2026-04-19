@@ -342,18 +342,18 @@ Payment system for frontend monetization.
 
 ---
 
-## 📋 TODO - Skills System (HIGH PRIORITY)
+## ✅ Skills System - COMPLETED
 
 In-battle power-ups — toggleable per game, each usable once per battle.
 
-### Task Breakdown:
+### Completed:
 
-#### 1. Prisma Schema Updates
-- [ ] Add `SkillType` enum: `FREEZE`, `SCRAMBLE`, `BLIND`, `TIME_STEAL`, `FOG_OF_WAR`
-- [ ] Add `enabledSkills` field to Battle model (JSON array of SkillType, default: [])
-- [ ] Add `BattleSkillUse` model (id, battleId, userId, targetUserId, skillType, usedAt)
-- [ ] Run migration
-- [ ] **Success Criteria:** Schema compiles, migration runs clean ✅
+#### 1. Prisma Schema Updates ✅
+- [x] Add `SkillType` enum: `FREEZE`, `SCRAMBLE`, `BLIND`, `TIME_STEAL`, `FOG_OF_WAR`
+- [x] Add `enabledSkills` field to Battle model (JSON array of SkillType, default: [])
+- [x] Add `BattleSkillUse` model (id, battleId, userId, targetUserId, skillType, usedAt)
+- [x] Run migration
+- [x] **Success Criteria:** Schema compiles, migration runs clean ✅
 
 #### 2. Skill Definitions
 | Skill | Effect | Duration |
@@ -364,32 +364,32 @@ In-battle power-ups — toggleable per game, each usable once per battle.
 | `TIME_STEAL` | Reduce opponent's remaining time | -60 seconds |
 | `FOG_OF_WAR` | Blur opponent's screen | 20 seconds |
 
-#### 3. Skills Service
-- [ ] `useSkill(battleId, userId, targetUserId, skillType)` — Validate & record skill use
-- [ ] Validation: skill is enabled for this battle
-- [ ] Validation: user hasn't already used this skill in this battle (single-use)
-- [ ] Validation: battle is IN_PROGRESS
-- [ ] Validation: target is a participant in the battle
-- [ ] Validation: user is not targeting themselves
-- [ ] **Success Criteria:** All validations working ✅
+#### 3. Skills Service ✅
+- [x] `useSkill(battleId, userId, targetUserId, skillType)` — Validate & record skill use
+- [x] Validation: skill is enabled for this battle
+- [x] Validation: user hasn't already used this skill in this battle (single-use)
+- [x] Validation: battle is IN_PROGRESS
+- [x] Validation: target is a participant in the battle
+- [x] Validation: user is not targeting themselves
+- [x] **Success Criteria:** All validations working ✅
 
-#### 4. WebSocket Events
-- [ ] `skill.use` (client → server) — `{ battleId, targetUserId, skillType }`
-- [ ] `skill.effect` (server → client) — `{ skillType, fromUserId, duration }` (sent to target)
-- [ ] `skill.used` (server → room) — `{ userId, skillType, targetUserId }` (broadcast to room)
-- [ ] Add skill events to `BattlesGateway`
-- [ ] **Success Criteria:** Skill events emit correctly ✅
+#### 4. WebSocket Events ✅
+- [x] `skill.use` (client → server) — `{ battleId, targetUserId, skillType }`
+- [x] `skill.effect` (server → client) — `{ skillType, fromUserId, duration }` (sent to target)
+- [x] `skill.used` (server → room) — `{ userId, skillType, targetUserId }` (broadcast to room)
+- [x] Add skill events to `BattlesGateway`
+- [x] **Success Criteria:** Skill events emit correctly ✅
 
-#### 5. Battle Creation Integration
-- [ ] Add `enabledSkills` to `CreateBattleDto` (optional array of SkillType)
-- [ ] Store enabled skills on battle creation
-- [ ] **Success Criteria:** Skills config stored on battle ✅
+#### 5. Battle Creation Integration ✅
+- [x] Add `enabledSkills` to `CreateBattleDto` (optional array of SkillType)
+- [x] Store enabled skills on battle creation
+- [x] **Success Criteria:** Skills config stored on battle ✅
 
-#### 6. Tests
-- [ ] Skill use validation tests (enabled check, single-use, in-progress check)
-- [ ] WebSocket skill event tests
-- [ ] Battle creation with skills tests
-- [ ] **Success Criteria:** All skill tests passing ✅
+#### 6. Tests ✅
+- [x] Skill use validation tests (enabled check, single-use, in-progress check)
+- [x] WebSocket skill event tests
+- [x] Battle creation with skills tests
+- [x] **Success Criteria:** All skill tests passing ✅
 
 ---
 
