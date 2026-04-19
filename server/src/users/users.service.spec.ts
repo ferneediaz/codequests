@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService, MockPrismaService } from '../__mocks__/prisma.service';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 
 describe('UsersService', () => {
     let service: UsersService;
@@ -222,7 +222,7 @@ describe('UsersService', () => {
             ).rejects.toThrow(NotFoundException);
         });
 
-        it('should throw NotFoundException if username is taken', async () => {
+        it('should throw ConflictException if username is taken', async () => {
             const existingUser = {
                 id: 'user-123',
                 username: 'oldname',
@@ -257,7 +257,7 @@ describe('UsersService', () => {
 
             await expect(
                 service.update('user-123', { username: 'taken' }),
-            ).rejects.toThrow(NotFoundException);
+            ).rejects.toThrow(ConflictException);
         });
     });
 

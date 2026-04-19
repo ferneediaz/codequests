@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -93,7 +93,7 @@ export class UsersService {
         where: { username: updateUserDto.username },
       });
       if (existingUser) {
-        throw new NotFoundException('Username already taken');
+        throw new ConflictException('Username already taken');
       }
     }
 

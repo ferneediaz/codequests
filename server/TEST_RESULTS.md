@@ -1,6 +1,6 @@
 # Test Results Summary
 
-**Last Run:** March 8, 2026  
+**Last Run:** April 13, 2026  
 **Overall Status:** ✅ **PASSING**
 
 ---
@@ -8,10 +8,12 @@
 ## 📊 Test Statistics
 
 ```
-Test Suites: 6 passed, 6 total
-Tests:       82 passed, 82 total
-Time:        ~7-8 seconds
+Test Suites: 7 passed, 7 total
+Tests:       94 passed, 94 total
+Time:        ~5-6 seconds
 ```
+
+> **Note:** 17 Piston integration tests require Docker/Piston running. These are skipped when Piston is unavailable.
 
 ---
 
@@ -97,6 +99,32 @@ Time:        ~7-8 seconds
 - [x] Battle status transitions
 - [x] All integration scenarios working
 
+### 7. WebSocket Gateway Tests ✅ (24 tests) - NEW
+- [x] Gateway is defined
+- [x] Server is initialized with configuration
+- [x] Valid token connection stores client info
+- [x] Invalid token connection emits error
+- [x] Missing token connection emits error
+- [x] Token with missing user ID emits error
+- [x] Disconnect removes client from tracking
+- [x] Disconnect removes client from all rooms
+- [x] Join battle room successfully
+- [x] Join battle room fails when battle not found
+- [x] Join battle room fails when user not participant
+- [x] Join battle room handles database errors
+- [x] Leave battle room successfully
+- [x] Leave battle room handles non-existent rooms
+- [x] Emit battle started to room
+- [x] Emit battle submission to room
+- [x] Emit battle completed to room
+- [x] Emit battle status update to room
+- [x] Get connected clients
+- [x] Get socket by user ID
+- [x] Handle unexpected errors gracefully
+- [x] Emit error event on exception
+- [x] Auto-rejoin battles on reconnection
+- [x] Handle reconnection with no active battles
+
 ---
 
 ## 🎯 Feature Status
@@ -150,14 +178,20 @@ Time:        ~7-8 seconds
 - [x] Battle completion flow
 
 ### 2. WebSocket Real-time Features
-**Status:** Dependencies installed, no implementation
+**Status:** ✅ CORE GATEWAY IMPLEMENTED
 
-**Missing Tests:**
-- [ ] WebSocket connection
-- [ ] Room join/leave
-- [ ] Real-time battle updates
-- [ ] Live code execution results
-- [ ] Disconnection handling
+**Passing Tests (24 tests):**
+- [x] WebSocket connection with JWT
+- [x] Room join/leave
+- [x] Real-time battle updates
+- [x] Client tracking
+- [x] Disconnection handling
+- [x] Reconnection support
+- [x] Error handling
+
+**Remaining:**
+- [ ] WsAuthGuard implementation
+- [ ] Integration with live server
 
 ### 3. Matchmaking
 **Status:** Not implemented
@@ -191,7 +225,7 @@ Time:        ~7-8 seconds
 | Problems | ✅ 10/10 | N/A | COMPLETE |
 | Code Execution | ✅ 6/6 | ✅ 17/17 (Piston) | COMPLETE |
 | Battles | ✅ 25/25 | N/A | COMPLETE |
-| WebSockets | ❌ 0 | ❌ 0 | NOT STARTED |
+| WebSockets | ✅ 24/24 | ⏳ Pending | CORE COMPLETE |
 | Matchmaking | ❌ 0 | ❌ 0 | NOT STARTED |
 | Clans | ❌ 0 | ❌ 0 | NOT STARTED |
 
@@ -307,11 +341,11 @@ npm run test:integration
 - [x] Problems: All tests passing (10/10)
 - [x] Code Execution: All tests passing (23/23 - unit + integration)
 - [x] Battles: All tests passing (25/25)
-- [ ] WebSockets: Not yet implemented
+- [x] WebSockets: Core gateway tests passing (24/24)
 - [ ] Matchmaking: Not yet implemented
 - [ ] Clans: Not yet implemented
 
 ---
 
-**Last Updated:** March 8, 2026  
-**Next Test Run:** After implementing WebSocket/Real-time Features
+**Last Updated:** April 13, 2026  
+**Next Test Run:** After implementing WsAuthGuard

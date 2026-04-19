@@ -3,7 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
-import { importJWK, JWK } from 'jose';
+import { createPublicKey } from 'crypto';
 
 // This is the payload structure from Supabase JWT tokens
 interface JwtPayload {
@@ -29,16 +29,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         done: (err: any, secretOrKey?: string | Buffer) => void,
       ) => {
         try {
-          // Parse the JWK from environment variable
           const jwkString = configService.get<string>('JWT_JWK');
           if (!jwkString) {
             return done(new Error('JWT_JWK not configured'));
           }
           
-          const jwk: JWK = JSON.parse(jwkString);
-          const publicKey = await importJWK(jwk, 'ES256');
+          const jwk = JSON.parse(jwkString);
+          // Convert JWK to Node.js KeyObject (which passport-jwt understands)
+          const publicKey = createPublicKey({ key: jwk, format: 'jwk' });
           
-          // Convert to KeyObject for passport-jwt
           done(null, publicKey as any);
         } catch (error) {
           done(error);
@@ -53,14 +52,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
    * The returned object is attached to request.user
    */
   async validate(payload: JwtPayload) {
+    // Try to find user in our database
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
 
-    if (!user) {
-      throw new UnauthorizedException('User not found');
+    // If user exists in our DB, return the full user object
+    if (user) {
+      return user;
     }
 
-    return user;
+    // If user doesn't exist yet (first login, hasn't called /auth/sync),
+    // return the JWT payload so /auth/sync can create them
+    return {
+      id: payload.sub,
+      email: payload.email,
+      role: payload.role || 'user',
+    };
   }
 }
