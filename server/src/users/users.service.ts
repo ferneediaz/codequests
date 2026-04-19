@@ -57,6 +57,15 @@ export class UsersService {
             },
           },
         },
+        seasonRecords: {
+          where: { isDisplayed: true },
+          include: {
+            season: {
+              select: { number: true, name: true },
+            },
+          },
+          orderBy: { season: { number: 'desc' } },
+        },
       },
     });
 

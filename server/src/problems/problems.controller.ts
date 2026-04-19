@@ -74,6 +74,12 @@ export class ProblemsController {
         type: Number,
         description: 'Items per page (default: 20)',
     })
+    @ApiQuery({
+        name: 'tags',
+        required: false,
+        type: String,
+        description: 'Comma-separated tags to filter by (e.g. arrays,strings)',
+    })
     @ApiResponse({
         status: 200,
         description: 'Returns paginated list of problems',
@@ -82,29 +88,42 @@ export class ProblemsController {
         @Query('difficulty') difficulty?: Difficulty,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
+        @Query('tags') tags?: string,
     ) {
+        const parsedTags = tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined;
         return this.problemsService.findAll(
             difficulty,
             page ? parseInt(page) : 1,
             limit ? parseInt(limit) : 20,
+            parsedTags,
         );
     }
 
     @Get('random')
-    @ApiOperation({ summary: 'Get a random problem optionally filtered by difficulty' })
+    @ApiOperation({ summary: 'Get a random problem optionally filtered by difficulty and tags' })
     @ApiQuery({
         name: 'difficulty',
         required: false,
         enum: Difficulty,
         description: 'Filter by difficulty level',
     })
+    @ApiQuery({
+        name: 'tags',
+        required: false,
+        type: String,
+        description: 'Comma-separated tags to filter by',
+    })
     @ApiResponse({
         status: 200,
         description: 'Returns a random problem',
         type: ProblemResponseDto,
     })
-    findRandom(@Query('difficulty') difficulty?: Difficulty) {
-        return this.problemsService.findRandom(difficulty);
+    findRandom(
+        @Query('difficulty') difficulty?: Difficulty,
+        @Query('tags') tags?: string,
+    ) {
+        const parsedTags = tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined;
+        return this.problemsService.findRandom(difficulty, parsedTags);
     }
 
     @Get(':id')

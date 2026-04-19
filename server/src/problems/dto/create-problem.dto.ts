@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
     IsString,
     IsNotEmpty,
@@ -81,4 +81,14 @@ export class CreateProblemDto {
     @ValidateNested({ each: true })
     @Type(() => CreateTestCaseDto)
     testCases: CreateTestCaseDto[];
+
+    @ApiPropertyOptional({
+        description: 'Tags for categorizing the problem (e.g. arrays, strings, graphs)',
+        example: ['arrays', 'hash-table'],
+        type: [String],
+    })
+    @IsArray()
+    @IsString({ each: true })
+    @IsOptional()
+    tags?: string[];
 }

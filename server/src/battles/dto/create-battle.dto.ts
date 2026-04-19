@@ -91,4 +91,12 @@ export class CreateBattleDto {
     @IsBoolean()
     @IsOptional()
     withInviteCode?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Preferred topic tag for random problem selection (e.g. arrays, strings, graphs)',
+        example: 'arrays',
+    })
+    @IsString()
+    @IsOptional()
+    preferredTopic?: string;
 }

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { BattleMode, Difficulty } from '@prisma/client';
 
 export class JoinQueueDto {
@@ -19,4 +19,12 @@ export class JoinQueueDto {
     @IsEnum(Difficulty)
     @IsOptional()
     preferredDifficulty?: Difficulty;
+
+    @ApiPropertyOptional({
+        description: 'Preferred problem topic tag (e.g. arrays, strings, graphs)',
+        example: 'arrays',
+    })
+    @IsString()
+    @IsOptional()
+    preferredTopic?: string;
 }

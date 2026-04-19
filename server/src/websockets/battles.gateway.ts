@@ -515,6 +515,21 @@ export class BattlesGateway
     }
 
     /**
+     * Emit season ended event to all connected clients
+     */
+    emitSeasonEnded(data: {
+        endedSeason: { id: string; name: string; number: number };
+        newSeason: { id: string; name: string; number: number };
+    }) {
+        this.server.emit('season.ended', {
+            endedSeason: data.endedSeason,
+            newSeason: data.newSeason,
+            message: `${data.endedSeason.name} has ended! ${data.newSeason.name} has begun. All MMR has been reset to 1000.`,
+            timestamp: new Date(),
+        });
+    }
+
+    /**
      * Auto-rejoin active battle rooms on reconnection
      */
     private async rejoinActiveBattles(client: AuthenticatedSocket) {

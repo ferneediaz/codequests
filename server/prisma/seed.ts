@@ -97,6 +97,7 @@ async function main() {
         {
             id: 'problem-001-two-sum',
             title: 'Two Sum',
+            tags: ['arrays', 'hash-table'],
             description: `Given an array of integers \`nums\` and an integer \`target\`, return indices of the two numbers such that they add up to \`target\`.
 
 You may assume that each input would have exactly one solution, and you may not use the same element twice.
@@ -129,6 +130,7 @@ Output: [1,2]
         {
             id: 'problem-002-reverse-string',
             title: 'Reverse String',
+            tags: ['strings', 'two-pointers'],
             description: `Write a function that reverses a string. The input string is given as an array of characters.
 
 You must do this by modifying the input array in-place with O(1) extra memory.
@@ -158,6 +160,7 @@ Output: ["h","a","n","n","a","H"]
         {
             id: 'problem-003-valid-parentheses',
             title: 'Valid Parentheses',
+            tags: ['strings', 'stacks'],
             description: `Given a string \`s\` containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.
 
 An input string is valid if:
@@ -198,6 +201,7 @@ Output: false
         {
             id: 'problem-004-binary-search',
             title: 'Binary Search',
+            tags: ['arrays', 'binary-search'],
             description: `Given an array of integers \`nums\` which is sorted in ascending order, and an integer \`target\`, write a function to search \`target\` in \`nums\`. If \`target\` exists, then return its index. Otherwise, return -1.
 
 You must write an algorithm with O(log n) runtime complexity.
@@ -230,6 +234,7 @@ Explanation: 2 does not exist in nums so return -1
         {
             id: 'problem-005-palindrome',
             title: 'Valid Palindrome',
+            tags: ['strings', 'two-pointers'],
             description: `A phrase is a palindrome if, after converting all uppercase letters into lowercase letters and removing all non-alphanumeric characters, it reads the same forward and backward. Alphanumeric characters include letters and numbers.
 
 Given a string \`s\`, return true if it is a palindrome, or false otherwise.
@@ -261,6 +266,7 @@ Explanation: "raceacar" is not a palindrome.
         {
             id: 'problem-006-merge-intervals',
             title: 'Merge Intervals',
+            tags: ['arrays', 'sorting'],
             description: `Given an array of intervals where intervals[i] = [starti, endi], merge all overlapping intervals, and return an array of the non-overlapping intervals that cover all the intervals in the input.
 
 **Example 1:**
@@ -290,6 +296,7 @@ Explanation: Intervals [1,4] and [4,5] are considered overlapping.
         {
             id: 'problem-007-longest-substring',
             title: 'Longest Substring Without Repeating Characters',
+            tags: ['strings', 'sliding-window', 'hash-table'],
             description: `Given a string \`s\`, find the length of the longest substring without repeating characters.
 
 **Example 1:**
@@ -343,6 +350,25 @@ Explanation: The answer is "wke", with the length of 3.
 
         console.log(`✅ Created problem: ${createdProblem.title} (${createdProblem.difficulty})`);
     }
+
+    // Create Season 1
+    const now = new Date();
+    const seasonEndDate = new Date(now);
+    seasonEndDate.setMonth(seasonEndDate.getMonth() + 3);
+
+    const season = await prisma.season.upsert({
+        where: { number: 1 },
+        update: {},
+        create: {
+            number: 1,
+            name: 'Season 1',
+            isActive: true,
+            startDate: now,
+            endDate: seasonEndDate,
+        },
+    });
+
+    console.log(`✅ Created ${season.name} (ends ${seasonEndDate.toISOString().split('T')[0]})`);
 
     console.log('🎉 Seed completed successfully!');
 }

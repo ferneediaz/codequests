@@ -81,6 +81,7 @@ export class MatchmakingService {
                 userId,
                 mode,
                 preferredDifficulty: dto.preferredDifficulty || null,
+                preferredTopic: dto.preferredTopic || null,
                 mmrAtQueue: user.mmr,
             },
         });
@@ -222,21 +223,40 @@ export class MatchmakingService {
      * Create a battle from two matched queue entries
      */
     private async createMatchedBattle(
-        entry1: { id: string; userId: string; mode: BattleMode; preferredDifficulty: Difficulty | null },
-        entry2: { id: string; userId: string; mode: BattleMode; preferredDifficulty: Difficulty | null },
+        entry1: { id: string; userId: string; mode: BattleMode; preferredDifficulty: Difficulty | null; preferredTopic: string | null },
+        entry2: { id: string; userId: string; mode: BattleMode; preferredDifficulty: Difficulty | null; preferredTopic: string | null },
     ): Promise<{ battleId: string; player1Id: string; player2Id: string } | null> {
-        // Pick a random problem, optionally filtered by difficulty
+        // Pick a random problem, optionally filtered by difficulty and topic
         const difficulty =
             entry1.preferredDifficulty || entry2.preferredDifficulty || undefined;
+        const topic =
+            entry1.preferredTopic || entry2.preferredTopic || undefined;
 
-        const whereClause = difficulty ? { difficulty } : {};
+        const whereClause: any = {};
+        if (difficulty) whereClause.difficulty = difficulty;
+        if (topic) whereClause.tags = { has: topic };
 
-        const problemCount = await this.prisma.problem.count({
+        let problemCount = await this.prisma.problem.count({
             where: whereClause,
         });
 
+        // Fallback: if no problems match the topic filter, try without topic
+        let effectiveWhere = whereClause;
+        if (problemCount === 0 && topic) {
+            const fallbackWhere: any = {};
+            if (difficulty) fallbackWhere.difficulty = difficulty;
+            problemCount = await this.prisma.problem.count({ where: fallbackWhere });
+            effectiveWhere = fallbackWhere;
+        }
+
+        // Final fallback: if difficulty filter also matched nothing, try any problem
+        if (problemCount === 0 && difficulty) {
+            problemCount = await this.prisma.problem.count({ where: {} });
+            effectiveWhere = {};
+        }
+
         if (problemCount === 0) {
-            // No problems available — can't create a battle
+            // No problems available at all — can't create a battle
             this.logger.warn(
                 'No problems available for matchmaking, skipping match',
             );
@@ -245,7 +265,7 @@ export class MatchmakingService {
 
         const skip = Math.floor(Math.random() * problemCount);
         const problem = await this.prisma.problem.findFirst({
-            where: whereClause,
+            where: effectiveWhere,
             skip,
         });
 

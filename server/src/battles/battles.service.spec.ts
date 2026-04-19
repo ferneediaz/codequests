@@ -3,6 +3,7 @@ import { BattlesService } from './battles.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { SeasonsService } from '../seasons/seasons.service';
 import {
     createMockPrismaService,
     MockPrismaService,
@@ -134,6 +135,14 @@ describe('BattlesService', () => {
                 {
                     provide: SubscriptionsService,
                     useValue: mockSubscriptionsService,
+                },
+                {
+                    provide: SeasonsService,
+                    useValue: {
+                        getActiveSeason: jest.fn().mockResolvedValue({ id: 'season-1' }),
+                        updatePeakMmr: jest.fn().mockResolvedValue(undefined),
+                        incrementSeasonStats: jest.fn().mockResolvedValue(undefined),
+                    },
                 },
             ],
         }).compile();
@@ -996,10 +1005,10 @@ describe('BattlesService', () => {
             await service.completeBattle(mockBattle.id);
 
             // With equal MMR (1000 vs 1000), expected score is 0.5
-            // Winner gets: 32 * (1 - 0.5) = +16
-            // Loser gets: 32 * (0 - 0.5) = -16
-            expect(capturedMmrChanges).toContain(16);
-            expect(capturedMmrChanges).toContain(-16);
+            // Winner gets: 16 * (1 - 0.5) = +8
+            // Loser gets: 16 * (0 - 0.5) = -8
+            expect(capturedMmrChanges).toContain(8);
+            expect(capturedMmrChanges).toContain(-8);
         });
 
         it('should give more MMR when beating higher rated opponent', async () => {
@@ -1061,8 +1070,8 @@ describe('BattlesService', () => {
 
             await service.completeBattle(mockBattle.id);
 
-            // Underdog winning should get more than 16 points
-            expect(winnerMmrChange).toBeGreaterThan(16);
+            // Underdog winning should get more than 8 points (K=16 base)
+            expect(winnerMmrChange).toBeGreaterThan(8);
         });
     });
 

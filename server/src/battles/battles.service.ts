@@ -7,13 +7,16 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { SeasonsService } from '../seasons/seasons.service';
 import { BattleMode, BattleStatus, Difficulty, SkillType } from '@prisma/client';
 import { CreateBattleDto } from './dto/create-battle.dto';
 import { getRankTier } from '../common/utils/rank-tiers';
 import { randomBytes } from 'crypto';
 
 // K-factor for Elo calculation (higher = more volatile ratings)
-const ELO_K_FACTOR = 32;
+const ELO_K_FACTOR = 16;
+// Minimum MMR value (floor)
+const MIN_MMR = 0;
 const CLAN_MMR_CHANGE = 15;
 const INVITE_CODE_LENGTH = 8;
 const INVITE_EXPIRY_HOURS = 24;
@@ -46,6 +49,7 @@ export class BattlesService {
         private prisma: PrismaService,
         private codeExecutionService: CodeExecutionService,
         private subscriptionsService: SubscriptionsService,
+        private seasonsService: SeasonsService,
     ) { }
 
     /**
@@ -152,6 +156,9 @@ export class BattlesService {
             inviteExpiresAt = new Date(Date.now() + INVITE_EXPIRY_HOURS * 60 * 60 * 1000);
         }
 
+        // Get active season
+        const activeSeason = await this.seasonsService.getActiveSeason();
+
         // Create battle
         const battle = await this.prisma.battle.create({
             data: {
@@ -163,6 +170,7 @@ export class BattlesService {
                 enabledSkills: dto.enabledSkills || [],
                 inviteCode,
                 inviteExpiresAt,
+                seasonId: activeSeason?.id || null,
                 status: BattleStatus.WAITING,
                 participants: {
                     create: {
@@ -722,10 +730,11 @@ export class BattlesService {
                     participant.user.subscriptionTier === 'PRO' ||
                     (participant.user.trialEndsAt && new Date(participant.user.trialEndsAt) > new Date());
                 if (!isTeam && hasProAccess) {
+                    const newMmr = Math.max(MIN_MMR, participant.user.mmr + mmrChange);
                     await tx.user.update({
                         where: { id: participant.userId },
                         data: {
-                            mmr: { increment: mmrChange },
+                            mmr: newMmr,
                             wins: isWinner ? { increment: 1 } : undefined,
                             losses: !isWinner && winnerId ? { increment: 1 } : undefined,
                         },
@@ -762,6 +771,29 @@ export class BattlesService {
                 }
             }
         });
+
+        // Update season records (outside transaction — non-critical)
+        if (!isTeam) {
+            for (const participant of battle.participants) {
+                const mmrChange = mmrChanges.get(participant.userId) || 0;
+                const hasProAccess =
+                    participant.user.subscriptionTier === 'PRO' ||
+                    (participant.user.trialEndsAt && new Date(participant.user.trialEndsAt) > new Date());
+
+                if (hasProAccess) {
+                    const isWinner = participant.userId === winnerId;
+                    const newMmr = Math.max(MIN_MMR, participant.user.mmr + mmrChange);
+
+                    // Update peak MMR and final MMR
+                    await this.seasonsService.updatePeakMmr(participant.userId, newMmr);
+
+                    // Increment wins/losses if there was a winner
+                    if (winnerId) {
+                        await this.seasonsService.incrementSeasonStats(participant.userId, isWinner);
+                    }
+                }
+            }
+        }
 
         // Return updated battle
         return this.getBattleDetails(battleId);

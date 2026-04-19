@@ -12,12 +12,13 @@ export class ProblemsService {
      * Create a new problem with test cases
      */
     async create(createProblemDto: CreateProblemDto) {
-        const { testCases, starterCode, ...problemData } = createProblemDto;
+        const { testCases, starterCode, tags, ...problemData } = createProblemDto;
 
         return this.prisma.problem.create({
             data: {
                 ...problemData,
                 starterCode: starterCode ? JSON.stringify(starterCode) : '{}',
+                tags: tags || [],
                 testCases: {
                     create: testCases,
                 },
@@ -31,10 +32,14 @@ export class ProblemsService {
     /**
      * Find all problems with optional filtering
      */
-    async findAll(difficulty?: Difficulty, page: number = 1, limit: number = 20) {
+    async findAll(difficulty?: Difficulty, page: number = 1, limit: number = 20, tags?: string[]) {
         const skip = (page - 1) * limit;
 
-        const where = difficulty ? { difficulty } : {};
+        const where: any = {};
+        if (difficulty) where.difficulty = difficulty;
+        if (tags && tags.length > 0) {
+            where.tags = { hasSome: tags };
+        }
 
         const [problems, total] = await Promise.all([
             this.prisma.problem.findMany({
@@ -81,10 +86,14 @@ export class ProblemsService {
     }
 
     /**
-     * Get a random problem optionally filtered by difficulty
+     * Get a random problem optionally filtered by difficulty and tags
      */
-    async findRandom(difficulty?: Difficulty) {
-        const where = difficulty ? { difficulty } : {};
+    async findRandom(difficulty?: Difficulty, tags?: string[]) {
+        const where: any = {};
+        if (difficulty) where.difficulty = difficulty;
+        if (tags && tags.length > 0) {
+            where.tags = { hasSome: tags };
+        }
 
         const count = await this.prisma.problem.count({ where });
 

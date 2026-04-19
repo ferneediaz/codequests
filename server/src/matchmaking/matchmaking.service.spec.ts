@@ -162,6 +162,7 @@ describe('MatchmakingService', () => {
                     userId: mockUser1.id,
                     mode: BattleMode.ONE_V_ONE,
                     preferredDifficulty: null,
+                    preferredTopic: null,
                     mmrAtQueue: mockUser1.mmr,
                 },
             });
@@ -591,6 +592,45 @@ describe('MatchmakingService', () => {
 
             // When no problems exist, createMatchedBattle returns null
             expect(result).toBeNull();
+        });
+
+        it('should fall back to any problem when difficulty filter matches nothing', async () => {
+            const entry = {
+                ...baseQueueEntry,
+                preferredDifficulty: Difficulty.HARD,
+                status: MatchmakingStatus.QUEUED,
+            };
+            const candidate = {
+                ...baseQueueEntry,
+                id: 'entry-2',
+                userId: 'user-2',
+                preferredDifficulty: Difficulty.HARD,
+                status: MatchmakingStatus.QUEUED,
+            };
+
+            prisma.matchmakingEntry.findUnique.mockResolvedValue(entry);
+            prisma.matchmakingEntry.findMany.mockResolvedValue([candidate]);
+
+            // No HARD problems exist at all
+            prisma.problem.count
+                .mockResolvedValueOnce(0)  // difficulty=HARD → 0
+                .mockResolvedValueOnce(5); // final fallback (any problem) → 5
+            prisma.problem.findFirst.mockResolvedValue(mockProblem);
+            prisma.matchmakingEntry.updateMany.mockResolvedValue({ count: 2 });
+            battlesService.createBattle!.mockResolvedValue(mockBattle as any);
+            battlesService.joinBattle!.mockResolvedValue(mockBattle as any);
+            prisma.matchmakingEntry.deleteMany.mockResolvedValue({ count: 2 });
+
+            const result = await service.tryFindMatch(entry.id);
+
+            expect(result).not.toBeNull();
+            expect(result!.battleId).toBe('battle-1');
+            // Final fallback should query with empty where clause
+            expect(prisma.problem.count).toHaveBeenLastCalledWith({ where: {} });
+            expect(prisma.problem.findFirst).toHaveBeenCalledWith({
+                where: {},
+                skip: expect.any(Number),
+            });
         });
     });
 

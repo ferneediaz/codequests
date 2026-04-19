@@ -59,6 +59,7 @@ describe('ProblemsService', () => {
           description: createDto.description,
           difficulty: createDto.difficulty,
           starterCode: JSON.stringify(createDto.starterCode),
+          tags: [],
           testCases: {
             create: createDto.testCases,
           },

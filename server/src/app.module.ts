@@ -10,6 +10,7 @@ import { ClansModule } from './clans/clans.module';
 import { WebsocketsModule } from './websockets/websockets.module';
 import { MatchmakingModule } from './matchmaking/matchmaking.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { SeasonsModule } from './seasons/seasons.module';
 
 @Module({
     imports: [
@@ -32,6 +33,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
         WebsocketsModule,
         MatchmakingModule,
         SubscriptionsModule,
+        SeasonsModule,
 
         // TODO: Add these modules as we build them
         // RankingsModule,

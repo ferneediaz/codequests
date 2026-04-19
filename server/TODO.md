@@ -73,9 +73,9 @@ The **core competitive feature** is now implemented!
 
 #### 3. MMR Calculation System ✅ (base implementation)
 - [x] Elo-based MMR rating algorithm
-- [x] MMR updates for winners/losers (K-factor = 32)
+- [x] MMR updates for winners/losers (K-factor = 16)
 - [x] Win/loss counters update
-- [ ] **⚠️ NEEDS UPDATE:** Scale MMR by problem count (see "MMR Scaling System" section below)
+- [x] MMR floor at 0 (can never go negative)
 
 #### 4. Battle Logic ✅
 - [x] Winner determination:
@@ -581,69 +581,91 @@ Clan vs Clan war challenges.
 
 ---
 
-## 📋 TODO - MMR Scaling System (HIGH PRIORITY)
+## ✅ MMR Rebalance - COMPLETED
 
-MMR gains/losses scale based on the number of problems in a battle. More problems = higher stakes.
+Rebalanced MMR system with standard Elo K=16 and MMR floor.
 
-### Design
+### Completed:
+- [x] K-factor changed from 32 to 16 (smaller, more stable gains/losses)
+- [x] MMR floor at 0 (can never go negative)
+- [x] All MMR calculation tests updated and passing (31 tests)
+- [x] **Success Criteria:** All tests passing ✅
 
-| Problem Count | MMR Multiplier | Example Win (vs equal MMR) |
-|---------------|----------------|---------------------------|
-| 1 problem | 1x (base) | ~+16 MMR |
-| 2 problems | 2x | ~+32 MMR |
-| 3 problems | 3x | ~+48 MMR |
-| 5 problems | 5x | ~+80 MMR |
+---
 
-**Formula:** `K-factor = BASE_K * problemCount` where `BASE_K = 16`
+## ✅ Topic Tags System - COMPLETED
 
-The Elo formula stays the same, but K-factor scales linearly with problem count.
-This means a 3-question battle has 3x the MMR at stake compared to a 1-question battle.
+Tag-based topic filtering for problems and matchmaking.
 
-### Default Problem Counts
-| Context | Default Problem Count |
-|---------|-----------------------|
-| Public matchmaking (1v1) | 1 problem |
-| Private invite (1v1) | Configurable (1-5, default 1) |
-| Battle Royale (per round) | 1 problem per round |
-| Clan vs Clan / Group | Uses problem pool (existing point system) |
+### Completed:
 
-### Task Breakdown:
+#### 1. Schema & DTOs ✅
+- [x] Added `tags String[]` to Problem model
+- [x] Added `tags` to `CreateProblemDto` (optional string array)
+- [x] Added `preferredTopic` to MatchmakingEntry and JoinQueueDto
+- [x] Added `preferredTopic` to CreateBattleDto
 
-#### 1. Schema Updates
-- [ ] Add `problemCount` field to Battle model (Int, default 1, min 1, max 5)
-- [ ] Add `problemCount` to `CreateBattleDto` (optional, default 1, validated 1-5)
-- [ ] For multi-problem 1v1: add `problemIds` support (array of problem IDs) or random selection
-- [ ] Run migration
-- [ ] **Success Criteria:** Schema compiles, migration runs clean ✅
+#### 2. Problem Filtering ✅
+- [x] `findAll()` accepts `tags` query param (comma-separated, uses `hasSome`)
+- [x] `findRandom()` accepts `tags` param for topic-filtered random selection
+- [x] Controller parses comma-separated tags query string
 
-#### 2. Multi-Problem 1v1 Flow
-- [ ] When `problemCount > 1` for 1v1: select N random problems (by difficulty preference)
-- [ ] Players solve problems sequentially (solve problem 1 → problem 2 → ...)
-- [ ] OR all problems visible at once (player chooses order)
-- [ ] Track per-problem results in `BattleParticipant` (update `submissions` JSON or add `BattleSubmission` model)
-- [ ] Winner = most total test cases passed across all problems, tiebreaker = fastest total time
-- [ ] **Success Criteria:** Multi-problem battles work end-to-end ✅
+#### 3. Matchmaking Integration ✅
+- [x] `joinQueue` stores `preferredTopic`
+- [x] `createMatchedBattle` filters problems by topic with fallback (if no problems match topic, retries without filter)
 
-#### 3. MMR Calculation Update
-- [ ] Change `ELO_K_FACTOR` from flat 32 to `BASE_K * battle.problemCount`
-- [ ] Set `BASE_K = 16` (so 1 problem = K16, 2 = K32 same as before, 3 = K48, etc.)
-- [ ] Update `calculateMmrChanges()` to accept `problemCount` parameter
-- [ ] Ensure Battle Royale uses per-round K-factor (1 problem per round = base K)
-- [ ] Clan/Group battles continue using existing point-based system (unchanged)
-- [ ] **Success Criteria:** MMR changes scale correctly with problem count ✅
+#### 4. Seed Data ✅
+- [x] All 7 seed problems tagged: arrays, hash-table, strings, two-pointers, stacks, binary-search, sorting, sliding-window
+- [x] **Success Criteria:** All tests passing ✅
 
-#### 4. Matchmaking Integration
-- [ ] Public matchmaking always creates 1-problem battles (default, no config needed)
-- [ ] Add `problemCount` to matchmaking queue entry (for future: match by preferred problem count)
-- [ ] **Success Criteria:** Public matches use default problem count ✅
+---
 
-#### 5. Tests
-- [ ] MMR calculation with problemCount=1 (K=16, smaller changes than before)
-- [ ] MMR calculation with problemCount=3 (K=48, larger changes)
-- [ ] MMR calculation with problemCount=5 (K=80, highest stakes)
-- [ ] Verify multi-problem winner determination
-- [ ] Verify matchmaking default problem count
-- [ ] **Success Criteria:** All MMR scaling tests passing ✅
+## ✅ Seasons System - COMPLETED
+
+Competitive seasons with 3-month cycles, MMR hard reset, and historical records.
+
+### Completed:
+
+#### 1. Schema ✅
+- [x] `Season` model (id, number, name, isActive, startDate, endDate)
+- [x] `SeasonRecord` model (userId, seasonId, peakMmr, peakRankTier, finalMmr, finalRankTier, wins, losses, winRate, isDisplayed)
+- [x] `@@unique([userId, seasonId])` constraint on SeasonRecord
+- [x] `seasonId` added to Battle model (links battles to seasons)
+
+#### 2. Seasons Service ✅
+- [x] `getActiveSeason()` — Get current active season
+- [x] `getAllSeasons()` — List all seasons (ordered by number desc)
+- [x] `getSeasonById(id)` — Get season details
+- [x] `getSeasonRecords(userId)` — Get user's season history with season info
+- [x] `toggleDisplaySeason(userId, seasonId)` — Toggle season record visibility on profile
+- [x] `updatePeakMmr(userId, currentMmr)` — Track peak MMR (upserts, only updates if higher)
+- [x] `incrementSeasonStats(userId, won)` — Track wins/losses with win rate calculation
+- [x] `getSeasonLeaderboard(seasonId, options)` — Leaderboard sorted by peakMmr or finalMmr
+- [x] `startSeason(name?)` — Auto-increment number, 3-month duration, deactivate previous
+- [x] `endSeason(seasonId)` — Finalize records, hard reset ALL users to MMR 1000/wins 0/losses 0
+- [x] `processSeasonTransition()` — Daily cron job, auto end/start seasons
+
+#### 3. Seasons API ✅
+- [x] `GET /api/seasons` — List all seasons
+- [x] `GET /api/seasons/active` — Get active season
+- [x] `GET /api/seasons/:id` — Get season details
+- [x] `GET /api/seasons/:id/leaderboard` — Season leaderboard (sortBy, limit, offset)
+- [x] `GET /api/users/:id/seasons` — Get user's season records
+- [x] `POST /api/users/seasons/:seasonId/display` — Toggle season display on profile
+
+#### 4. Integration ✅
+- [x] Battles linked to active season on creation
+- [x] Peak MMR and win/loss stats updated after each battle (PRO users)
+- [x] User profile includes displayed season records
+- [x] `season.ended` WebSocket event broadcast to all clients on season transition
+
+#### 5. Seed Data ✅
+- [x] Season 1 created in seed (active, 3-month duration)
+
+#### 6. Tests ✅
+- [x] 30 season service tests passing
+- [x] All existing tests updated and passing (333 total)
+- [x] **Success Criteria:** All tests passing ✅
 
 ---
 
@@ -959,7 +981,9 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [x] **Skills: All tests passing ✅** (tests in battles.service.spec + battles.gateway.spec)
 - [x] **Rank Tiers: All tests passing ✅** (18 tests in users.service.spec)
 - [ ] **Invites: All tests passing** ⏳
-- [ ] **MMR Scaling: All tests passing** ⏳
+- [x] **MMR Rebalance: All tests passing** ✅
+- [x] **Topic Tags: All tests passing** ✅
+- [x] **Seasons System: All tests passing** ✅
 - [ ] **Friends: All tests passing** ⏳
 - [ ] **Chat: All tests passing** ⏳
 - [ ] **Clan Challenges: All tests passing** ⏳
@@ -1053,7 +1077,9 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [x] Skills system working (5 skills, single-use, toggleable per game) ✅
 - [x] Rank tiers implemented (Bug → Cracked) ✅
 - [ ] Direct invite system working (link + in-app)
-- [ ] MMR scaling system
+- [x] MMR rebalance (K=16, floor at 0)
+- [x] Topic tags and filtering
+- [x] Seasons system (3-month cycles, hard reset, leaderboards)
 - [ ] **All tests passing**
 
 ### Phase 4: Social Features
@@ -1092,7 +1118,9 @@ Track daily activity for GitHub-style heatmap on profiles.
 | Subscription/Stripe | HIGH | — |
 | Skills System | HIGH | — |
 | Direct Invites | HIGH | — |
-| MMR Scaling System | HIGH | — |
+| MMR Rebalance | HIGH | ✅ |
+| Topic Tags | MEDIUM | ✅ |
+| Seasons System | HIGH | ✅ |
 | Rank Tiers | HIGH | — |
 | Friends System | MEDIUM | — |
 | Chat System | MEDIUM | WebSockets (done) |

@@ -4,9 +4,10 @@ import { BattlesController } from './battles.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CodeExecutionModule } from '../code-execution/code-execution.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { SeasonsModule } from '../seasons/seasons.module';
 
 @Module({
-    imports: [PrismaModule, CodeExecutionModule, SubscriptionsModule],
+    imports: [PrismaModule, CodeExecutionModule, SubscriptionsModule, SeasonsModule],
     controllers: [BattlesController],
     providers: [BattlesService],
     exports: [BattlesService],
