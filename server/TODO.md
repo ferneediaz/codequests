@@ -513,43 +513,92 @@ Social connections between players.
 
 ---
 
-## 📋 TODO - Chat System (MEDIUM PRIORITY)
+## ✅ Chat System - COMPLETED
 
-Real-time messaging via Socket.IO.
+Real-time messaging via Socket.IO with security hardening.
 
-### Task Breakdown:
+### Completed:
 
-#### 1. Prisma Schema Updates
-- [ ] Add `Message` model (id, senderId, content, roomType: BATTLE/LOBBY/DM, roomId, createdAt)
-- [ ] Add `Conversation` model (id, type: DM/GROUP, participantIds, createdAt)
-- [ ] Run migration
-- [ ] **Success Criteria:** Schema compiles ✅
+#### 1. Prisma Schema Updates ✅
+- [x] Add `Message` model (id, senderId, content, roomType: BATTLE/LOBBY/DM, roomId, createdAt)
+- [x] Add `Conversation` model (id, type: DM/GROUP, participantIds, createdAt, updatedAt)
+- [x] Add `ChatRoomType` and `ConversationType` enums
+- [x] Add `sentMessages` relation on User model
+- [x] Composite index on `(roomType, roomId, createdAt)` for efficient paginated queries
+- [x] **Success Criteria:** Schema compiles ✅
 
-#### 2. Chat Gateway (Socket.IO)
-- [ ] Create `chat/` module with its own Socket.IO namespace `/chat`
-- [ ] `chat.send` (client → server) — `{ roomType, roomId, content }`
-- [ ] `chat.message` (server → room) — `{ senderId, username, content, timestamp }`
-- [ ] `chat.join_room` / `chat.leave_room` — Room management
-- [ ] Room types: `battle:{battleId}`, `lobby`, `dm:{conversationId}`
-- [ ] **Success Criteria:** Messages sent and received in real-time ✅
+#### 2. Chat Gateway (Socket.IO) ✅
+- [x] Create `chat/` module with its own Socket.IO namespace `/chat`
+- [x] JWT authentication on connection via `JwtVerificationService`
+- [x] `chat.send` (client → server) — `{ roomType, roomId, content }`
+- [x] `chat.message` (server → room) — `{ senderId, senderUsername, senderAvatarUrl, content, roomType, roomId, createdAt }`
+- [x] `chat.join_room` / `chat.leave_room` — Room management with access control
+- [x] `chat.user_joined` / `chat.user_left` — Presence notifications to room members
+- [x] Room types: `lobby`, `battle:{battleId}`, `dm:{conversationId}`
+- [x] Auto-join lobby room on connect
+- [x] **Security:** Room access validated before join (prevents eavesdropping on battles/DMs)
+- [x] **Security:** Leave events only fire if client is actually in the room (prevents presence leaks)
+- [x] **Security:** Rate limiting — 10 messages per 10-second window per user (in-memory)
+- [x] **Security:** Error sanitization — only HttpException messages forwarded to clients
+- [x] **Security:** CORS reads from `CORS_ORIGIN` env var (comma-separated), falls back to wildcard
+- [x] Multi-device support: `userSocketMap` uses `Map<string, Set<string>>` (multiple tabs/devices)
+- [x] **Success Criteria:** Messages sent and received in real-time ✅
 
-#### 3. Chat API (History)
-- [ ] `GET /api/chat/:roomType/:roomId` — Get message history (paginated)
-- [ ] `GET /api/chat/conversations` — List user's DM conversations
-- [ ] `POST /api/chat/conversations` — Create DM conversation with user
-- [ ] **Success Criteria:** Chat history loads ✅
+#### 3. Chat Service ✅
+- [x] `sendMessage(userId, roomType, roomId, content)` — Validate access & persist message
+- [x] `getMessages(roomType, roomId, cursor?, limit?)` — Cursor-based pagination (oldest-first), limit capped at 100
+- [x] `createConversation(userId, targetUserId)` — Create DM (requires friendship, idempotent)
+- [x] `getConversations(userId)` — List conversations with last message & participant info
+- [x] `getConversation(conversationId, userId)` — Single conversation with participant check
+- [x] `validateRoomAccess(userId, roomType, roomId)` — Public method used by service, gateway, and controller
+  - [x] LOBBY: any authenticated user
+  - [x] BATTLE: requires `BattleParticipant` record
+  - [x] DM: requires conversation membership
+  - [x] Default case throws `ForbiddenException` for unknown room types
+- [x] **Success Criteria:** All service operations work ✅
 
-#### 4. Integration
-- [ ] Battle chat: auto-join chat room when joining battle room
-- [ ] Lobby chat: global chat room for logged-in users
-- [ ] DM: private conversations between two users
-- [ ] **Success Criteria:** All chat types work ✅
+#### 4. Chat API (REST) ✅
+- [x] `GET /api/chat/conversations` — List user's DM conversations
+- [x] `POST /api/chat/conversations` — Create DM conversation (requires friendship)
+- [x] `GET /api/chat/:roomType/:roomId` — Get message history (paginated, access-controlled, limit capped at 100)
+- [x] Swagger documentation
+- [x] Authentication guards
+- [x] **Success Criteria:** Chat history loads ✅
 
-#### 5. Tests
-- [ ] Message send/receive tests
-- [ ] Room management tests
-- [ ] Chat history pagination tests
-- [ ] **Success Criteria:** All chat tests passing ✅
+#### 5. DTOs ✅
+- [x] `SendMessageDto` — content (max 1000 chars), roomType (enum), roomId
+- [x] `CreateConversationDto` — targetUserId
+- [x] `MessageResponseDto` — Full message response with sender info
+- [x] `ConversationResponseDto` — Conversation with participants and last message
+
+#### 6. Integration ✅
+- [x] Battle chat: join chat room when joining battle room (access validated)
+- [x] Lobby chat: global chat room for logged-in users (auto-join on connect)
+- [x] DM: private conversations between friends
+- [x] **Success Criteria:** All chat types work ✅
+
+#### 7. Tests ✅
+- [x] ChatService: 17 tests passing
+  - [x] sendMessage (lobby, battle participant, battle forbidden, DM participant, DM forbidden, DM not found)
+  - [x] getMessages (no cursor, with cursor pagination, empty room)
+  - [x] createConversation (friends, existing, self, not found, not friends)
+  - [x] getConversations (with last message, empty)
+  - [x] getConversation (participant, not found, forbidden)
+- [x] ChatGateway: 21 tests passing
+  - [x] Connection (auth success + lobby join, no token, invalid token)
+  - [x] Disconnect (cleanup tracking)
+  - [x] chat.send (lobby/battle/DM broadcast, empty content, long content, unauthenticated, service errors)
+  - [x] chat.join_room (success with access validation, access denied, unauthenticated)
+  - [x] chat.leave_room (success with room check, not-in-room no-op, unauthenticated)
+  - [x] Client tracking (multiple clients, non-connected user)
+- [x] **Success Criteria:** All 38 chat tests passing ✅
+
+#### 8. Module ✅
+- [x] `ChatModule` imports `AuthModule` and `FriendsModule` (forwardRef)
+- [x] Provides `ChatService`, `ChatGateway`, `WsAuthGuard`
+- [x] Exports `ChatService` and `ChatGateway` for use by other modules
+- [x] Registered in `AppModule`
+- [x] Mock Prisma service updated with `message` and `conversation` models
 
 ---
 
