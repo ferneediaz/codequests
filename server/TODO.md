@@ -1031,26 +1031,23 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [x] Auth: All tests passing ✅ (7 tests)
 - [x] Users: All tests passing ✅ (29 tests - includes 18 rank tier tests)
 - [x] Problems: All tests passing ✅ (15 tests)
-- [x] Code Execution: All tests passing ✅ (9 unit + 17 integration)
-- [x] **Battles: All tests passing ✅ (51 tests - includes clan wins/losses test)**
-- [x] **WebSockets: All tests passing ✅ (33 tests)**
-- [x] **Matchmaking: All tests passing ✅ (39 tests)**
+- [x] Code Execution: All tests passing ✅ (9 unit + 17 integration = 26 tests)
+- [x] **Battles: All tests passing ✅ (88 tests - includes invites, skills, clan wins/losses)**
+- [x] **WebSockets (BattlesGateway): All tests passing ✅ (48 tests - includes invites, skills, presence)**
+- [x] **Matchmaking: All tests passing ✅ (40 tests)**
 - [x] **WsAuthGuard: All tests passing ✅ (8 tests)**
-- [x] **Clans: All tests passing ✅ (5 tests in clans.service.spec.ts)**
+- [x] **Clans: All tests passing ✅ (5 tests)**
 - [x] **Subscriptions: All tests passing ✅ (42 tests)**
-- [x] **Skills: All tests passing ✅** (tests in battles.service.spec + battles.gateway.spec)
-- [x] **Rank Tiers: All tests passing ✅** (18 tests in users.service.spec)
-- [ ] **Invites: All tests passing** ⏳
-- [x] **MMR Rebalance: All tests passing** ✅
-- [x] **Topic Tags: All tests passing** ✅
-- [x] **Seasons System: All tests passing** ✅
+- [x] **Seasons: All tests passing ✅ (30 tests)**
 - [x] **Friends: All tests passing ✅ (22 tests)**
-- [ ] **Chat: All tests passing** ⏳
+- [x] **Chat: All tests passing ✅ (38 tests - 19 service + 19 gateway)**
 - [ ] **Clan Challenges: All tests passing** ⏳
 - [ ] **Battle Royale Elimination: All tests passing** ⏳
 - [ ] **Achievements: All tests passing** ⏳
 - [ ] **Notifications: All tests passing** ⏳
 - [ ] **E2E Tests: Full flow working** ⏳
+
+**Total: 398 tests passing** ✅
 
 ### E2E Test Scenarios:
 - [ ] User signs up → syncs to DB → appears on leaderboard
