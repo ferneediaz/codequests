@@ -83,4 +83,12 @@ export class CreateBattleDto {
     @IsEnum(SkillType, { each: true })
     @IsOptional()
     enabledSkills?: SkillType[];
+
+    @ApiPropertyOptional({
+        description: 'Generate an invite code for this battle. Players must ready up before the game starts.',
+        default: false,
+    })
+    @IsBoolean()
+    @IsOptional()
+    withInviteCode?: boolean;
 }

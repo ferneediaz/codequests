@@ -47,6 +47,9 @@ export class BattleParticipantResponseDto {
     @ApiProperty({ description: 'Points earned in team battles' })
     pointsEarned: number;
 
+    @ApiProperty({ description: 'Whether the player is ready (invite battles)' })
+    isReady: boolean;
+
     @ApiPropertyOptional()
     submittedAt?: Date;
 
@@ -147,6 +150,12 @@ export class BattleResponseDto {
 
     @ApiPropertyOptional({ enum: SkillType, isArray: true, description: 'Skills enabled for this battle' })
     enabledSkills?: SkillType[];
+
+    @ApiPropertyOptional({ description: 'Invite code for direct invite battles' })
+    inviteCode?: string;
+
+    @ApiPropertyOptional({ description: 'When the invite code expires' })
+    inviteExpiresAt?: Date;
 
     @ApiPropertyOptional({ type: [SkillUseResponseDto], description: 'Skills used during this battle' })
     skillUses?: SkillUseResponseDto[];

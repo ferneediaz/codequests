@@ -10,10 +10,13 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { BattleMode, BattleStatus, Difficulty, SkillType } from '@prisma/client';
 import { CreateBattleDto } from './dto/create-battle.dto';
 import { getRankTier } from '../common/utils/rank-tiers';
+import { randomBytes } from 'crypto';
 
 // K-factor for Elo calculation (higher = more volatile ratings)
 const ELO_K_FACTOR = 32;
 const CLAN_MMR_CHANGE = 15;
+const INVITE_CODE_LENGTH = 8;
+const INVITE_EXPIRY_HOURS = 24;
 
 // Point values by difficulty
 const DIFFICULTY_POINTS: Record<Difficulty, number> = {
@@ -50,6 +53,35 @@ export class BattlesService {
      */
     private isTeamMode(mode: BattleMode): boolean {
         return mode === BattleMode.CLAN_VS_CLAN || mode === BattleMode.GROUP;
+    }
+
+    /**
+     * Generate a unique 8-character alphanumeric invite code (uppercase)
+     */
+    async generateInviteCode(): Promise<string> {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluded ambiguous: I, O, 0, 1
+        const maxAttempts = 10;
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const bytes = randomBytes(INVITE_CODE_LENGTH);
+            let code = '';
+            for (let i = 0; i < INVITE_CODE_LENGTH; i++) {
+                code += chars[bytes[i] % chars.length];
+            }
+
+            // Check uniqueness against active (non-expired, non-completed) battles
+            const existing = await this.prisma.battle.findFirst({
+                where: {
+                    inviteCode: code,
+                    status: { not: BattleStatus.COMPLETED },
+                },
+            });
+            if (!existing) {
+                return code;
+            }
+        }
+
+        throw new BadRequestException('Failed to generate unique invite code. Please try again.');
     }
 
     /**
@@ -112,6 +144,14 @@ export class BattlesService {
             }
         }
 
+        // Generate invite code if requested
+        let inviteCode: string | null = null;
+        let inviteExpiresAt: Date | null = null;
+        if (dto.withInviteCode) {
+            inviteCode = await this.generateInviteCode();
+            inviteExpiresAt = new Date(Date.now() + INVITE_EXPIRY_HOURS * 60 * 60 * 1000);
+        }
+
         // Create battle
         const battle = await this.prisma.battle.create({
             data: {
@@ -121,6 +161,8 @@ export class BattlesService {
                 timeLimitMinutes: dto.timeLimitMinutes || 5,
                 autoBalance: dto.autoBalance ?? true,
                 enabledSkills: dto.enabledSkills || [],
+                inviteCode,
+                inviteExpiresAt,
                 status: BattleStatus.WAITING,
                 participants: {
                     create: {
@@ -195,7 +237,7 @@ export class BattlesService {
     /**
      * Join an existing battle
      */
-    async joinBattle(userId: string, battleId: string, preferredTeam?: string) {
+    async joinBattle(userId: string, battleId: string, preferredTeam?: string, viaInviteCode?: boolean) {
         // Check if user can play (subscription / daily limit)
         const canPlay = await this.subscriptionsService.canPlay(userId);
         if (!canPlay) {
@@ -229,6 +271,11 @@ export class BattlesService {
         // Check battle is still waiting for players
         if (battle.status !== BattleStatus.WAITING) {
             throw new BadRequestException('Battle is not accepting new players');
+        }
+
+        // Block direct joins to invite-code battles (must use joinByInviteCode)
+        if (battle.inviteCode && !viaInviteCode) {
+            throw new BadRequestException('This battle requires an invite code to join');
         }
 
         // Check user is not already in the battle
@@ -285,12 +332,14 @@ export class BattlesService {
             );
         }
 
-        // Determine if battle should start
-        const shouldStart = this.shouldStartBattle(
-            battle.mode,
-            battle.participants.length + 1,
-            battle.teamSize,
-        );
+        // Determine if battle should start (invite battles never auto-start)
+        const shouldStart = battle.inviteCode
+            ? false
+            : this.shouldStartBattle(
+                battle.mode,
+                battle.participants.length + 1,
+                battle.teamSize,
+            );
 
         // Increment daily game count for all participants when battle starts
         if (shouldStart) {
@@ -1014,6 +1063,7 @@ export class BattlesService {
         return this.prisma.battle.findMany({
             where: {
                 status: BattleStatus.WAITING,
+                inviteCode: null, // Exclude invite-only battles from public list
                 // Exclude battles the user is already in
                 participants: {
                     none: { userId },
@@ -1043,5 +1093,230 @@ export class BattlesService {
             orderBy: { createdAt: 'desc' },
             take: 20,
         });
+    }
+
+    /**
+     * Get battle details by invite code (case-insensitive)
+     */
+    async getByInviteCode(code: string) {
+        const battle = await this.prisma.battle.findUnique({
+            where: { inviteCode: code.toUpperCase() },
+            include: {
+                participants: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                username: true,
+                                avatarUrl: true,
+                                mmr: true,
+                                clan: { select: { tag: true, name: true } },
+                            },
+                        },
+                    },
+                },
+                problem: {
+                    select: {
+                        id: true,
+                        title: true,
+                        difficulty: true,
+                    },
+                },
+            },
+        });
+
+        if (!battle) {
+            throw new NotFoundException('Invalid invite code');
+        }
+
+        if (battle.inviteExpiresAt && battle.inviteExpiresAt < new Date()) {
+            throw new BadRequestException('Invite code has expired');
+        }
+
+        if (battle.status !== BattleStatus.WAITING) {
+            throw new BadRequestException('Battle is no longer accepting players');
+        }
+
+        return {
+            ...battle,
+            participants: battle.participants.map((p) => ({
+                ...p,
+                user: {
+                    ...p.user,
+                    tier: getRankTier(p.user.mmr),
+                },
+            })),
+        };
+    }
+
+    /**
+     * Join a battle via invite code (case-insensitive)
+     */
+    async joinByInviteCode(userId: string, code: string) {
+        const battle = await this.getByInviteCode(code);
+        return this.joinBattle(userId, battle.id, undefined, true);
+    }
+
+    /**
+     * Mark a participant as ready. When all participants are ready, start the battle.
+     * Returns the updated battle and whether the battle started.
+     */
+    async readyUp(battleId: string, userId: string) {
+        // Use a transaction to prevent race conditions when multiple players ready up simultaneously
+        const allReady = await this.prisma.$transaction(async (tx) => {
+            const battle = await tx.battle.findUnique({
+                where: { id: battleId },
+                include: {
+                    participants: true,
+                },
+            });
+
+            if (!battle) {
+                throw new NotFoundException(`Battle with ID ${battleId} not found`);
+            }
+
+            if (battle.status !== BattleStatus.WAITING) {
+                throw new BadRequestException('Battle is not in waiting state');
+            }
+
+            const participant = battle.participants.find((p) => p.userId === userId);
+            if (!participant) {
+                throw new ForbiddenException('You are not a participant in this battle');
+            }
+
+            if (participant.isReady) {
+                throw new BadRequestException('You are already ready');
+            }
+
+            // Need at least 2 participants to ready up
+            if (battle.participants.length < 2) {
+                throw new BadRequestException('Not enough players to ready up');
+            }
+
+            // Mark this participant as ready
+            await tx.battleParticipant.update({
+                where: { id: participant.id },
+                data: { isReady: true },
+            });
+
+            // Check if all participants are now ready
+            const otherReady = battle.participants
+                .filter((p) => p.userId !== userId)
+                .every((p) => p.isReady);
+
+            if (otherReady) {
+                // Increment daily game counts for all participants
+                for (const p of battle.participants) {
+                    await this.subscriptionsService.incrementGamesPlayed(p.userId);
+                }
+
+                // Start the battle
+                await tx.battle.update({
+                    where: { id: battleId },
+                    data: {
+                        status: BattleStatus.IN_PROGRESS,
+                        startedAt: new Date(),
+                    },
+                });
+            }
+
+            return otherReady;
+        });
+
+        return {
+            battle: await this.getBattleDetails(battleId),
+            started: allReady,
+        };
+    }
+
+    /**
+     * Unready a participant (toggle ready state off)
+     */
+    async unready(battleId: string, userId: string) {
+        const battle = await this.prisma.battle.findUnique({
+            where: { id: battleId },
+            include: { participants: true },
+        });
+
+        if (!battle) {
+            throw new NotFoundException(`Battle with ID ${battleId} not found`);
+        }
+
+        if (battle.status !== BattleStatus.WAITING) {
+            throw new BadRequestException('Battle is not in waiting state');
+        }
+
+        const participant = battle.participants.find((p) => p.userId === userId);
+        if (!participant) {
+            throw new ForbiddenException('You are not a participant in this battle');
+        }
+
+        if (!participant.isReady) {
+            throw new BadRequestException('You are not currently ready');
+        }
+
+        await this.prisma.battleParticipant.update({
+            where: { id: participant.id },
+            data: { isReady: false },
+        });
+
+        return this.getBattleDetails(battleId);
+    }
+
+    /**
+     * Send an in-app invite to a user by username
+     */
+    async inviteUserToBattle(battleId: string, inviterUserId: string, targetUsername: string) {
+        const battle = await this.prisma.battle.findUnique({
+            where: { id: battleId },
+            include: { participants: true },
+        });
+
+        if (!battle) {
+            throw new NotFoundException(`Battle with ID ${battleId} not found`);
+        }
+
+        if (battle.status !== BattleStatus.WAITING) {
+            throw new BadRequestException('Battle is not accepting players');
+        }
+
+        // Verify inviter is a participant
+        const inviterParticipant = battle.participants.find(
+            (p) => p.userId === inviterUserId,
+        );
+        if (!inviterParticipant) {
+            throw new ForbiddenException('You are not a participant in this battle');
+        }
+
+        // Find target user
+        const targetUser = await this.prisma.user.findUnique({
+            where: { username: targetUsername },
+        });
+        if (!targetUser) {
+            throw new NotFoundException(`User "${targetUsername}" not found`);
+        }
+
+        // Check target is not already in the battle
+        const targetInBattle = battle.participants.find(
+            (p) => p.userId === targetUser.id,
+        );
+        if (targetInBattle) {
+            throw new BadRequestException('User is already in this battle');
+        }
+
+        // Get inviter info for the notification
+        const inviter = await this.prisma.user.findUnique({
+            where: { id: inviterUserId },
+            select: { username: true, avatarUrl: true },
+        });
+
+        return {
+            targetUserId: targetUser.id,
+            battleId,
+            inviterUsername: inviter?.username,
+            inviterAvatarUrl: inviter?.avatarUrl,
+            battleMode: battle.mode,
+            inviteCode: battle.inviteCode,
+        };
     }
 }

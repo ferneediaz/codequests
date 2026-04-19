@@ -100,6 +100,8 @@ describe('BattlesService', () => {
         timeLimitMinutes: 5,
         autoBalance: true,
         enabledSkills: [] as SkillType[],
+        inviteCode: null as string | null,
+        inviteExpiresAt: null as Date | null,
         status: BattleStatus.WAITING,
         startedAt: null,
         endedAt: null,
@@ -924,6 +926,7 @@ describe('BattlesService', () => {
                 expect.objectContaining({
                     where: {
                         status: BattleStatus.WAITING,
+                        inviteCode: null,
                         participants: {
                             none: { userId: mockUser1.id },
                         },
@@ -1984,6 +1987,747 @@ describe('BattlesService', () => {
                     }),
                 }),
             );
+        });
+    });
+
+    describe('generateInviteCode', () => {
+        it('should generate an 8-character uppercase alphanumeric code', async () => {
+            prisma.battle.findFirst.mockResolvedValue(null); // no collision
+
+            const code = await service.generateInviteCode();
+
+            expect(code).toHaveLength(8);
+            expect(code).toMatch(/^[A-Z2-9]+$/);
+        });
+
+        it('should retry if generated code already exists', async () => {
+            // First call: collision, second call: no collision
+            prisma.battle.findFirst
+                .mockResolvedValueOnce({ id: 'existing-battle' }) // collision
+                .mockResolvedValueOnce(null); // unique
+
+            const code = await service.generateInviteCode();
+
+            expect(code).toHaveLength(8);
+            expect(prisma.battle.findFirst).toHaveBeenCalledTimes(2);
+        });
+
+        it('should throw after max attempts if all codes collide', async () => {
+            // Always return a collision
+            prisma.battle.findFirst.mockResolvedValue({ id: 'existing-battle' });
+
+            await expect(service.generateInviteCode()).rejects.toThrow(
+                /Failed to generate unique invite code/,
+            );
+
+            expect(prisma.battle.findFirst).toHaveBeenCalledTimes(10);
+        });
+
+        it('should not include ambiguous characters (I, O, 0, 1)', async () => {
+            prisma.battle.findFirst.mockResolvedValue(null);
+
+            // Generate many codes to statistically verify no ambiguous chars
+            for (let i = 0; i < 20; i++) {
+                const code = await service.generateInviteCode();
+                expect(code).not.toMatch(/[IO01]/);
+            }
+        });
+
+        it('should only check non-completed battles for uniqueness', async () => {
+            prisma.battle.findFirst.mockResolvedValue(null);
+
+            await service.generateInviteCode();
+
+            expect(prisma.battle.findFirst).toHaveBeenCalledWith({
+                where: {
+                    inviteCode: expect.any(String),
+                    status: { not: BattleStatus.COMPLETED },
+                },
+            });
+        });
+    });
+
+    describe('createBattle with invite code', () => {
+        it('should create a battle with invite code when withInviteCode is true', async () => {
+            prisma.problem.findUnique.mockResolvedValue(mockProblem);
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            // No collision for invite code (now uses findFirst)
+            prisma.battle.findFirst.mockResolvedValue(null);
+            prisma.battle.findUnique.mockResolvedValue({         // getBattleDetails
+                    ...mockBattle,
+                    inviteCode: 'ABCD1234',
+                    inviteExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                    participants: [{
+                        id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                        user: mockUser1, teamId: null, testsPassed: 0,
+                        totalTests: 2, pointsEarned: 0, isReady: false,
+                        submittedAt: null, mmrChange: null,
+                    }],
+                    problem: mockProblem,
+                    skillUses: [],
+                });
+
+            prisma.battle.create.mockResolvedValue({
+                ...mockBattle,
+                inviteCode: 'ABCD1234',
+                inviteExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                participants: [{
+                    id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                    user: mockUser1, teamId: null, testsPassed: 0,
+                    totalTests: 2, pointsEarned: 0, isReady: false,
+                    submittedAt: null, mmrChange: null,
+                }],
+                problem: mockProblem,
+            });
+
+            const dto: CreateBattleDto = {
+                problemId: 'problem-1',
+                withInviteCode: true,
+            };
+
+            await service.createBattle('user-1', dto);
+
+            expect(prisma.battle.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        inviteCode: expect.any(String),
+                        inviteExpiresAt: expect.any(Date),
+                    }),
+                }),
+            );
+        });
+
+        it('should create a battle without invite code when withInviteCode is false', async () => {
+            prisma.problem.findUnique.mockResolvedValue(mockProblem);
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+
+            const createdBattle = {
+                ...mockBattle,
+                participants: [{
+                    id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                    user: mockUser1, teamId: null, testsPassed: 0,
+                    totalTests: 2, pointsEarned: 0, isReady: false,
+                    submittedAt: null, mmrChange: null,
+                }],
+                problem: mockProblem,
+                skillUses: [],
+            };
+
+            prisma.battle.create.mockResolvedValue(createdBattle);
+            prisma.battle.findUnique.mockResolvedValue(createdBattle);
+
+            await service.createBattle('user-1', { problemId: 'problem-1' });
+
+            expect(prisma.battle.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        inviteCode: null,
+                        inviteExpiresAt: null,
+                    }),
+                }),
+            );
+        });
+    });
+
+    describe('getByInviteCode', () => {
+        const battleWithInvite = {
+            ...mockBattle,
+            inviteCode: 'ABCD1234',
+            inviteExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            status: BattleStatus.WAITING,
+            participants: [{
+                id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                user: { ...mockUser1, clan: null },
+                teamId: null, testsPassed: 0, totalTests: 2,
+                pointsEarned: 0, isReady: false, submittedAt: null, mmrChange: null,
+            }],
+            problem: { id: 'problem-1', title: 'Two Sum', difficulty: 'EASY' },
+        };
+
+        it('should return battle details for a valid invite code', async () => {
+            prisma.battle.findUnique.mockResolvedValue(battleWithInvite);
+
+            const result = await service.getByInviteCode('ABCD1234');
+
+            expect(result.id).toBe('battle-1');
+            expect(result.inviteCode).toBe('ABCD1234');
+            expect(prisma.battle.findUnique).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { inviteCode: 'ABCD1234' },
+                }),
+            );
+        });
+
+        it('should be case-insensitive (normalizes to uppercase)', async () => {
+            prisma.battle.findUnique.mockResolvedValue(battleWithInvite);
+
+            await service.getByInviteCode('abcd1234');
+
+            expect(prisma.battle.findUnique).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { inviteCode: 'ABCD1234' },
+                }),
+            );
+        });
+
+        it('should throw NotFoundException for invalid invite code', async () => {
+            prisma.battle.findUnique.mockResolvedValue(null);
+
+            await expect(service.getByInviteCode('INVALID1')).rejects.toThrow(
+                NotFoundException,
+            );
+        });
+
+        it('should throw BadRequestException for expired invite code', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...battleWithInvite,
+                inviteExpiresAt: new Date(Date.now() - 1000), // expired
+            });
+
+            await expect(service.getByInviteCode('ABCD1234')).rejects.toThrow(
+                /expired/,
+            );
+        });
+
+        it('should throw BadRequestException if battle is no longer WAITING', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...battleWithInvite,
+                status: BattleStatus.IN_PROGRESS,
+            });
+
+            await expect(service.getByInviteCode('ABCD1234')).rejects.toThrow(
+                /no longer accepting/,
+            );
+        });
+
+        it('should include rank tier in participant user data', async () => {
+            prisma.battle.findUnique.mockResolvedValue(battleWithInvite);
+
+            const result = await service.getByInviteCode('ABCD1234');
+
+            expect(result.participants[0].user).toHaveProperty('tier');
+            expect(result.participants[0].user.tier).toHaveProperty('name');
+        });
+    });
+
+    describe('joinByInviteCode', () => {
+        it('should find battle by code and delegate to joinBattle', async () => {
+            const battleWithInvite = {
+                ...mockBattle,
+                inviteCode: 'ABCD1234',
+                inviteExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                status: BattleStatus.WAITING,
+                participants: [{
+                    id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                    user: { ...mockUser1, clan: null, mmr: 1000 },
+                    teamId: null, testsPassed: 0, totalTests: 2,
+                    pointsEarned: 0, isReady: false, submittedAt: null, mmrChange: null,
+                }],
+                problem: { id: 'problem-1', title: 'Two Sum', difficulty: 'EASY' },
+            };
+
+            // getByInviteCode lookup
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(battleWithInvite) // getByInviteCode
+                .mockResolvedValueOnce({                  // joinBattle: findUnique
+                    ...battleWithInvite,
+                    problem: { ...mockProblem },
+                    problemPool: null,
+                })
+                .mockResolvedValueOnce(battleWithInvite); // getBattleDetails after join
+
+            prisma.user.findUnique.mockResolvedValue(mockUser2);
+            prisma.battle.update.mockResolvedValue(battleWithInvite);
+
+            await service.joinByInviteCode('user-2', 'abcd1234');
+
+            // Verify the code was normalized to uppercase for lookup
+            expect(prisma.battle.findUnique).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { inviteCode: 'ABCD1234' },
+                }),
+            );
+        });
+    });
+
+    describe('readyUp', () => {
+        const twoPlayerBattle = {
+            ...mockBattle,
+            inviteCode: 'ABCD1234',
+            participants: [
+                {
+                    id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                    teamId: null, code: null, language: null,
+                    testsPassed: 0, totalTests: 2, pointsEarned: 0,
+                    isReady: false, submittedAt: null, mmrChange: null,
+                },
+                {
+                    id: 'p2', battleId: 'battle-1', userId: 'user-2',
+                    teamId: null, code: null, language: null,
+                    testsPassed: 0, totalTests: 2, pointsEarned: 0,
+                    isReady: false, submittedAt: null, mmrChange: null,
+                },
+            ],
+        };
+
+        beforeEach(() => {
+            prisma.$transaction.mockImplementation(async (callback) => callback(prisma));
+        });
+
+        it('should mark a participant as ready', async () => {
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(twoPlayerBattle) // readyUp tx lookup
+                .mockResolvedValueOnce({                 // getBattleDetails
+                    ...twoPlayerBattle,
+                    participants: [{
+                        ...twoPlayerBattle.participants[0], isReady: true,
+                        user: { ...mockUser1, clan: null },
+                    }, {
+                        ...twoPlayerBattle.participants[1], isReady: false,
+                        user: { ...mockUser2, clan: null },
+                    }],
+                    problem: mockProblem,
+                    skillUses: [],
+                });
+            prisma.battleParticipant.update.mockResolvedValue({
+                ...twoPlayerBattle.participants[0], isReady: true,
+            });
+
+            const result = await service.readyUp('battle-1', 'user-1');
+
+            expect(result.started).toBe(false);
+            expect(prisma.battleParticipant.update).toHaveBeenCalledWith({
+                where: { id: 'p1' },
+                data: { isReady: true },
+            });
+        });
+
+        it('should start battle when all participants are ready', async () => {
+            const battleOneReady = {
+                ...twoPlayerBattle,
+                participants: [
+                    { ...twoPlayerBattle.participants[0], isReady: true },  // user-1 already ready
+                    { ...twoPlayerBattle.participants[1], isReady: false }, // user-2 about to ready
+                ],
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(battleOneReady) // readyUp tx lookup
+                .mockResolvedValueOnce({               // getBattleDetails after start
+                    ...battleOneReady,
+                    status: BattleStatus.IN_PROGRESS,
+                    startedAt: new Date(),
+                    participants: battleOneReady.participants.map((p) => ({
+                        ...p, isReady: true,
+                        user: p.userId === 'user-1'
+                            ? { ...mockUser1, clan: null }
+                            : { ...mockUser2, clan: null },
+                    })),
+                    problem: mockProblem,
+                    skillUses: [],
+                });
+
+            prisma.battleParticipant.update.mockResolvedValue({
+                ...battleOneReady.participants[1], isReady: true,
+            });
+            prisma.battle.update.mockResolvedValue({
+                ...battleOneReady,
+                status: BattleStatus.IN_PROGRESS,
+                startedAt: new Date(),
+            });
+
+            const result = await service.readyUp('battle-1', 'user-2');
+
+            expect(result.started).toBe(true);
+            // Should have started the battle
+            expect(prisma.battle.update).toHaveBeenCalledWith({
+                where: { id: 'battle-1' },
+                data: {
+                    status: BattleStatus.IN_PROGRESS,
+                    startedAt: expect.any(Date),
+                },
+            });
+            // Should have incremented game counts for both players
+            expect(subscriptionsService.incrementGamesPlayed).toHaveBeenCalledWith('user-1');
+            expect(subscriptionsService.incrementGamesPlayed).toHaveBeenCalledWith('user-2');
+        });
+
+        it('should throw NotFoundException if battle does not exist', async () => {
+            prisma.battle.findUnique.mockResolvedValue(null);
+
+            await expect(service.readyUp('nonexistent', 'user-1')).rejects.toThrow(
+                NotFoundException,
+            );
+        });
+
+        it('should throw BadRequestException if battle is not WAITING', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...twoPlayerBattle,
+                status: BattleStatus.IN_PROGRESS,
+            });
+
+            await expect(service.readyUp('battle-1', 'user-1')).rejects.toThrow(
+                /not in waiting state/,
+            );
+        });
+
+        it('should throw ForbiddenException if user is not a participant', async () => {
+            prisma.battle.findUnique.mockResolvedValue(twoPlayerBattle);
+
+            await expect(service.readyUp('battle-1', 'non-participant')).rejects.toThrow(
+                ForbiddenException,
+            );
+        });
+
+        it('should throw BadRequestException if user is already ready', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...twoPlayerBattle,
+                participants: [
+                    { ...twoPlayerBattle.participants[0], isReady: true },
+                    twoPlayerBattle.participants[1],
+                ],
+            });
+
+            await expect(service.readyUp('battle-1', 'user-1')).rejects.toThrow(
+                /already ready/,
+            );
+        });
+
+        it('should throw BadRequestException if only one participant', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...twoPlayerBattle,
+                participants: [twoPlayerBattle.participants[0]],
+            });
+
+            await expect(service.readyUp('battle-1', 'user-1')).rejects.toThrow(
+                /Not enough players/,
+            );
+        });
+
+        it('should not start if only some participants are ready', async () => {
+            const threePlayerBattle = {
+                ...twoPlayerBattle,
+                participants: [
+                    { ...twoPlayerBattle.participants[0], isReady: false },
+                    { ...twoPlayerBattle.participants[1], isReady: false },
+                    {
+                        id: 'p3', battleId: 'battle-1', userId: 'user-3',
+                        teamId: null, code: null, language: null,
+                        testsPassed: 0, totalTests: 2, pointsEarned: 0,
+                        isReady: false, submittedAt: null, mmrChange: null,
+                    },
+                ],
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(threePlayerBattle) // tx lookup
+                .mockResolvedValueOnce({                   // getBattleDetails
+                    ...threePlayerBattle,
+                    participants: threePlayerBattle.participants.map((p) => ({
+                        ...p,
+                        user: { ...mockUser1, id: p.userId, clan: null },
+                    })),
+                    problem: mockProblem,
+                    skillUses: [],
+                });
+            prisma.battleParticipant.update.mockResolvedValue({
+                ...threePlayerBattle.participants[0], isReady: true,
+            });
+
+            const result = await service.readyUp('battle-1', 'user-1');
+
+            expect(result.started).toBe(false);
+            // Should NOT have updated battle status
+            expect(prisma.battle.update).not.toHaveBeenCalled();
+        });
+
+        it('should execute readyUp within a transaction', async () => {
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(twoPlayerBattle)
+                .mockResolvedValueOnce({
+                    ...twoPlayerBattle,
+                    participants: twoPlayerBattle.participants.map((p) => ({
+                        ...p,
+                        user: { ...mockUser1, id: p.userId, clan: null },
+                    })),
+                    problem: mockProblem,
+                    skillUses: [],
+                });
+            prisma.battleParticipant.update.mockResolvedValue({
+                ...twoPlayerBattle.participants[0], isReady: true,
+            });
+
+            await service.readyUp('battle-1', 'user-1');
+
+            expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+            expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+        });
+    });
+
+    describe('unready', () => {
+        const twoPlayerBattle = {
+            ...mockBattle,
+            participants: [
+                {
+                    id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                    teamId: null, isReady: true,
+                    code: null, language: null, testsPassed: 0,
+                    totalTests: 2, pointsEarned: 0,
+                    submittedAt: null, mmrChange: null,
+                },
+                {
+                    id: 'p2', battleId: 'battle-1', userId: 'user-2',
+                    teamId: null, isReady: false,
+                    code: null, language: null, testsPassed: 0,
+                    totalTests: 2, pointsEarned: 0,
+                    submittedAt: null, mmrChange: null,
+                },
+            ],
+        };
+
+        it('should set a ready participant back to not ready', async () => {
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(twoPlayerBattle)
+                .mockResolvedValueOnce({
+                    ...twoPlayerBattle,
+                    participants: twoPlayerBattle.participants.map((p) => ({
+                        ...p, isReady: false,
+                        user: { ...mockUser1, id: p.userId, clan: null },
+                    })),
+                    problem: mockProblem,
+                    skillUses: [],
+                });
+            prisma.battleParticipant.update.mockResolvedValue({
+                ...twoPlayerBattle.participants[0], isReady: false,
+            });
+
+            await service.unready('battle-1', 'user-1');
+
+            expect(prisma.battleParticipant.update).toHaveBeenCalledWith({
+                where: { id: 'p1' },
+                data: { isReady: false },
+            });
+        });
+
+        it('should throw NotFoundException if battle does not exist', async () => {
+            prisma.battle.findUnique.mockResolvedValue(null);
+
+            await expect(service.unready('nonexistent', 'user-1')).rejects.toThrow(
+                NotFoundException,
+            );
+        });
+
+        it('should throw BadRequestException if battle is not WAITING', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...twoPlayerBattle,
+                status: BattleStatus.IN_PROGRESS,
+            });
+
+            await expect(service.unready('battle-1', 'user-1')).rejects.toThrow(
+                /not in waiting state/,
+            );
+        });
+
+        it('should throw ForbiddenException if user is not a participant', async () => {
+            prisma.battle.findUnique.mockResolvedValue(twoPlayerBattle);
+
+            await expect(service.unready('battle-1', 'non-participant')).rejects.toThrow(
+                ForbiddenException,
+            );
+        });
+
+        it('should throw BadRequestException if user is not currently ready', async () => {
+            prisma.battle.findUnique.mockResolvedValue(twoPlayerBattle);
+
+            await expect(service.unready('battle-1', 'user-2')).rejects.toThrow(
+                /not currently ready/,
+            );
+        });
+    });
+
+    describe('inviteUserToBattle', () => {
+        const battleWithParticipant = {
+            ...mockBattle,
+            inviteCode: 'ABCD1234',
+            participants: [
+                {
+                    id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                    teamId: null, isReady: false,
+                    code: null, language: null, testsPassed: 0,
+                    totalTests: 2, pointsEarned: 0,
+                    submittedAt: null, mmrChange: null,
+                },
+            ],
+        };
+
+        it('should return invite data for a valid invite', async () => {
+            prisma.battle.findUnique.mockResolvedValue(battleWithParticipant);
+            prisma.user.findUnique
+                .mockResolvedValueOnce(mockUser2)                          // target user lookup
+                .mockResolvedValueOnce({ username: 'alice', avatarUrl: null }); // inviter info
+
+            const result = await service.inviteUserToBattle('battle-1', 'user-1', 'bob');
+
+            expect(result.targetUserId).toBe('user-2');
+            expect(result.battleId).toBe('battle-1');
+            expect(result.inviterUsername).toBe('alice');
+            expect(result.battleMode).toBe(BattleMode.ONE_V_ONE);
+            expect(result.inviteCode).toBe('ABCD1234');
+        });
+
+        it('should throw NotFoundException if battle does not exist', async () => {
+            prisma.battle.findUnique.mockResolvedValue(null);
+
+            await expect(
+                service.inviteUserToBattle('nonexistent', 'user-1', 'bob'),
+            ).rejects.toThrow(NotFoundException);
+        });
+
+        it('should throw BadRequestException if battle is not WAITING', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...battleWithParticipant,
+                status: BattleStatus.IN_PROGRESS,
+            });
+
+            await expect(
+                service.inviteUserToBattle('battle-1', 'user-1', 'bob'),
+            ).rejects.toThrow(/not accepting players/);
+        });
+
+        it('should throw ForbiddenException if inviter is not a participant', async () => {
+            prisma.battle.findUnique.mockResolvedValue(battleWithParticipant);
+
+            await expect(
+                service.inviteUserToBattle('battle-1', 'non-participant', 'bob'),
+            ).rejects.toThrow(ForbiddenException);
+        });
+
+        it('should throw NotFoundException if target user does not exist', async () => {
+            prisma.battle.findUnique.mockResolvedValue(battleWithParticipant);
+            prisma.user.findUnique.mockResolvedValue(null);
+
+            await expect(
+                service.inviteUserToBattle('battle-1', 'user-1', 'nonexistent'),
+            ).rejects.toThrow(/not found/);
+        });
+
+        it('should throw BadRequestException if target user is already in battle', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...battleWithParticipant,
+                participants: [
+                    ...battleWithParticipant.participants,
+                    {
+                        id: 'p2', battleId: 'battle-1', userId: 'user-2',
+                        teamId: null, isReady: false,
+                        code: null, language: null, testsPassed: 0,
+                        totalTests: 2, pointsEarned: 0,
+                        submittedAt: null, mmrChange: null,
+                    },
+                ],
+            });
+            prisma.user.findUnique.mockResolvedValue(mockUser2);
+
+            await expect(
+                service.inviteUserToBattle('battle-1', 'user-1', 'bob'),
+            ).rejects.toThrow(/already in this battle/);
+        });
+    });
+
+    describe('joinBattle with invite code (no auto-start)', () => {
+        it('should throw BadRequestException when directly joining an invite-code battle', async () => {
+            const inviteBattle = {
+                ...mockBattle,
+                inviteCode: 'ABCD1234',
+                inviteExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                participants: [{
+                    id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                    teamId: null, code: null, language: null,
+                    testsPassed: 0, totalTests: 2, pointsEarned: 0,
+                    isReady: false, submittedAt: null, mmrChange: null,
+                    user: { mmr: 1000, clanId: null },
+                }],
+                problem: { ...mockProblem },
+                problemPool: null,
+            };
+
+            prisma.battle.findUnique.mockResolvedValue(inviteBattle);
+            prisma.user.findUnique.mockResolvedValue(mockUser2);
+
+            await expect(
+                service.joinBattle('user-2', 'battle-1'),
+            ).rejects.toThrow(/invite code to join/);
+        });
+
+        it('should not auto-start a 1v1 invite battle when joined via invite code', async () => {
+            const inviteBattle = {
+                ...mockBattle,
+                inviteCode: 'ABCD1234',
+                inviteExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                participants: [{
+                    id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                    teamId: null, code: null, language: null,
+                    testsPassed: 0, totalTests: 2, pointsEarned: 0,
+                    isReady: false, submittedAt: null, mmrChange: null,
+                    user: { mmr: 1000, clanId: null },
+                }],
+                problem: { ...mockProblem },
+                problemPool: null,
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(inviteBattle)  // joinBattle lookup
+                .mockResolvedValueOnce(inviteBattle); // not used for this test path
+            prisma.user.findUnique.mockResolvedValue(mockUser2);
+            prisma.battle.update.mockResolvedValue(inviteBattle);
+
+            await service.joinBattle('user-2', 'battle-1', undefined, true);
+
+            // Should NOT start the battle - status stays WAITING
+            expect(prisma.battle.update).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        status: BattleStatus.WAITING,
+                    }),
+                }),
+            );
+            // Should NOT have incremented game counts
+            expect(subscriptionsService.incrementGamesPlayed).not.toHaveBeenCalled();
+        });
+
+        it('should auto-start a non-invite 1v1 battle when second player joins', async () => {
+            const normalBattle = {
+                ...mockBattle,
+                inviteCode: null,
+                participants: [{
+                    id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                    teamId: null, code: null, language: null,
+                    testsPassed: 0, totalTests: 2, pointsEarned: 0,
+                    isReady: false, submittedAt: null, mmrChange: null,
+                    user: { mmr: 1000, clanId: null },
+                }],
+                problem: { ...mockProblem },
+                problemPool: null,
+            };
+
+            prisma.battle.findUnique.mockResolvedValue(normalBattle);
+            prisma.user.findUnique.mockResolvedValue(mockUser2);
+            prisma.battle.update.mockResolvedValue({
+                ...normalBattle,
+                status: BattleStatus.IN_PROGRESS,
+            });
+
+            await service.joinBattle('user-2', 'battle-1');
+
+            // SHOULD start the battle
+            expect(prisma.battle.update).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        status: BattleStatus.IN_PROGRESS,
+                    }),
+                }),
+            );
+            // Should have incremented game counts
+            expect(subscriptionsService.incrementGamesPlayed).toHaveBeenCalledTimes(2);
         });
     });
 });

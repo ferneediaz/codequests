@@ -37,6 +37,7 @@ interface LeaveRoomPayload {
 interface RoomResult {
     success: boolean;
     error?: string;
+    delivered?: boolean;
 }
 
 interface SubmissionData {
@@ -51,6 +52,15 @@ interface UseSkillPayload {
     battleId: string;
     targetUserId: string;
     skillType: SkillType;
+}
+
+interface ReadyPayload {
+    battleId: string;
+}
+
+interface InviteUserPayload {
+    battleId: string;
+    targetUsername: string;
 }
 
 // Duration in seconds for each skill effect (0 = instant)
@@ -308,6 +318,123 @@ export class BattlesGateway
             });
 
             return { success: true };
+        } catch (error) {
+            client.emit('error', { message: (error as Error).message });
+            return { success: false, error: (error as Error).message };
+        }
+    }
+
+    /**
+     * Handle player ready up
+     */
+    @UseGuards(WsAuthGuard)
+    @SubscribeMessage('battle.ready')
+    async handleReady(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() payload: ReadyPayload,
+    ): Promise<RoomResult> {
+        const user = client.data.user;
+
+        if (!user) {
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        const { battleId } = payload;
+
+        try {
+            const result = await this.battlesService.readyUp(battleId, user.id);
+
+            // Broadcast ready status to room
+            this.server.to(`battle:${battleId}`).emit('battle.player_ready', {
+                userId: user.id,
+                username: user.username,
+                isReady: true,
+            });
+
+            // If all players are ready and battle started
+            if (result.started) {
+                this.emitBattleStarted(battleId, result.battle);
+            }
+
+            return { success: true };
+        } catch (error) {
+            client.emit('error', { message: (error as Error).message });
+            return { success: false, error: (error as Error).message };
+        }
+    }
+
+    /**
+     * Handle player unready
+     */
+    @UseGuards(WsAuthGuard)
+    @SubscribeMessage('battle.unready')
+    async handleUnready(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() payload: ReadyPayload,
+    ): Promise<RoomResult> {
+        const user = client.data.user;
+
+        if (!user) {
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        const { battleId } = payload;
+
+        try {
+            await this.battlesService.unready(battleId, user.id);
+
+            // Broadcast unready status to room
+            this.server.to(`battle:${battleId}`).emit('battle.player_ready', {
+                userId: user.id,
+                username: user.username,
+                isReady: false,
+            });
+
+            return { success: true };
+        } catch (error) {
+            client.emit('error', { message: (error as Error).message });
+            return { success: false, error: (error as Error).message };
+        }
+    }
+
+    /**
+     * Handle in-app invite to a user by username
+     */
+    @UseGuards(WsAuthGuard)
+    @SubscribeMessage('battle.invite_user')
+    async handleInviteUser(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() payload: InviteUserPayload,
+    ): Promise<RoomResult> {
+        const user = client.data.user;
+
+        if (!user) {
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        const { battleId, targetUsername } = payload;
+
+        try {
+            const inviteData = await this.battlesService.inviteUserToBattle(
+                battleId,
+                user.id,
+                targetUsername,
+            );
+
+            // Send invite notification to the target user if online
+            const targetSocket = this.getSocketByUserId(inviteData.targetUserId);
+            const delivered = !!targetSocket;
+            if (targetSocket) {
+                targetSocket.emit('battle.invite_received', {
+                    battleId: inviteData.battleId,
+                    inviterUsername: inviteData.inviterUsername,
+                    inviterAvatarUrl: inviteData.inviterAvatarUrl,
+                    battleMode: inviteData.battleMode,
+                    inviteCode: inviteData.inviteCode,
+                });
+            }
+
+            return { success: true, delivered };
         } catch (error) {
             client.emit('error', { message: (error as Error).message });
             return { success: false, error: (error as Error).message };

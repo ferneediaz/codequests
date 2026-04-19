@@ -21,6 +21,9 @@ describe('BattlesGateway', () => {
         completeBattle: jest.Mock;
         createBattle: jest.Mock;
         useSkill: jest.Mock;
+        readyUp: jest.Mock;
+        unready: jest.Mock;
+        inviteUserToBattle: jest.Mock;
     };
     let mockServer: {
         to: jest.Mock;
@@ -136,6 +139,9 @@ describe('BattlesGateway', () => {
             completeBattle: jest.fn(),
             createBattle: jest.fn(),
             useSkill: jest.fn(),
+            readyUp: jest.fn(),
+            unready: jest.fn(),
+            inviteUserToBattle: jest.fn(),
         };
 
         mockServer = {
@@ -768,6 +774,218 @@ describe('BattlesGateway', () => {
                 fromUserId: 'user-1',
                 duration: expectedDuration,
             });
+        });
+    });
+
+    describe('Ready Up', () => {
+        it('should broadcast battle.player_ready when a player readies up', async () => {
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
+            await gateway.handleConnection(socket1);
+
+            mockBattlesService.readyUp.mockResolvedValue({
+                battle: mockBattle,
+                started: false,
+            });
+
+            const result = await gateway.handleReady(socket1, { battleId: 'battle-1' });
+
+            expect(result).toEqual({ success: true });
+            expect(mockServer.to).toHaveBeenCalledWith('battle:battle-1');
+            expect(mockServer.emit).toHaveBeenCalledWith('battle.player_ready', {
+                userId: 'user-1',
+                username: 'alice',
+                isReady: true,
+            });
+        });
+
+        it('should emit battle.started when all players are ready', async () => {
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
+            await gateway.handleConnection(socket1);
+
+            const startedBattle = {
+                ...mockBattle,
+                status: 'IN_PROGRESS',
+                startedAt: new Date(),
+            };
+            mockBattlesService.readyUp.mockResolvedValue({
+                battle: startedBattle,
+                started: true,
+            });
+
+            const result = await gateway.handleReady(socket1, { battleId: 'battle-1' });
+
+            expect(result).toEqual({ success: true });
+            // Should emit player_ready
+            expect(mockServer.emit).toHaveBeenCalledWith('battle.player_ready', expect.any(Object));
+            // Should emit battle.started
+            expect(mockServer.emit).toHaveBeenCalledWith('battle.started', expect.objectContaining({
+                battleId: 'battle-1',
+                status: 'IN_PROGRESS',
+            }));
+        });
+
+        it('should return error when readyUp validation fails', async () => {
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
+            await gateway.handleConnection(socket1);
+
+            mockBattlesService.readyUp.mockRejectedValue(
+                new Error('You are already ready'),
+            );
+
+            const result = await gateway.handleReady(socket1, { battleId: 'battle-1' });
+
+            expect(result).toEqual({ success: false, error: 'You are already ready' });
+            expect(socket1.emit).toHaveBeenCalledWith('error', { message: 'You are already ready' });
+        });
+
+        it('should return error when user is not authenticated', async () => {
+            const socket = createMockSocket();
+            socket.data = {};
+
+            const result = await gateway.handleReady(socket, { battleId: 'battle-1' });
+
+            expect(result).toEqual({ success: false, error: 'Not authenticated' });
+        });
+    });
+
+    describe('Unready', () => {
+        it('should broadcast battle.player_ready with isReady false when a player unreadies', async () => {
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
+            await gateway.handleConnection(socket1);
+
+            mockBattlesService.unready.mockResolvedValue(mockBattle);
+
+            const result = await gateway.handleUnready(socket1, { battleId: 'battle-1' });
+
+            expect(result).toEqual({ success: true });
+            expect(mockServer.to).toHaveBeenCalledWith('battle:battle-1');
+            expect(mockServer.emit).toHaveBeenCalledWith('battle.player_ready', {
+                userId: 'user-1',
+                username: 'alice',
+                isReady: false,
+            });
+        });
+
+        it('should return error when unready validation fails', async () => {
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
+            await gateway.handleConnection(socket1);
+
+            mockBattlesService.unready.mockRejectedValue(
+                new Error('You are not currently ready'),
+            );
+
+            const result = await gateway.handleUnready(socket1, { battleId: 'battle-1' });
+
+            expect(result).toEqual({ success: false, error: 'You are not currently ready' });
+        });
+
+        it('should return error when user is not authenticated', async () => {
+            const socket = createMockSocket();
+            socket.data = {};
+
+            const result = await gateway.handleUnready(socket, { battleId: 'battle-1' });
+
+            expect(result).toEqual({ success: false, error: 'Not authenticated' });
+        });
+    });
+
+    describe('In-app Invite', () => {
+        it('should emit battle.invite_received to target user when online', async () => {
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            const socket2 = createMockSocket('user-2', 'socket-2');
+            mockJwtVerificationService.verifyAndGetUser
+                .mockResolvedValueOnce(mockUser)
+                .mockResolvedValueOnce(mockUser2);
+
+            await gateway.handleConnection(socket1);
+            await gateway.handleConnection(socket2);
+
+            mockBattlesService.inviteUserToBattle.mockResolvedValue({
+                targetUserId: 'user-2',
+                battleId: 'battle-1',
+                inviterUsername: 'alice',
+                inviterAvatarUrl: null,
+                battleMode: 'ONE_V_ONE',
+                inviteCode: 'ABCD1234',
+            });
+
+            const result = await gateway.handleInviteUser(socket1, {
+                battleId: 'battle-1',
+                targetUsername: 'bob',
+            });
+
+            expect(result).toEqual({ success: true, delivered: true });
+            expect(socket2.emit).toHaveBeenCalledWith('battle.invite_received', {
+                battleId: 'battle-1',
+                inviterUsername: 'alice',
+                inviterAvatarUrl: null,
+                battleMode: 'ONE_V_ONE',
+                inviteCode: 'ABCD1234',
+            });
+        });
+
+        it('should succeed without emitting when target user is offline', async () => {
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
+            await gateway.handleConnection(socket1);
+
+            mockBattlesService.inviteUserToBattle.mockResolvedValue({
+                targetUserId: 'user-2', // not connected
+                battleId: 'battle-1',
+                inviterUsername: 'alice',
+                inviterAvatarUrl: null,
+                battleMode: 'ONE_V_ONE',
+                inviteCode: 'ABCD1234',
+            });
+
+            const result = await gateway.handleInviteUser(socket1, {
+                battleId: 'battle-1',
+                targetUsername: 'bob',
+            });
+
+            expect(result).toEqual({ success: true, delivered: false });
+            // socket1 should not have received invite_received
+            const inviteCalls = socket1.emit.mock.calls.filter(
+                (call: any[]) => call[0] === 'battle.invite_received',
+            );
+            expect(inviteCalls).toHaveLength(0);
+        });
+
+        it('should return error when inviteUserToBattle validation fails', async () => {
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
+            await gateway.handleConnection(socket1);
+
+            mockBattlesService.inviteUserToBattle.mockRejectedValue(
+                new Error('User "nonexistent" not found'),
+            );
+
+            const result = await gateway.handleInviteUser(socket1, {
+                battleId: 'battle-1',
+                targetUsername: 'nonexistent',
+            });
+
+            expect(result).toEqual({ success: false, error: 'User "nonexistent" not found' });
+            expect(socket1.emit).toHaveBeenCalledWith('error', {
+                message: 'User "nonexistent" not found',
+            });
+        });
+
+        it('should return error when user is not authenticated', async () => {
+            const socket = createMockSocket();
+            socket.data = {};
+
+            const result = await gateway.handleInviteUser(socket, {
+                battleId: 'battle-1',
+                targetUsername: 'bob',
+            });
+
+            expect(result).toEqual({ success: false, error: 'Not authenticated' });
         });
     });
 });

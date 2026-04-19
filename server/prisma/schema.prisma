@@ -158,6 +158,10 @@ model Battle {
   // Skills enabled for this battle (toggleable per game)
   enabledSkills SkillType[] @default([])
 
+  // Direct invite system
+  inviteCode      String?   @unique // 8-char alphanumeric code (case-insensitive)
+  inviteExpiresAt DateTime? // 24 hours after creation
+
   participants BattleParticipant[]
   skillUses    BattleSkillUse[]
 
@@ -203,6 +207,9 @@ model BattleParticipant {
 
   // Scoring for team battles
   pointsEarned Int @default(0) // Sum of points from solved problems
+
+  // Ready state for invite battles
+  isReady Boolean @default(false)
 
   // MMR change after battle
   mmrChange Int?

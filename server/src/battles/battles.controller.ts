@@ -7,6 +7,7 @@ import {
     UseGuards,
     Query,
     Req,
+    Delete,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
@@ -94,6 +95,47 @@ export class BattlesController {
         );
     }
 
+    // Invite routes MUST come before :id routes to avoid route conflicts
+    @Post('invite')
+    @ApiOperation({ summary: 'Create a battle with an invite code' })
+    @ApiResponse({
+        status: 201,
+        description: 'Battle created with invite code',
+        type: BattleResponseDto,
+    })
+    async createWithInvite(
+        @Req() req: AuthRequest,
+        @Body() createBattleDto: CreateBattleDto,
+    ) {
+        return this.battlesService.createBattle(req.user.sub, {
+            ...createBattleDto,
+            withInviteCode: true,
+        });
+    }
+
+    @Get('invite/:code')
+    @ApiOperation({ summary: 'Get battle info from invite code' })
+    @ApiParam({ name: 'code', description: 'Invite code (case-insensitive)' })
+    @ApiResponse({ status: 200, description: 'Battle details', type: BattleResponseDto })
+    @ApiResponse({ status: 404, description: 'Invalid invite code' })
+    @ApiResponse({ status: 400, description: 'Invite code expired or battle started' })
+    async getByInviteCode(@Param('code') code: string) {
+        return this.battlesService.getByInviteCode(code);
+    }
+
+    @Post('invite/:code/join')
+    @ApiOperation({ summary: 'Join a battle via invite code' })
+    @ApiParam({ name: 'code', description: 'Invite code (case-insensitive)' })
+    @ApiResponse({ status: 200, description: 'Successfully joined battle', type: BattleResponseDto })
+    @ApiResponse({ status: 400, description: 'Cannot join battle' })
+    @ApiResponse({ status: 404, description: 'Invalid invite code' })
+    async joinByInviteCode(
+        @Req() req: AuthRequest,
+        @Param('code') code: string,
+    ) {
+        return this.battlesService.joinByInviteCode(req.user.sub, code);
+    }
+
     @Get(':id')
     @ApiOperation({ summary: 'Get battle details' })
     @ApiParam({ name: 'id', description: 'Battle ID' })
@@ -157,5 +199,39 @@ export class BattlesController {
     @ApiResponse({ status: 404, description: 'Battle not found' })
     async completeBattle(@Param('id') id: string) {
         return this.battlesService.completeBattle(id);
+    }
+
+    @Post(':id/ready')
+    @ApiOperation({ summary: 'Mark yourself as ready. Battle starts when all players are ready.' })
+    @ApiParam({ name: 'id', description: 'Battle ID' })
+    @ApiResponse({ status: 200, description: 'Ready status updated' })
+    @ApiResponse({ status: 400, description: 'Cannot ready up' })
+    @ApiResponse({ status: 403, description: 'Not a participant' })
+    async readyUp(@Req() req: AuthRequest, @Param('id') id: string) {
+        return this.battlesService.readyUp(id, req.user.sub);
+    }
+
+    @Delete(':id/ready')
+    @ApiOperation({ summary: 'Unready yourself' })
+    @ApiParam({ name: 'id', description: 'Battle ID' })
+    @ApiResponse({ status: 200, description: 'Unready successful' })
+    @ApiResponse({ status: 400, description: 'Not currently ready' })
+    @ApiResponse({ status: 403, description: 'Not a participant' })
+    async unready(@Req() req: AuthRequest, @Param('id') id: string) {
+        return this.battlesService.unready(id, req.user.sub);
+    }
+
+    @Post(':id/invite-user')
+    @ApiOperation({ summary: 'Send an in-app invite to a user by username' })
+    @ApiParam({ name: 'id', description: 'Battle ID' })
+    @ApiResponse({ status: 200, description: 'Invite sent' })
+    @ApiResponse({ status: 404, description: 'Battle or user not found' })
+    @ApiResponse({ status: 403, description: 'Not a participant' })
+    async inviteUser(
+        @Req() req: AuthRequest,
+        @Param('id') id: string,
+        @Body('username') username: string,
+    ) {
+        return this.battlesService.inviteUserToBattle(id, req.user.sub, username);
     }
 }

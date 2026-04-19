@@ -393,42 +393,66 @@ In-battle power-ups — toggleable per game, each usable once per battle.
 
 ---
 
-## 📋 TODO - Direct Invite System (HIGH PRIORITY)
+## ✅ Direct Invite System - COMPLETED
 
 Allow players to invite each other to games via link or username.
 
-### Task Breakdown:
+### Completed:
 
-#### 1. Prisma Schema Updates
-- [ ] Add `inviteCode` field to Battle model (unique, nullable, 8-char alphanumeric)
-- [ ] Add index on `inviteCode`
-- [ ] Run migration
-- [ ] **Success Criteria:** Schema compiles ✅
+#### 1. Prisma Schema Updates ✅
+- [x] Add `inviteCode` field to Battle model (unique, nullable, 8-char alphanumeric)
+- [x] Add `inviteExpiresAt` field to Battle model (24-hour expiry)
+- [x] Add `isReady` field to BattleParticipant model (for ready-up flow)
+- [x] Run migration
+- [x] **Success Criteria:** Schema compiles ✅
 
-#### 2. Invite Service
-- [ ] `generateInviteCode()` — Generate unique 8-char code
-- [ ] `createBattleWithInvite(userId, dto)` — Create battle with invite code
-- [ ] `joinByInviteCode(userId, code)` — Join battle via invite code
-- [ ] `getByInviteCode(code)` — Get battle details from invite code
-- [ ] **Success Criteria:** Invite codes work end-to-end ✅
+#### 2. Invite Service ✅
+- [x] `generateInviteCode()` — Generate unique 8-char uppercase alphanumeric code (excludes ambiguous chars I, O, 0, 1)
+- [x] Invite code uniqueness checked against non-completed battles only (completed battles don't block code reuse)
+- [x] `createBattle` with `withInviteCode: true` — Create battle with invite code + 24h expiry
+- [x] `joinByInviteCode(userId, code)` — Join battle via invite code (case-insensitive)
+- [x] `getByInviteCode(code)` — Get battle details from invite code with expiry/status validation
+- [x] Direct `joinBattle()` blocked for invite-code battles (must use `joinByInviteCode`)
+- [x] Invite-code battles filtered out of `getAvailableBattles()` (private by default)
+- [x] Invite-code battles never auto-start on join (require ready-up)
+- [x] **Success Criteria:** Invite codes work end-to-end ✅
 
-#### 3. Invite API
-- [ ] `POST /api/battles/invite` — Create battle with invite code (returns code + link)
-- [ ] `GET /api/battles/invite/:code` — Get battle info from invite code
-- [ ] `POST /api/battles/invite/:code/join` — Join battle via invite code
-- [ ] Swagger documentation
-- [ ] **Success Criteria:** API tests passing ✅
+#### 3. Ready-Up System ✅
+- [x] `readyUp(battleId, userId)` — Mark participant as ready (wrapped in DB transaction to prevent race conditions)
+- [x] `unready(battleId, userId)` — Toggle ready state off
+- [x] Battle auto-starts when all participants are ready
+- [x] Minimum 2 participants required to ready up
+- [x] Daily game counts incremented at battle start (not at join)
+- [x] **Success Criteria:** Ready-up flow works with concurrency safety ✅
 
-#### 4. In-app Invite
-- [ ] `POST /api/battles/:id/invite-user` — Send invite notification to user by username
-- [ ] WebSocket event `battle.invite_received` — Notify target user of invite
-- [ ] **Success Criteria:** In-app invites work ✅
+#### 4. Invite API ✅
+- [x] `POST /api/battles/invite` — Create battle with invite code (returns code + link)
+- [x] `GET /api/battles/invite/:code` — Get battle info from invite code
+- [x] `POST /api/battles/invite/:code/join` — Join battle via invite code
+- [x] `POST /api/battles/:id/ready` — Ready up
+- [x] `DELETE /api/battles/:id/ready` — Unready
+- [x] Swagger documentation
+- [x] **Success Criteria:** API working ✅
 
-#### 5. Tests
-- [ ] Invite code generation tests
-- [ ] Join by code tests (valid, expired, full battle)
-- [ ] In-app invite notification tests
-- [ ] **Success Criteria:** All invite tests passing ✅
+#### 5. In-app Invite ✅
+- [x] `POST /api/battles/:id/invite-user` — Send invite notification to user by username
+- [x] `inviteUserToBattle(battleId, inviterId, targetUsername)` — Validate & return invite data
+- [x] WebSocket event `battle.invite_received` — Notify target user of invite (if online)
+- [x] WebSocket event `battle.player_ready` — Broadcast ready/unready status to room
+- [x] Gateway returns `{ success: true, delivered: boolean }` so inviter knows if target was online
+- [x] **Success Criteria:** In-app invites work ✅
+
+#### 6. Tests ✅
+- [x] Invite code generation tests (length, charset, retry on collision, max attempts, no ambiguous chars, uniqueness scoped to non-completed)
+- [x] Create battle with/without invite code tests
+- [x] getByInviteCode tests (valid, case-insensitive, invalid, expired, non-waiting, rank tier)
+- [x] joinByInviteCode delegation test
+- [x] readyUp tests (mark ready, all-ready starts battle, not found, wrong status, not participant, already ready, not enough players, partial ready, transaction verification)
+- [x] unready tests (toggle off, not found, wrong status, not participant, not ready)
+- [x] inviteUserToBattle tests (valid, not found, wrong status, not participant, target not found, target already in battle)
+- [x] joinBattle invite-code guard tests (direct join blocked, via-invite works, non-invite auto-starts)
+- [x] Gateway tests (ready broadcast, battle.started on all ready, unready broadcast, invite_received delivery, offline handling, delivered flag, error handling, auth checks)
+- [x] **Success Criteria:** All 132 tests passing (service: 98, gateway: 34) ✅
 
 ---
 
