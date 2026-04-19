@@ -1201,6 +1201,82 @@ describe('BattlesService', () => {
                 }),
             );
         });
+
+        it('should update clan wins/losses and MMR when completing a CLAN_VS_CLAN battle', async () => {
+            const clanBattle = {
+                ...mockBattle,
+                mode: BattleMode.CLAN_VS_CLAN,
+                status: BattleStatus.IN_PROGRESS,
+                teamSize: 2,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: mockUserWithClan1.id,
+                        teamId: 'team-1',
+                        pointsEarned: 10,
+                        user: { ...mockUserWithClan1, clan: mockClan1 },
+                        testsPassed: 2,
+                        totalTests: 2,
+                        submittedAt: new Date(),
+                        mmrChange: null,
+                    },
+                    {
+                        id: 'p2',
+                        userId: mockUserWithClan2.id,
+                        teamId: 'team-2',
+                        pointsEarned: 5,
+                        user: { ...mockUserWithClan2, clan: mockClan2 },
+                        testsPassed: 1,
+                        totalTests: 2,
+                        submittedAt: new Date(),
+                        mmrChange: null,
+                    },
+                ],
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(clanBattle)
+                .mockResolvedValueOnce({
+                    ...clanBattle,
+                    status: BattleStatus.COMPLETED,
+                    winningTeam: 'team-1',
+                });
+
+            const txClanUpdates: Array<{ where: any; data: any }> = [];
+            prisma.$transaction.mockImplementation(async (callback) => {
+                const mockTx = {
+                    ...prisma,
+                    battle: { update: jest.fn().mockResolvedValue({}) },
+                    battleParticipant: { update: jest.fn().mockResolvedValue({}) },
+                    user: { update: jest.fn().mockResolvedValue({}) },
+                    clan: {
+                        update: jest.fn().mockImplementation((args) => {
+                            txClanUpdates.push(args);
+                            return Promise.resolve({});
+                        }),
+                    },
+                };
+                return callback(mockTx);
+            });
+
+            await service.completeBattle(mockBattle.id);
+
+            // Winning clan gets +15 MMR and +1 win
+            const winnerUpdate = txClanUpdates.find(
+                (u) => u.where.id === mockClan1.id,
+            );
+            expect(winnerUpdate).toBeDefined();
+            expect(winnerUpdate!.data.mmr).toEqual({ increment: 15 });
+            expect(winnerUpdate!.data.wins).toEqual({ increment: 1 });
+
+            // Losing clan gets -15 MMR and +1 loss
+            const loserUpdate = txClanUpdates.find(
+                (u) => u.where.id === mockClan2.id,
+            );
+            expect(loserUpdate).toBeDefined();
+            expect(loserUpdate!.data.mmr).toEqual({ increment: -15 });
+            expect(loserUpdate!.data.losses).toEqual({ increment: 1 });
+        });
     });
 
     describe('GROUP mode', () => {

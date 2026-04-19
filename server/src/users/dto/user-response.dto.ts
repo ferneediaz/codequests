@@ -1,4 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { RankTierDto } from '../../common/dto/rank-tier.dto';
 
 export class UserResponseDto {
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
@@ -21,6 +22,9 @@ export class UserResponseDto {
 
   @ApiProperty({ example: 8 })
   losses: number;
+
+  @ApiPropertyOptional({ type: RankTierDto, description: 'Rank tier based on MMR' })
+  tier?: RankTierDto;
 
   @ApiProperty({ example: '2024-01-15T10:30:00Z' })
   createdAt: Date;

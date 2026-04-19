@@ -88,7 +88,9 @@ model Clan {
   ownerId String
 
   // Clan MMR for clan vs clan battles
-  mmr Int @default(1000)
+  mmr    Int @default(1000)
+  wins   Int @default(0)
+  losses Int @default(0)
 
   members User[]
 

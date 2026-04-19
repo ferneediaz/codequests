@@ -1,5 +1,23 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BattleMode, BattleStatus, SkillType } from '@prisma/client';
+import { RankTierDto } from '../../common/dto/rank-tier.dto';
+
+export class ParticipantUserDto {
+    @ApiProperty()
+    id: string;
+
+    @ApiProperty()
+    username: string;
+
+    @ApiPropertyOptional()
+    avatarUrl?: string;
+
+    @ApiPropertyOptional()
+    mmr?: number;
+
+    @ApiPropertyOptional({ type: RankTierDto, description: 'Rank tier based on MMR' })
+    tier?: RankTierDto;
+}
 
 export class BattleParticipantResponseDto {
     @ApiProperty()

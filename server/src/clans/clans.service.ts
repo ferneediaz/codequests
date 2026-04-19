@@ -346,4 +346,112 @@ export class ClansService {
             },
         });
     }
+
+    /**
+     * Get clan battle history (completed CLAN_VS_CLAN battles involving this clan's members)
+     */
+    async getBattleHistory(
+        clanId: string,
+        page: number = 1,
+        limit: number = 20,
+    ) {
+        const clan = await this.prisma.clan.findUnique({
+            where: { id: clanId },
+            select: { id: true, name: true, tag: true, wins: true, losses: true, mmr: true },
+        });
+
+        if (!clan) {
+            throw new NotFoundException(`Clan with ID ${clanId} not found`);
+        }
+
+        const skip = (page - 1) * limit;
+
+        const where = {
+            mode: 'CLAN_VS_CLAN' as const,
+            status: 'COMPLETED' as const,
+            participants: {
+                some: { user: { clanId } },
+            },
+        };
+
+        const [battles, total] = await Promise.all([
+            this.prisma.battle.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: { endedAt: 'desc' as const },
+                include: {
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    avatarUrl: true,
+                                    mmr: true,
+                                    clanId: true,
+                                    clan: { select: { id: true, name: true, tag: true } },
+                                },
+                            },
+                        },
+                    },
+                },
+            }),
+            this.prisma.battle.count({ where }),
+        ]);
+
+        return {
+            clan: {
+                id: clan.id,
+                name: clan.name,
+                tag: clan.tag,
+                wins: clan.wins,
+                losses: clan.losses,
+                mmr: clan.mmr,
+            },
+            data: battles.map((battle) => ({
+                id: battle.id,
+                mode: battle.mode,
+                winningTeam: battle.winningTeam,
+                teamSize: battle.teamSize,
+                endedAt: battle.endedAt,
+                createdAt: battle.createdAt,
+                clanResult: this.getClanResult(battle, clanId),
+                participants: battle.participants.map((p) => ({
+                    userId: p.userId,
+                    username: p.user.username,
+                    avatarUrl: p.user.avatarUrl,
+                    teamId: p.teamId,
+                    pointsEarned: p.pointsEarned,
+                    clan: p.user.clan,
+                })),
+            })),
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
+
+    /**
+     * Determine if the clan won, lost, or drew a specific battle
+     */
+    private getClanResult(
+        battle: {
+            winningTeam: string | null;
+            participants: Array<{ teamId: string | null; user: { clanId: string | null } }>;
+        },
+        clanId: string,
+    ): 'win' | 'loss' | 'draw' {
+        if (!battle.winningTeam) return 'draw';
+
+        const clanParticipant = battle.participants.find(
+            (p) => p.user.clanId === clanId,
+        );
+        if (!clanParticipant?.teamId) return 'draw';
+
+        return clanParticipant.teamId === battle.winningTeam ? 'win' : 'loss';
+    }
 }

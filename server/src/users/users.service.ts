@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { getRankTier } from '../common/utils/rank-tiers';
 
 @Injectable()
 export class UsersService {
@@ -10,7 +11,7 @@ export class UsersService {
    * Get all users (for leaderboard, etc.)
    */
   async findAll(options?: { limit?: number; offset?: number }) {
-    return this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       take: options?.limit || 50,
       skip: options?.offset || 0,
       orderBy: { mmr: 'desc' },
@@ -26,6 +27,11 @@ export class UsersService {
         },
       },
     });
+
+    return users.map((user) => ({
+      ...user,
+      tier: getRankTier(user.mmr),
+    }));
   }
 
   /**
@@ -58,7 +64,10 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    return user;
+    return {
+      ...user,
+      tier: getRankTier(user.mmr),
+    };
   }
 
   /**
@@ -159,7 +168,7 @@ export class UsersService {
     const winRate = totalGames > 0 ? (user.wins / totalGames) * 100 : 0;
 
     // Calculate rank tier based on MMR
-    const tier = this.calculateTier(user.mmr);
+    const tier = getRankTier(user.mmr);
 
     return {
       ...user,
@@ -167,15 +176,5 @@ export class UsersService {
       winRate: Math.round(winRate * 10) / 10,
       tier,
     };
-  }
-
-  private calculateTier(mmr: number): string {
-    if (mmr >= 2000) return 'Grandmaster';
-    if (mmr >= 1800) return 'Master';
-    if (mmr >= 1600) return 'Diamond';
-    if (mmr >= 1400) return 'Platinum';
-    if (mmr >= 1200) return 'Gold';
-    if (mmr >= 1000) return 'Silver';
-    return 'Bronze';
   }
 }

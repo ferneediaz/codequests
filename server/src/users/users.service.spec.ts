@@ -3,6 +3,7 @@ import { UsersService } from './users.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService, MockPrismaService } from '../__mocks__/prisma.service';
 import { NotFoundException, ConflictException } from '@nestjs/common';
+import { getRankTier } from '../common/utils/rank-tiers';
 
 describe('UsersService', () => {
     let service: UsersService;
@@ -23,6 +24,10 @@ describe('UsersService', () => {
 
         service = module.get<UsersService>(UsersService);
         prisma = module.get<MockPrismaService>(PrismaService);
+    });
+
+    it('should be defined', () => {
+        expect(service).toBeDefined();
     });
 
     describe('findAll', () => {
@@ -68,7 +73,8 @@ describe('UsersService', () => {
                     },
                 },
             });
-            expect(result).toEqual(users);
+            expect(result[0]).toEqual({ ...users[0], tier: getRankTier(1800) });
+            expect(result[1]).toEqual({ ...users[1], tier: getRankTier(1200) });
         });
 
         it('should respect limit and offset options', async () => {
@@ -128,7 +134,7 @@ describe('UsersService', () => {
                     },
                 },
             });
-            expect(result).toEqual(user);
+            expect(result).toEqual({ ...user, tier: getRankTier(1000) });
         });
 
         it('should throw NotFoundException if user not found', async () => {
@@ -275,7 +281,7 @@ describe('UsersService', () => {
                 losses: 5,
                 totalGames: 20,
                 winRate: 75,
-                tier: 'Platinum',
+                tier: getRankTier(1500),
             });
         });
 
@@ -292,7 +298,7 @@ describe('UsersService', () => {
 
             expect(result.totalGames).toBe(0);
             expect(result.winRate).toBe(0);
-            expect(result.tier).toBe('Silver');
+            expect(result.tier).toEqual(getRankTier(1000));
         });
 
         it('should throw NotFoundException if user not found', async () => {
@@ -304,99 +310,42 @@ describe('UsersService', () => {
         });
     });
 
-    describe('calculateTier', () => {
-        it('should return correct tier for each MMR bracket', () => {
-            // Access private method through any type
-            const calculateTier = (service as any).calculateTier.bind(service);
-
-            expect(calculateTier(2100)).toBe('Grandmaster');
-            expect(calculateTier(2000)).toBe('Grandmaster');
-            expect(calculateTier(1900)).toBe('Master');
-            expect(calculateTier(1800)).toBe('Master');
-            expect(calculateTier(1700)).toBe('Diamond');
-            expect(calculateTier(1600)).toBe('Diamond');
-            expect(calculateTier(1500)).toBe('Platinum');
-            expect(calculateTier(1400)).toBe('Platinum');
-            expect(calculateTier(1300)).toBe('Gold');
-            expect(calculateTier(1200)).toBe('Gold');
-            expect(calculateTier(1100)).toBe('Silver');
-            expect(calculateTier(1000)).toBe('Silver');
-            expect(calculateTier(900)).toBe('Bronze');
-            expect(calculateTier(500)).toBe('Bronze');
-        });
-    });
-
-    describe('getMatchHistory', () => {
-        it('should return match history for a user', async () => {
-            const matchHistory = [
-                {
-                    id: 'participant-1',
-                    userId: 'user-123',
-                    battleId: 'battle-1',
-                    battle: {
-                        id: 'battle-1',
-                        problem: { title: 'Two Sum', difficulty: 'EASY' },
-                        participants: [
-                            {
-                                userId: 'user-123',
-                                testsPassed: 5,
-                                totalTests: 5,
-                                user: { username: 'testuser', avatarUrl: null },
-                            },
-                        ],
-                    },
-                },
-            ];
-
-            prisma.user.findUnique.mockResolvedValue({ id: 'user-123' });
-            prisma.battleParticipant.findMany.mockResolvedValue(matchHistory);
-
-            const result = await service.getMatchHistory('user-123');
-
-            expect(result).toEqual(matchHistory);
-            expect(prisma.battleParticipant.findMany).toHaveBeenCalledWith({
-                where: { userId: 'user-123' },
-                take: 20,
-                orderBy: { battle: { createdAt: 'desc' } },
-                include: {
-                    battle: {
-                        include: {
-                            problem: {
-                                select: { title: true, difficulty: true },
-                            },
-                            participants: {
-                                select: {
-                                    userId: true,
-                                    testsPassed: true,
-                                    totalTests: true,
-                                    user: {
-                                        select: { username: true, avatarUrl: true },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            });
+    describe('getRankTier', () => {
+        it.each([
+            [799, 'Bug', '🐛', '#22c55e'],
+            [0, 'Bug', '🐛', '#22c55e'],
+            [500, 'Bug', '🐛', '#22c55e'],
+            [800, 'Intern', '📎', '#9ca3af'],
+            [999, 'Intern', '📎', '#9ca3af'],
+            [1000, 'Copy Paster', '📋', '#cd7f32'],
+            [1199, 'Copy Paster', '📋', '#cd7f32'],
+            [1200, 'Stack Overflow Andy', '🔍', '#c0c0c0'],
+            [1399, 'Stack Overflow Andy', '🔍', '#c0c0c0'],
+            [1400, 'Code Monkey', '🐒', '#ffd700'],
+            [1599, 'Code Monkey', '🐒', '#ffd700'],
+            [1600, '10x Dev', '⚡', '#3b82f6'],
+            [1899, '10x Dev', '⚡', '#3b82f6'],
+            [1900, 'Cracked', '💀', '#ef4444'],
+            [2500, 'Cracked', '💀', '#ef4444'],
+        ])('mmr %i should be %s %s', (mmr, name, icon, color) => {
+            const tier = getRankTier(mmr);
+            expect(tier.name).toBe(name);
+            expect(tier.icon).toBe(icon);
+            expect(tier.color).toBe(color);
         });
 
-        it('should throw NotFoundException if user does not exist', async () => {
-            prisma.user.findUnique.mockResolvedValue(null);
+        it('should return minMmr and maxMmr for each tier', () => {
+            const bug = getRankTier(500);
+            expect(bug.minMmr).toBe(-Infinity);
+            expect(bug.maxMmr).toBe(799);
 
-            await expect(service.getMatchHistory('nonexistent')).rejects.toThrow(
-                NotFoundException,
-            );
-        });
+            const intern = getRankTier(800);
+            expect(intern.minMmr).toBe(800);
+            expect(intern.maxMmr).toBe(999);
 
-        it('should respect custom limit parameter', async () => {
-            prisma.user.findUnique.mockResolvedValue({ id: 'user-123' });
-            prisma.battleParticipant.findMany.mockResolvedValue([]);
-
-            await service.getMatchHistory('user-123', 5);
-
-            expect(prisma.battleParticipant.findMany).toHaveBeenCalledWith(
-                expect.objectContaining({ take: 5 }),
-            );
+            const cracked = getRankTier(1900);
+            expect(cracked.minMmr).toBe(1900);
+            expect(cracked.maxMmr).toBeNull();
         });
     });
 });

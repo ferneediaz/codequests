@@ -9,6 +9,7 @@ import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { BattleMode, BattleStatus, Difficulty, SkillType } from '@prisma/client';
 import { CreateBattleDto } from './dto/create-battle.dto';
+import { getRankTier } from '../common/utils/rank-tiers';
 
 // K-factor for Elo calculation (higher = more volatile ratings)
 const ELO_K_FACTOR = 32;
@@ -695,13 +696,19 @@ export class BattlesService {
                 if (winningParticipant?.user.clanId) {
                     await tx.clan.update({
                         where: { id: winningParticipant.user.clanId },
-                        data: { mmr: { increment: CLAN_MMR_CHANGE } },
+                        data: {
+                            mmr: { increment: CLAN_MMR_CHANGE },
+                            wins: { increment: 1 },
+                        },
                     });
                 }
                 if (losingParticipant?.user.clanId) {
                     await tx.clan.update({
                         where: { id: losingParticipant.user.clanId },
-                        data: { mmr: { increment: -CLAN_MMR_CHANGE } },
+                        data: {
+                            mmr: { increment: -CLAN_MMR_CHANGE },
+                            losses: { increment: 1 },
+                        },
                     });
                 }
             }
@@ -783,7 +790,16 @@ export class BattlesService {
             throw new NotFoundException(`Battle with ID ${battleId} not found`);
         }
 
-        return battle;
+        return {
+            ...battle,
+            participants: battle.participants.map((p) => ({
+                ...p,
+                user: {
+                    ...p.user,
+                    tier: getRankTier(p.user.mmr),
+                },
+            })),
+        };
     }
 
     /**
@@ -823,6 +839,7 @@ export class BattlesService {
                                     id: true,
                                     username: true,
                                     avatarUrl: true,
+                                    mmr: true,
                                 },
                             },
                         },
@@ -846,7 +863,16 @@ export class BattlesService {
         ]);
 
         return {
-            data: battles,
+            data: battles.map((battle) => ({
+                ...battle,
+                participants: battle.participants.map((p) => ({
+                    ...p,
+                    user: {
+                        ...p.user,
+                        tier: getRankTier(p.user.mmr),
+                    },
+                })),
+            })),
             meta: {
                 total,
                 page,
