@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { BattleMode, BattleStatus, Difficulty } from '@prisma/client';
 import { CreateBattleDto } from './dto/create-battle.dto';
 
@@ -40,6 +41,7 @@ export class BattlesService {
     constructor(
         private prisma: PrismaService,
         private codeExecutionService: CodeExecutionService,
+        private subscriptionsService: SubscriptionsService,
     ) { }
 
     /**
@@ -53,6 +55,14 @@ export class BattlesService {
      * Create a new battle
      */
     async createBattle(userId: string, dto: CreateBattleDto) {
+        // Check if user can play (subscription / daily limit)
+        const canPlay = await this.subscriptionsService.canPlay(userId);
+        if (!canPlay) {
+            throw new ForbiddenException(
+                'Daily free game limit reached. Upgrade to Pro for unlimited games.',
+            );
+        }
+
         const mode = dto.mode || BattleMode.ONE_V_ONE;
         const isTeam = this.isTeamMode(mode);
 
@@ -184,6 +194,14 @@ export class BattlesService {
      * Join an existing battle
      */
     async joinBattle(userId: string, battleId: string, preferredTeam?: string) {
+        // Check if user can play (subscription / daily limit)
+        const canPlay = await this.subscriptionsService.canPlay(userId);
+        if (!canPlay) {
+            throw new ForbiddenException(
+                'Daily free game limit reached. Upgrade to Pro for unlimited games.',
+            );
+        }
+
         // Get battle with participants
         const battle = await this.prisma.battle.findUnique({
             where: { id: battleId },
@@ -271,6 +289,14 @@ export class BattlesService {
             battle.participants.length + 1,
             battle.teamSize,
         );
+
+        // Increment daily game count for all participants when battle starts
+        if (shouldStart) {
+            for (const p of battle.participants) {
+                await this.subscriptionsService.incrementGamesPlayed(p.userId);
+            }
+            await this.subscriptionsService.incrementGamesPlayed(userId);
+        }
 
         // Add user as participant
         const totalTests = battle.problem?.testCases.length || 0;
@@ -640,8 +666,11 @@ export class BattlesService {
                     data: { mmrChange },
                 });
 
-                // Update user MMR and win/loss counters (only for non-team battles)
-                if (!isTeam) {
+                // Update user MMR and win/loss counters (only for non-team, Pro/trial users)
+                const hasProAccess =
+                    participant.user.subscriptionTier === 'PRO' ||
+                    (participant.user.trialEndsAt && new Date(participant.user.trialEndsAt) > new Date());
+                if (!isTeam && hasProAccess) {
                     await tx.user.update({
                         where: { id: participant.userId },
                         data: {

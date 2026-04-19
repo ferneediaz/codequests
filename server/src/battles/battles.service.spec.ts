@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BattlesService } from './battles.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import {
     createMockPrismaService,
     MockPrismaService,
@@ -18,6 +19,7 @@ describe('BattlesService', () => {
     let service: BattlesService;
     let prisma: MockPrismaService;
     let codeExecutionService: jest.Mocked<CodeExecutionService>;
+    let subscriptionsService: jest.Mocked<SubscriptionsService>;
 
     // Mock data
     const mockUser1 = {
@@ -31,6 +33,12 @@ describe('BattlesService', () => {
         role: 'user',
         clanId: null,
         clan: null,
+        subscriptionTier: 'PRO',
+        stripeCustomerId: null,
+        gamesPlayedToday: 0,
+        lastGameResetAt: new Date(),
+        trialEndsAt: null,
+        hasUsedTrial: false,
         createdAt: new Date(),
         updatedAt: new Date(),
     };
@@ -46,6 +54,12 @@ describe('BattlesService', () => {
         role: 'user',
         clanId: null,
         clan: null,
+        subscriptionTier: 'PRO',
+        stripeCustomerId: null,
+        gamesPlayedToday: 0,
+        lastGameResetAt: new Date(),
+        trialEndsAt: null,
+        hasUsedTrial: false,
         createdAt: new Date(),
         updatedAt: new Date(),
     };
@@ -98,6 +112,11 @@ describe('BattlesService', () => {
             executeCode: jest.fn(),
         };
 
+        const mockSubscriptionsService = {
+            canPlay: jest.fn().mockResolvedValue(true),
+            incrementGamesPlayed: jest.fn().mockResolvedValue(undefined),
+        };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 BattlesService,
@@ -109,12 +128,17 @@ describe('BattlesService', () => {
                     provide: CodeExecutionService,
                     useValue: mockCodeExecutionService,
                 },
+                {
+                    provide: SubscriptionsService,
+                    useValue: mockSubscriptionsService,
+                },
             ],
         }).compile();
 
         service = module.get<BattlesService>(BattlesService);
         prisma = module.get<MockPrismaService>(PrismaService);
         codeExecutionService = module.get(CodeExecutionService);
+        subscriptionsService = module.get(SubscriptionsService);
     });
 
     describe('createBattle', () => {
@@ -1287,6 +1311,298 @@ describe('BattlesService', () => {
                     }),
                 }),
             );
+        });
+    });
+
+    // =========================================
+    // Subscription gating tests
+    // =========================================
+
+    describe('subscription gating', () => {
+        it('should throw ForbiddenException when free user at daily limit tries to create battle', async () => {
+            subscriptionsService.canPlay.mockResolvedValue(false);
+
+            const dto: CreateBattleDto = {
+                problemId: mockProblem.id,
+                mode: BattleMode.ONE_V_ONE,
+            };
+
+            await expect(
+                service.createBattle(mockUser1.id, dto),
+            ).rejects.toThrow(ForbiddenException);
+        });
+
+        it('should throw ForbiddenException when free user at daily limit tries to join battle', async () => {
+            subscriptionsService.canPlay.mockResolvedValue(false);
+
+            await expect(
+                service.joinBattle(mockUser2.id, mockBattle.id),
+            ).rejects.toThrow(ForbiddenException);
+        });
+
+        it('should allow pro user to create battle', async () => {
+            subscriptionsService.canPlay.mockResolvedValue(true);
+            prisma.problem.findUnique.mockResolvedValue(mockProblem);
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            prisma.battle.create.mockResolvedValue({
+                ...mockBattle,
+                participants: [{
+                    id: 'p1', battleId: mockBattle.id, userId: mockUser1.id,
+                    teamId: null, code: null, language: null, testsPassed: 0,
+                    totalTests: 2, pointsEarned: 0, submittedAt: null,
+                    mmrChange: null, user: mockUser1,
+                }],
+                problem: { id: mockProblem.id, title: mockProblem.title, difficulty: mockProblem.difficulty },
+                problemPool: null,
+            });
+            prisma.battle.findUnique.mockResolvedValue({
+                ...mockBattle,
+                participants: [{
+                    id: 'p1', battleId: mockBattle.id, userId: mockUser1.id,
+                    teamId: null, code: null, language: null, testsPassed: 0,
+                    totalTests: 2, pointsEarned: 0, submittedAt: null,
+                    mmrChange: null, user: mockUser1,
+                }],
+                problem: { id: mockProblem.id, title: mockProblem.title, difficulty: mockProblem.difficulty },
+                problemPool: null,
+            });
+
+            const dto: CreateBattleDto = {
+                problemId: mockProblem.id,
+                mode: BattleMode.ONE_V_ONE,
+            };
+
+            const result = await service.createBattle(mockUser1.id, dto);
+            expect(result).toBeDefined();
+            expect(subscriptionsService.canPlay).toHaveBeenCalledWith(mockUser1.id);
+        });
+
+        it('should skip stats persistence for free users in completeBattle', async () => {
+            const freeUser = { ...mockUser1, subscriptionTier: 'FREE' };
+            const proUser = { ...mockUser2, subscriptionTier: 'PRO' };
+
+            const battleWithSubmissions = {
+                ...mockBattle,
+                status: BattleStatus.IN_PROGRESS,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: freeUser.id,
+                        teamId: null,
+                        user: { ...freeUser, clan: null },
+                        testsPassed: 2,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:05'),
+                        mmrChange: null,
+                    },
+                    {
+                        id: 'p2',
+                        userId: proUser.id,
+                        teamId: null,
+                        user: { ...proUser, clan: null },
+                        testsPassed: 1,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:03'),
+                        mmrChange: null,
+                    },
+                ],
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(battleWithSubmissions)
+                .mockResolvedValueOnce({
+                    ...battleWithSubmissions,
+                    status: BattleStatus.COMPLETED,
+                    winnerId: freeUser.id,
+                });
+
+            const txMock = { ...prisma };
+            prisma.$transaction.mockImplementation(async (callback) => {
+                return callback(txMock);
+            });
+
+            await service.completeBattle(mockBattle.id);
+
+            // Free user (winner) should NOT get stats updated
+            // Pro user (loser) should get stats updated
+            const userUpdateCalls = txMock.user.update.mock.calls;
+            const proUserUpdate = userUpdateCalls.find(
+                (call) => call[0].where.id === proUser.id,
+            );
+            const freeUserUpdate = userUpdateCalls.find(
+                (call) => call[0].where.id === freeUser.id,
+            );
+
+            expect(proUserUpdate).toBeDefined();
+            expect(freeUserUpdate).toBeUndefined();
+        });
+
+        it('should persist stats for pro users in completeBattle', async () => {
+            const proUser1 = { ...mockUser1, subscriptionTier: 'PRO' };
+            const proUser2 = { ...mockUser2, subscriptionTier: 'PRO' };
+
+            const battleWithSubmissions = {
+                ...mockBattle,
+                status: BattleStatus.IN_PROGRESS,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: proUser1.id,
+                        teamId: null,
+                        user: { ...proUser1, clan: null },
+                        testsPassed: 2,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:05'),
+                        mmrChange: null,
+                    },
+                    {
+                        id: 'p2',
+                        userId: proUser2.id,
+                        teamId: null,
+                        user: { ...proUser2, clan: null },
+                        testsPassed: 1,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:03'),
+                        mmrChange: null,
+                    },
+                ],
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(battleWithSubmissions)
+                .mockResolvedValueOnce({
+                    ...battleWithSubmissions,
+                    status: BattleStatus.COMPLETED,
+                    winnerId: proUser1.id,
+                });
+
+            const txMock = { ...prisma };
+            prisma.$transaction.mockImplementation(async (callback) => {
+                return callback(txMock);
+            });
+
+            await service.completeBattle(mockBattle.id);
+
+            // Both pro users should get stats updated
+            const userUpdateCalls = txMock.user.update.mock.calls;
+            expect(userUpdateCalls.length).toBeGreaterThanOrEqual(2);
+        });
+
+        it('should increment game count for all participants when battle starts', async () => {
+            const battleWithOneParticipant = {
+                ...mockBattle,
+                participants: [
+                    {
+                        id: 'participant-1',
+                        battleId: 'battle-1',
+                        userId: mockUser1.id,
+                        teamId: null,
+                        code: null,
+                        language: null,
+                        testsPassed: 0,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: null,
+                        mmrChange: null,
+                        user: { mmr: mockUser1.mmr, clanId: null },
+                    },
+                ],
+                problem: mockProblem,
+                problemPool: null,
+            };
+
+            prisma.battle.findUnique.mockResolvedValue(battleWithOneParticipant);
+            prisma.user.findUnique.mockResolvedValue(mockUser2);
+
+            const updatedBattle = {
+                ...mockBattle,
+                status: BattleStatus.IN_PROGRESS,
+                startedAt: new Date(),
+                participants: [
+                    { ...battleWithOneParticipant.participants[0], user: mockUser1 },
+                    {
+                        id: 'participant-2', battleId: 'battle-1', userId: mockUser2.id,
+                        teamId: null, user: mockUser2, code: null, language: null,
+                        testsPassed: 0, totalTests: 2, pointsEarned: 0,
+                        submittedAt: null, mmrChange: null,
+                    },
+                ],
+                problem: mockProblem,
+                problemPool: null,
+            };
+
+            prisma.battle.update.mockResolvedValue(updatedBattle);
+
+            await service.joinBattle(mockUser2.id, mockBattle.id);
+
+            // Both participants should get game count incremented
+            expect(subscriptionsService.incrementGamesPlayed).toHaveBeenCalledWith(mockUser1.id);
+            expect(subscriptionsService.incrementGamesPlayed).toHaveBeenCalledWith(mockUser2.id);
+        });
+
+        it('should persist stats for trial users in completeBattle', async () => {
+            const trialUser = {
+                ...mockUser1,
+                subscriptionTier: 'FREE',
+                trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+                hasUsedTrial: true,
+            };
+            const proUser = { ...mockUser2, subscriptionTier: 'PRO' };
+
+            const battleWithSubmissions = {
+                ...mockBattle,
+                status: BattleStatus.IN_PROGRESS,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: trialUser.id,
+                        teamId: null,
+                        user: { ...trialUser, clan: null },
+                        testsPassed: 2,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:05'),
+                        mmrChange: null,
+                    },
+                    {
+                        id: 'p2',
+                        userId: proUser.id,
+                        teamId: null,
+                        user: { ...proUser, clan: null },
+                        testsPassed: 1,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:03'),
+                        mmrChange: null,
+                    },
+                ],
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(battleWithSubmissions)
+                .mockResolvedValueOnce({
+                    ...battleWithSubmissions,
+                    status: BattleStatus.COMPLETED,
+                    winnerId: trialUser.id,
+                });
+
+            const txMock = { ...prisma };
+            prisma.$transaction.mockImplementation(async (callback) => {
+                return callback(txMock);
+            });
+
+            await service.completeBattle(mockBattle.id);
+
+            // Trial user should get stats updated (Pro benefits)
+            const userUpdateCalls = txMock.user.update.mock.calls;
+            const trialUserUpdate = userUpdateCalls.find(
+                (call) => call[0].where.id === trialUser.id,
+            );
+            expect(trialUserUpdate).toBeDefined();
         });
     });
 });

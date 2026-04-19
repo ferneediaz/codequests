@@ -4,7 +4,9 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    rawBody: true, // Required for Stripe webhook signature verification
+  });
 
   // Enable CORS for frontend
   app.enableCors({
@@ -44,6 +46,7 @@ async function bootstrap() {
     .addTag('problems', 'Coding problems')
     .addTag('battles', 'Battle history')
     .addTag('rankings', 'Leaderboards')
+    .addTag('subscriptions', 'Subscription & billing')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

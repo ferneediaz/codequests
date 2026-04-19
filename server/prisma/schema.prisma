@@ -26,6 +26,15 @@ model User {
   wins   Int @default(0)
   losses Int @default(0)
 
+  // Subscription
+  subscriptionTier SubscriptionTier @default(FREE)
+  stripeCustomerId String?          @unique
+  gamesPlayedToday Int              @default(0)
+  lastGameResetAt  DateTime         @default(now())
+  trialEndsAt      DateTime?
+  hasUsedTrial     Boolean          @default(false)
+  subscription     Subscription?
+
   // Clan membership
   clanId String?
   clan   Clan?   @relation(fields: [clanId], references: [id])
@@ -35,6 +44,34 @@ model User {
 
   // Matchmaking
   matchmakingEntry MatchmakingEntry?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  UNPAID
+}
+
+model Subscription {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  stripeSubscriptionId String             @unique
+  stripePriceId        String
+  status               SubscriptionStatus
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

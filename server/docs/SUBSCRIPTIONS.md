@@ -1,6 +1,6 @@
 # Subscriptions & Paywall Implementation
 
-CodeQuest Battles uses a **freemium model** similar to GeoGuessr — users get limited free games per day, then must subscribe for unlimited access.
+CodeQuest Battles uses a **freemium model** — users get limited free games per day, then must subscribe for unlimited access. Free users do not have stats persisted. New users can start a **7-day free trial** with full Pro benefits.
 
 ---
 
@@ -9,26 +9,26 @@ CodeQuest Battles uses a **freemium model** similar to GeoGuessr — users get l
 ### Free Tier
 | Feature | Access |
 |---------|--------|
-| Games per day | **2** |
-| Casual matchmaking | ✅ |
-| Ranked matchmaking | ❌ |
-| Battle Royale | ❌ |
-| Clans & Clan Wars | ❌ |
-| Basic profile | ✅ |
-| Match history | Last 5 games |
+| Games per day | **1** |
+| All game modes | ✅ |
+| Clans | ✅ |
+| Stats persistence | ❌ |
 
-### Pro Subscription ($7.99/month or $59.99/year)
+### Free Trial (7 days, one-time)
 | Feature | Access |
 |---------|--------|
 | Games per day | **Unlimited** |
-| Casual matchmaking | ✅ |
-| Ranked matchmaking | ✅ |
-| Battle Royale | ✅ |
-| Clans & Clan Wars | ✅ |
-| Full profile & stats | ✅ |
-| Match history | Unlimited |
-| Priority matchmaking | ✅ |
-| Exclusive badges | ✅ |
+| All game modes | ✅ |
+| Clans | ✅ |
+| Stats persistence | ✅ |
+
+### Pro Subscription ($5/2 months or $24.99/year)
+| Feature | Access |
+|---------|--------|
+| Games per day | **Unlimited** |
+| All game modes | ✅ |
+| Clans | ✅ |
+| Stats persistence | ✅ |
 
 ---
 
@@ -36,38 +36,43 @@ CodeQuest Battles uses a **freemium model** similar to GeoGuessr — users get l
 
 ```prisma
 model User {
-  id                String   @id @default(uuid())
-  email             String   @unique
-  // ... other fields
+  id        String  @id @default(uuid())
+  email     String  @unique
+  username  String  @unique
+  avatarUrl String?
+  role      String  @default("user")
 
-  // Subscription fields
-  subscriptionTier  SubscriptionTier @default(FREE)
-  stripeCustomerId  String?  @unique
-  stripeSubscriptionId String?
-  subscriptionEndsAt DateTime?
+  // Stats
+  mmr    Int @default(1000)
+  wins   Int @default(0)
+  losses Int @default(0)
 
-  // Daily game tracking
-  gamesPlayedToday  Int      @default(0)
-  lastGameResetAt   DateTime @default(now())
+  // Subscription
+  subscriptionTier SubscriptionTier @default(FREE)
+  stripeCustomerId String?          @unique
+  gamesPlayedToday Int              @default(0)
+  lastGameResetAt  DateTime         @default(now())
+  trialEndsAt      DateTime?
+  hasUsedTrial     Boolean          @default(false)
+  subscription     Subscription?
 
-  // Relations
-  subscription      Subscription?
+  // ...other relations
 }
 
 model Subscription {
-  id                String   @id @default(uuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id])
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
 
-  stripeSubscriptionId String @unique
-  stripePriceId     String
-  status            SubscriptionStatus
-  currentPeriodStart DateTime
-  currentPeriodEnd  DateTime
-  cancelAtPeriodEnd Boolean @default(false)
+  stripeSubscriptionId String             @unique
+  stripePriceId        String
+  status               SubscriptionStatus
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum SubscriptionTier {
@@ -80,7 +85,6 @@ enum SubscriptionStatus {
   CANCELED
   PAST_DUE
   UNPAID
-  TRIALING
 }
 ```
 
@@ -90,21 +94,14 @@ enum SubscriptionStatus {
 
 ```
 src/subscriptions/
-├── subscriptions.module.ts
+├── subscriptions.module.ts          # Module registration
 ├── subscriptions.controller.ts      # REST endpoints
-├── subscriptions.service.ts         # Core business logic
-├── stripe.service.ts                # Stripe API integration
-├── game-limit.service.ts            # Daily game tracking
-├── guards/
-│   └── subscription.guard.ts        # Route protection
-├── decorators/
-│   └── requires-pro.decorator.ts    # Mark routes as Pro-only
-├── dto/
-│   ├── create-checkout.dto.ts
-│   ├── subscription-status.dto.ts
-│   └── webhook-event.dto.ts
-└── entities/
-    └── subscription.entity.ts
+├── subscriptions.service.ts         # Core business logic + webhook handlers + cron
+├── stripe.service.ts                # Stripe SDK wrapper
+├── subscriptions.service.spec.ts    # Unit tests (39 tests)
+└── dto/
+    ├── create-checkout.dto.ts
+    └── subscription-status-response.dto.ts
 ```
 
 ---
@@ -114,159 +111,145 @@ src/subscriptions/
 ### REST Endpoints
 
 ```typescript
+@ApiTags('subscriptions')
 @Controller('subscriptions')
 export class SubscriptionsController {
   // Get current user's subscription status
   @Get('status')
-  @UseGuards(JwtAuthGuard)
-  async getStatus(@CurrentUser() user: User): Promise<SubscriptionStatusDto>
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('access-token')
+  async getStatus(@Req() req: AuthRequest): Promise<SubscriptionStatusResponseDto>
 
   // Create Stripe checkout session
   @Post('checkout')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('access-token')
   async createCheckout(
-    @CurrentUser() user: User,
-    @Body() dto: CreateCheckoutDto
+    @Req() req: AuthRequest,
+    @Body() dto: CreateCheckoutDto,
   ): Promise<{ sessionUrl: string }>
 
   // Create Stripe customer portal session (manage subscription)
   @Post('portal')
-  @UseGuards(JwtAuthGuard)
-  async createPortalSession(@CurrentUser() user: User): Promise<{ portalUrl: string }>
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('access-token')
+  async createPortal(@Req() req: AuthRequest): Promise<{ portalUrl: string }>
 
-  // Stripe webhook handler
+  // Start a 7-day free trial (one-time per user)
+  @Post('trial')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('access-token')
+  async startTrial(@Req() req: AuthRequest): Promise<{ trialEndsAt: Date }>
+
+  // Stripe webhook handler (no auth — uses stripe-signature verification)
   @Post('webhook')
   async handleWebhook(
     @Req() req: RawBodyRequest<Request>,
-    @Headers('stripe-signature') signature: string
+    @Headers('stripe-signature') signature: string,
   ): Promise<void>
 }
 ```
 
-### Response DTOs
+### DTOs
 
 ```typescript
+// POST /subscriptions/checkout
+class CreateCheckoutDto {
+  @IsIn(['bimonthly', 'yearly'])
+  plan: 'bimonthly' | 'yearly';
+}
+
 // GET /subscriptions/status
-interface SubscriptionStatusDto {
-  tier: 'free' | 'pro';
-  gamesRemaining: number;      // For free tier
+class SubscriptionStatusResponseDto {
+  tier: 'free' | 'pro' | 'trial';
+  gamesRemaining: number;      // For free tier (1 max), Infinity for pro/trial
   gamesPlayedToday: number;
-  dailyLimit: number;          // 2 for free, Infinity for pro
-  resetsAt: string;            // ISO timestamp (midnight UTC)
-  subscription?: {
-    status: SubscriptionStatus;
-    currentPeriodEnd: string;
-    cancelAtPeriodEnd: boolean;
-  };
+  dailyLimit: number;           // 1 for free, Infinity for pro/trial
+  resetsAt: string;             // ISO timestamp (next midnight UTC)
+  trialEndsAt?: string;         // ISO timestamp (only present during active trial)
+  subscription?: SubscriptionDetailsDto;
+}
+
+class SubscriptionDetailsDto {
+  status: string;               // ACTIVE, CANCELED, PAST_DUE, UNPAID
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
 }
 ```
 
 ---
 
-## Core Services
+## Core Service
 
 ### SubscriptionsService
 
+All subscription logic lives in a single service (no separate `GameLimitService`). Key methods:
+
 ```typescript
+export const FREE_DAILY_LIMIT = 1;
+export const TRIAL_DURATION_DAYS = 7;
+
 @Injectable()
 export class SubscriptionsService {
   constructor(
     private prisma: PrismaService,
     private stripeService: StripeService,
+    private configService: ConfigService,
   ) {}
 
-  async getSubscriptionStatus(userId: string): Promise<SubscriptionStatusDto> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { subscription: true },
-    });
+  // Check if a trial is currently active
+  isTrialActive(trialEndsAt: Date | null): boolean
 
-    const gamesRemaining = user.subscriptionTier === 'PRO'
-      ? Infinity
-      : Math.max(0, FREE_DAILY_LIMIT - user.gamesPlayedToday);
+  // Start a 7-day free trial (one-time per user)
+  async startTrial(userId: string): Promise<{ trialEndsAt: Date }>
 
-    return {
-      tier: user.subscriptionTier.toLowerCase(),
-      gamesRemaining,
-      gamesPlayedToday: user.gamesPlayedToday,
-      dailyLimit: user.subscriptionTier === 'PRO' ? Infinity : FREE_DAILY_LIMIT,
-      resetsAt: this.getNextResetTime(),
-      subscription: user.subscription ? {
-        status: user.subscription.status,
-        currentPeriodEnd: user.subscription.currentPeriodEnd.toISOString(),
-        cancelAtPeriodEnd: user.subscription.cancelAtPeriodEnd,
-      } : undefined,
-    };
-  }
+  // Check if a user can start/join a game (Pro/trial = unlimited, free = limited)
+  async canPlay(userId: string): Promise<boolean>
 
-  async canPlayGame(userId: string): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+  // Increment the daily games played counter
+  async incrementGamesPlayed(userId: string): Promise<void>
 
-    // Pro users can always play
-    if (user.subscriptionTier === 'PRO') {
-      return true;
-    }
+  // Lazy daily reset — compares UTC dates
+  async checkAndResetDailyGames(userId: string, lastGameResetAt: Date): Promise<void>
 
-    // Check if daily reset needed
-    await this.checkAndResetDailyGames(user);
+  // Get subscription status for the status endpoint
+  async getSubscriptionStatus(userId: string): Promise<SubscriptionStatusResponseDto>
 
-    // Free users limited to FREE_DAILY_LIMIT games
-    return user.gamesPlayedToday < FREE_DAILY_LIMIT;
-  }
+  // Create checkout session (resolves price ID from plan type)
+  async createCheckoutSession(userId: string, plan: 'bimonthly' | 'yearly'): Promise<string>
 
-  async incrementGamesPlayed(userId: string): Promise<void> {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { gamesPlayedToday: { increment: 1 } },
-    });
-  }
+  // Create portal session for managing subscription
+  async createPortalSession(userId: string): Promise<string>
 
-  async checkAndResetDailyGames(user: User): Promise<void> {
-    const now = new Date();
-    const lastReset = new Date(user.lastGameResetAt);
+  // Process Stripe webhook events
+  async handleWebhookEvent(event: StripeWebhookEvent): Promise<void>
 
-    // Reset if last reset was before today's midnight UTC
-    if (lastReset.toDateString() !== now.toDateString()) {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          gamesPlayedToday: 0,
-          lastGameResetAt: now,
-        },
-      });
-    }
-  }
+  // Cron: resets all free users' daily game counts at midnight UTC
+  @Cron('0 0 * * *', { timeZone: 'UTC' })
+  async resetAllDailyGameCounts(): Promise<void>
 }
 ```
 
-### GameLimitService
+#### `canPlay` logic
 
-```typescript
-@Injectable()
-export class GameLimitService {
-  private readonly FREE_DAILY_LIMIT = 2;
+1. Pro users or active trial → always `true`
+2. Free users (no active trial) → lazy daily reset via `checkAndResetDailyGames`, then check `gamesPlayedToday < FREE_DAILY_LIMIT`
 
-  async validateAndConsumeGame(userId: string): Promise<{ allowed: boolean; reason?: string }> {
-    const canPlay = await this.subscriptionsService.canPlayGame(userId);
-    
-    if (!canPlay) {
-      return {
-        allowed: false,
-        reason: 'Daily free game limit reached. Upgrade to Pro for unlimited games.',
-      };
-    }
+#### `startTrial` logic
 
-    // Increment counter (actual consumption happens when match starts)
-    return { allowed: true };
-  }
+1. Validates user exists, hasn't already used trial, and isn't already Pro
+2. Sets `trialEndsAt` to 7 days from now and `hasUsedTrial = true`
+3. Returns the `trialEndsAt` date
 
-  async consumeGame(userId: string): Promise<void> {
-    await this.subscriptionsService.incrementGamesPlayed(userId);
-  }
-}
-```
+#### `checkAndResetDailyGames` logic
+
+Compares `lastGameResetAt` date (UTC) with today's date (UTC). If different, resets `gamesPlayedToday` to 0 and updates `lastGameResetAt`.
+
+#### `createCheckoutSession` logic
+
+1. Find user, get or create Stripe customer
+2. Resolve price ID: `STRIPE_PRICE_ID_YEARLY` for yearly, `STRIPE_PRICE_ID_BIMONTHLY` for bimonthly
+3. Delegate to `StripeService.createCheckoutSession`
 
 ---
 
@@ -274,218 +257,93 @@ export class GameLimitService {
 
 ### StripeService
 
+Uses Stripe SDK v22 with `import Stripe = require('stripe')` (v22 export structure requires this pattern).
+
 ```typescript
 @Injectable()
 export class StripeService {
-  private stripe: Stripe;
+  private stripe: InstanceType<typeof Stripe>;
 
   constructor(private configService: ConfigService) {
-    this.stripe = new Stripe(configService.get('STRIPE_SECRET_KEY'), {
-      apiVersion: '2023-10-16',
-    });
+    this.stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY')!);
   }
 
-  async createCheckoutSession(user: User, priceId: string): Promise<string> {
-    // Create or get Stripe customer
-    let customerId = user.stripeCustomerId;
-    if (!customerId) {
-      const customer = await this.stripe.customers.create({
-        email: user.email,
-        metadata: { userId: user.id },
-      });
-      customerId = customer.id;
-      // Update user with customer ID
-    }
-
-    const session = await this.stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${this.configService.get('CLIENT_URL')}/subscription/success`,
-      cancel_url: `${this.configService.get('CLIENT_URL')}/subscription/cancel`,
-      metadata: { userId: user.id },
-    });
-
-    return session.url;
-  }
-
-  async createPortalSession(customerId: string): Promise<string> {
-    const session = await this.stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: `${this.configService.get('CLIENT_URL')}/settings`,
-    });
-    return session.url;
-  }
+  async createCustomer(email: string, userId: string): Promise<string>
+  async createCheckoutSession(customerId: string, priceId: string, userId: string): Promise<string>
+  async createPortalSession(customerId: string): Promise<string>
+  constructWebhookEvent(body: Buffer, signature: string): any
 }
 ```
+
+Checkout sessions include `{CHECKOUT_SESSION_ID}` in the success URL for client-side verification.
 
 ### Webhook Events
 
+Handled in `SubscriptionsService.handleWebhookEvent`:
+
+| Event | Handler | Effect |
+|-------|---------|--------|
+| `checkout.session.completed` | `handleCheckoutCompleted` | Saves `stripeCustomerId` on User |
+| `customer.subscription.created` | `handleSubscriptionUpdated` | Sets tier to PRO, upserts Subscription record |
+| `customer.subscription.updated` | `handleSubscriptionUpdated` | Updates tier + Subscription record |
+| `customer.subscription.deleted` | `handleSubscriptionDeleted` | Sets tier to FREE, marks Subscription CANCELED |
+| `invoice.payment_failed` | `handlePaymentFailed` | Marks Subscription PAST_DUE |
+
+#### Status Mapping
+
 ```typescript
-@Injectable()
-export class WebhookService {
-  async handleWebhookEvent(event: Stripe.Event): Promise<void> {
-    switch (event.type) {
-      case 'checkout.session.completed':
-        await this.handleCheckoutCompleted(event.data.object);
-        break;
-
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated':
-        await this.handleSubscriptionUpdated(event.data.object);
-        break;
-
-      case 'customer.subscription.deleted':
-        await this.handleSubscriptionDeleted(event.data.object);
-        break;
-
-      case 'invoice.payment_failed':
-        await this.handlePaymentFailed(event.data.object);
-        break;
-    }
-  }
-
-  private async handleSubscriptionUpdated(subscription: Stripe.Subscription): Promise<void> {
-    const userId = subscription.metadata.userId;
-    
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        subscriptionTier: subscription.status === 'active' ? 'PRO' : 'FREE',
-      },
-    });
-
-    await this.prisma.subscription.upsert({
-      where: { stripeSubscriptionId: subscription.id },
-      create: {
-        userId,
-        stripeSubscriptionId: subscription.id,
-        stripePriceId: subscription.items.data[0].price.id,
-        status: this.mapStripeStatus(subscription.status),
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      },
-      update: {
-        status: this.mapStripeStatus(subscription.status),
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      },
-    });
-  }
-
-  private async handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {
-    const userId = subscription.metadata.userId;
-    
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { subscriptionTier: 'FREE' },
-    });
-
-    await this.prisma.subscription.update({
-      where: { stripeSubscriptionId: subscription.id },
-      data: { status: 'CANCELED' },
-    });
+private mapStripeStatus(status: string): 'ACTIVE' | 'CANCELED' | 'PAST_DUE' | 'UNPAID' {
+  switch (status) {
+    case 'active':
+    case 'trialing':  return 'ACTIVE';
+    case 'canceled':  return 'CANCELED';
+    case 'past_due':  return 'PAST_DUE';
+    case 'unpaid':    return 'UNPAID';
+    default:          return 'ACTIVE';
   }
 }
 ```
 
 ---
 
-## Guards & Decorators
+## Battle Integration
 
-### SubscriptionGuard
+Subscription gating is enforced directly in `BattlesService` (no guards or decorators needed):
+
+### Game Limit Checks
 
 ```typescript
-@Injectable()
-export class SubscriptionGuard implements CanActivate {
-  constructor(
-    private reflector: Reflector,
-    private subscriptionsService: SubscriptionsService,
-  ) {}
-
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiresPro = this.reflector.get<boolean>('requiresPro', context.getHandler());
-    
-    if (!requiresPro) return true;
-
-    const request = context.switchToHttp().getRequest();
-    const user = request.user;
-
-    if (user.subscriptionTier !== 'PRO') {
-      throw new ForbiddenException('Pro subscription required');
-    }
-
-    return true;
-  }
+// In BattlesService.createBattle() and joinBattle():
+const canPlay = await this.subscriptionsService.canPlay(userId);
+if (!canPlay) {
+  throw new ForbiddenException(
+    'Daily free game limit reached. Upgrade to Pro for unlimited games.',
+  );
 }
 ```
 
-### CanPlayGuard (for matchmaking)
+### Game Count Increment
+
+When a battle starts (enough players join), all participants get their game count incremented:
 
 ```typescript
-@Injectable()
-export class CanPlayGuard implements CanActivate {
-  constructor(private gameLimitService: GameLimitService) {}
-
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const client = context.switchToWs().getClient<Socket>();
-    const userId = client.data.userId;
-
-    const { allowed, reason } = await this.gameLimitService.validateAndConsumeGame(userId);
-    
-    if (!allowed) {
-      client.emit('matchmaking:error', { code: 'GAME_LIMIT_REACHED', message: reason });
-      return false;
-    }
-
-    return true;
-  }
+// In BattlesService.joinBattle(), when shouldStart is true:
+for (const p of battle.participants) {
+  await this.subscriptionsService.incrementGamesPlayed(p.userId);
 }
+await this.subscriptionsService.incrementGamesPlayed(userId);
 ```
 
-### RequiresPro Decorator
+### Free User Stats Gating
+
+In `BattlesService.completeBattle()`, stats (wins/losses/mmr) are only persisted for Pro and trial users:
 
 ```typescript
-export const RequiresPro = () => SetMetadata('requiresPro', true);
-
-// Usage:
-@Get('ranked-leaderboard')
-@RequiresPro()
-async getRankedLeaderboard() { }
-```
-
----
-
-## Matchmaking Integration
-
-The game limit check is integrated into the matchmaking flow:
-
-```typescript
-@WebSocketGateway()
-export class MatchmakingGateway {
-  @SubscribeMessage('matchmaking:join')
-  @UseGuards(WsAuthGuard, CanPlayGuard) // CanPlayGuard checks game limit
-  async handleJoinQueue(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: JoinQueueDto,
-  ) {
-    // If we get here, user has games remaining or is Pro
-    await this.matchmakingService.addToQueue(client.data.userId, payload);
-  }
-}
-
-@Injectable()
-export class MatchmakingService {
-  async onMatchFound(player1Id: string, player2Id: string): Promise<void> {
-    // Consume a game for free users when match actually starts
-    await this.gameLimitService.consumeGame(player1Id);
-    await this.gameLimitService.consumeGame(player2Id);
-    
-    // Create battle...
-  }
+const hasProAccess =
+    participant.user.subscriptionTier === 'PRO' ||
+    (participant.user.trialEndsAt && new Date(participant.user.trialEndsAt) > new Date());
+if (!isTeam && hasProAccess) {
+  // Update mmr, wins, losses
 }
 ```
 
@@ -493,40 +351,39 @@ export class MatchmakingService {
 
 ## Cron Jobs
 
+Daily game count reset runs via `@nestjs/schedule` (uses `ScheduleModule.forRoot()` already imported in matchmaking module):
+
 ```typescript
-@Injectable()
-export class SubscriptionsCron {
-  constructor(private subscriptionsService: SubscriptionsService) {}
-
-  // Reset daily game counts at midnight UTC
-  @Cron('0 0 * * *', { timeZone: 'UTC' })
-  async resetDailyGames(): Promise<void> {
-    await this.prisma.user.updateMany({
-      where: { subscriptionTier: 'FREE' },
-      data: {
-        gamesPlayedToday: 0,
-        lastGameResetAt: new Date(),
-      },
-    });
-  }
-
-  // Check for expired subscriptions
-  @Cron('0 * * * *') // Every hour
-  async checkExpiredSubscriptions(): Promise<void> {
-    const expired = await this.prisma.subscription.findMany({
-      where: {
-        status: 'ACTIVE',
-        currentPeriodEnd: { lt: new Date() },
-      },
-    });
-
-    for (const sub of expired) {
-      // Stripe webhook should handle this, but this is a fallback
-      await this.subscriptionsService.downgradeToFree(sub.userId);
-    }
-  }
+@Cron('0 0 * * *', { timeZone: 'UTC' })
+async resetAllDailyGameCounts(): Promise<void> {
+  const result = await this.prisma.user.updateMany({
+    where: { subscriptionTier: 'FREE' },
+    data: {
+      gamesPlayedToday: 0,
+      lastGameResetAt: new Date(),
+    },
+  });
+  this.logger.log(`Daily game counts reset for ${result.count} free users`);
 }
 ```
+
+There is also a **lazy per-user reset** in `checkAndResetDailyGames` that fires on `canPlay` and `getSubscriptionStatus` calls, so users are never blocked due to cron timing.
+
+---
+
+## App Configuration
+
+### Raw body for webhooks
+
+`main.ts` enables raw body parsing required by Stripe webhook signature verification:
+
+```typescript
+const app = await NestFactory.create(AppModule, { rawBody: true });
+```
+
+### Module registration
+
+`SubscriptionsModule` is imported in `AppModule`. `BattlesModule` imports `SubscriptionsModule` for the `canPlay`/`incrementGamesPlayed` integration.
 
 ---
 
@@ -534,36 +391,39 @@ export class SubscriptionsCron {
 
 ```env
 # Stripe
-STRIPE_SECRET_KEY=sk_live_xxx
+STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
-STRIPE_PRICE_ID_MONTHLY=price_xxx
+STRIPE_PRICE_ID_BIMONTHLY=price_xxx
 STRIPE_PRICE_ID_YEARLY=price_xxx
 
-# Game limits
-FREE_DAILY_GAME_LIMIT=2
-
-# Client URL (for redirect)
-CLIENT_URL=https://codequest.gg
+# Client URL (for Stripe redirects)
+CLIENT_URL=http://localhost:5173
 ```
 
 ---
 
 ## Testing
 
-```typescript
-describe('SubscriptionsService', () => {
-  it('should allow Pro users unlimited games', async () => {
-    const proUser = { id: '1', subscriptionTier: 'PRO', gamesPlayedToday: 100 };
-    expect(await service.canPlayGame(proUser.id)).toBe(true);
-  });
+39 unit tests in `subscriptions.service.spec.ts`:
 
-  it('should limit free users to 2 games', async () => {
-    const freeUser = { id: '2', subscriptionTier: 'FREE', gamesPlayedToday: 2 };
-    expect(await service.canPlayGame(freeUser.id)).toBe(false);
-  });
+| Group | Count | Coverage |
+|-------|-------|----------|
+| canPlay | 7 | Pro unlimited, free under limit, free at limit, user not found, lazy reset, active trial unlimited, expired trial blocked |
+| isTrialActive | 3 | Future date (true), past date (false), null (false) |
+| startTrial | 4 | Activates 7-day trial, already used trial, already Pro, user not found |
+| incrementGamesPlayed | 1 | Increments counter |
+| checkAndResetDailyGames | 2 | Same day (no reset), different day (resets) |
+| getSubscriptionStatus | 4 | Free user, Pro user, user not found, trial user with unlimited |
+| createCheckoutSession | 5 | New customer, existing customer, yearly plan, user not found, missing price config |
+| createPortalSession | 3 | Success, user not found, no customer ID |
+| handleWebhookEvent | 7 | Checkout completed, subscription created/updated, subscription deleted, payment failed, missing metadata, unhandled event |
+| resetAllDailyGameCounts | 1 | Resets all free users |
+| Constants | 2 | `FREE_DAILY_LIMIT === 1`, `TRIAL_DURATION_DAYS === 7` |
 
-  it('should reset games at midnight', async () => {
-    // Test daily reset logic
-  });
-});
-```
+Battle integration tests (6 tests in `battles.service.spec.ts`):
+- Blocks `createBattle` when daily limit reached
+- Blocks `joinBattle` when daily limit reached
+- Allows battle creation when `canPlay` returns true
+- Increments game count for all participants when battle starts
+- Only persists stats for Pro users in `completeBattle`
+- Persists stats for trial users in `completeBattle`
