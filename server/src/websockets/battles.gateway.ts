@@ -307,6 +307,23 @@ export class BattlesGateway
     }
 
     /**
+     * Emit match found event to matched players
+     */
+    emitMatchFound(
+        userId: string,
+        data: { battleId: string; opponentId: string },
+    ) {
+        const socket = this.getSocketByUserId(userId);
+        if (socket) {
+            socket.emit('matchmaking.match_found', {
+                battleId: data.battleId,
+                opponentId: data.opponentId,
+                matchedAt: new Date(),
+            });
+        }
+    }
+
+    /**
      * Auto-rejoin active battle rooms on reconnection
      */
     private async rejoinActiveBattles(client: AuthenticatedSocket) {

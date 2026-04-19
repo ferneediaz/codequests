@@ -8,6 +8,7 @@ import { CodeExecutionModule } from './code-execution/code-execution.module';
 import { BattlesModule } from './battles/battles.module';
 import { ClansModule } from './clans/clans.module';
 import { WebsocketsModule } from './websockets/websockets.module';
+import { MatchmakingModule } from './matchmaking/matchmaking.module';
 
 @Module({
     imports: [
@@ -28,9 +29,9 @@ import { WebsocketsModule } from './websockets/websockets.module';
         BattlesModule,
         ClansModule,
         WebsocketsModule,
+        MatchmakingModule,
 
         // TODO: Add these modules as we build them
-        // MatchmakingModule,
         // RankingsModule,
     ],
 })

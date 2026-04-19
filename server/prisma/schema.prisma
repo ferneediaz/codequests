@@ -33,6 +33,9 @@ model User {
   // Battle participation
   battles BattleParticipant[]
 
+  // Matchmaking
+  matchmakingEntry MatchmakingEntry?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -162,6 +165,30 @@ enum BattleStatus {
   WAITING
   IN_PROGRESS
   COMPLETED
+}
+
+// ============================================
+// MATCHMAKING
+// ============================================
+
+model MatchmakingEntry {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  mode                BattleMode @default(ONE_V_ONE)
+  preferredDifficulty Difficulty?
+  mmrAtQueue          Int // Snapshot of user MMR when they joined
+
+  status    MatchmakingStatus @default(QUEUED)
+  queuedAt  DateTime          @default(now())
+  matchedAt DateTime?
+}
+
+enum MatchmakingStatus {
+  QUEUED
+  MATCHED
+  EXPIRED
 }
 
 // ============================================
