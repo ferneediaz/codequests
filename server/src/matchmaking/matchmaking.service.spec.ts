@@ -131,10 +131,6 @@ describe('MatchmakingService', () => {
         battlesGateway = module.get(BattlesGateway);
     });
 
-    it('should be defined', () => {
-        expect(service).toBeDefined();
-    });
-
     // ==========================================
     // joinQueue
     // ==========================================

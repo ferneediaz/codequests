@@ -307,14 +307,15 @@ Enhanced leaderboard features.
 **IMPORTANT:** This is a big feature. Mark as SUCCESS only when ALL tests pass.
 
 ### Test Coverage Goals:
-- [x] Auth: All tests passing ✅ (DONE)
-- [x] Users: All tests passing ✅ (DONE)
-- [x] Problems: All tests passing ✅ (DONE)
-- [x] Code Execution: All tests passing ✅ (DONE)
-- [x] **Battles: All tests passing ✅ (DONE - 30 tests)**
-- [ ] **WebSockets: All tests passing** ⏳ (TODO)
-- [ ] **Matchmaking: All tests passing** ⏳ (TODO)
-- [x] **Clans: Module implemented** ✅ (DONE - tests in battles.service.spec)
+- [x] Auth: All tests passing ✅ (7 tests)
+- [x] Users: All tests passing ✅ (15 tests)
+- [x] Problems: All tests passing ✅ (14 tests)
+- [x] Code Execution: All tests passing ✅ (9 unit + 17 integration)
+- [x] **Battles: All tests passing ✅ (32 tests)**
+- [x] **WebSockets: All tests passing ✅ (24 tests)**
+- [x] **Matchmaking: All tests passing ✅ (26 tests)**
+- [x] **WsAuthGuard: All tests passing ✅ (8 tests)**
+- [x] **Clans: Module implemented** ✅ (tests in battles.service.spec)
 - [ ] **E2E Tests: Full flow working** ⏳ (TODO)
 
 ### E2E Test Scenarios:

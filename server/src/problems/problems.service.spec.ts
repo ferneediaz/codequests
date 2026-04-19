@@ -26,10 +26,6 @@ describe('ProblemsService', () => {
     prisma = module.get<MockPrismaService>(PrismaService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
   describe('create', () => {
     it('should create a problem with test cases', async () => {
       const createDto = {
@@ -256,6 +252,14 @@ describe('ProblemsService', () => {
       });
       expect(result.title).toBe('New Title');
     });
+
+    it('should throw NotFoundException when problem not found', async () => {
+      prisma.problem.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.update('nonexistent', { title: 'New Title' }),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('remove', () => {
@@ -271,6 +275,45 @@ describe('ProblemsService', () => {
         where: { id: 'problem-1' },
       });
       expect(result.message).toBe('Problem deleted successfully');
+    });
+
+    it('should throw NotFoundException when problem not found', async () => {
+      prisma.problem.findUnique.mockResolvedValue(null);
+
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('getTestCases', () => {
+    it('should return all test cases including hidden ones', async () => {
+      const problem = {
+        id: 'problem-1',
+        title: 'Two Sum',
+        testCases: [
+          { id: 'test-1', isHidden: false },
+          { id: 'test-2', isHidden: true },
+        ],
+      };
+
+      prisma.problem.findUnique.mockResolvedValue(problem);
+
+      const result = await service.getTestCases('problem-1');
+
+      expect(result).toHaveLength(2);
+      expect(prisma.problem.findUnique).toHaveBeenCalledWith({
+        where: { id: 'problem-1' },
+        include: { testCases: true },
+      });
+    });
+
+    it('should throw NotFoundException when problem not found', async () => {
+      prisma.problem.findUnique.mockResolvedValue(null);
+
+      await expect(service.getTestCases('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

@@ -278,17 +278,16 @@ print(x)
             expect(result.stderr).toBeTruthy();
         }, 15000);
 
-        conditionalTest('should handle invalid Python code with wrong answer', async () => {
+        conditionalTest('should execute code that produces incorrect output without error', async () => {
             const code = `print("This is wrong")`;
 
             const result = await pistonClient.executeCode(code, 'python');
 
-            // Code runs successfully but produces wrong output
+            // Code executes successfully but produces output that wouldn't match expected
+            // Wrong-answer detection happens at the CodeExecutionService level, not Piston
             expect(result.status.id).toBe(3);
             expect(result.stdout?.trim()).toBe('This is wrong');
-
-            // In real scenario, this would be compared against expected output
-            // and marked as failed if they don't match
+            expect(result.stderr).toBeFalsy();
         }, 15000);
     });
 

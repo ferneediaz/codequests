@@ -1,0 +1,16 @@
+{
+  "name": "codequests",
+  "version": "1.0.0",
+  "description": "A competitive coding battle platform where players learn algorithms through real-time 1v1 duels and battle royale matches. Think LeetCode meets competitive gaming.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

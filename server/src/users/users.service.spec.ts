@@ -25,10 +25,6 @@ describe('UsersService', () => {
         prisma = module.get<MockPrismaService>(PrismaService);
     });
 
-    it('should be defined', () => {
-        expect(service).toBeDefined();
-    });
-
     describe('findAll', () => {
         it('should return users sorted by MMR', async () => {
             const users = [
@@ -327,6 +323,80 @@ describe('UsersService', () => {
             expect(calculateTier(1000)).toBe('Silver');
             expect(calculateTier(900)).toBe('Bronze');
             expect(calculateTier(500)).toBe('Bronze');
+        });
+    });
+
+    describe('getMatchHistory', () => {
+        it('should return match history for a user', async () => {
+            const matchHistory = [
+                {
+                    id: 'participant-1',
+                    userId: 'user-123',
+                    battleId: 'battle-1',
+                    battle: {
+                        id: 'battle-1',
+                        problem: { title: 'Two Sum', difficulty: 'EASY' },
+                        participants: [
+                            {
+                                userId: 'user-123',
+                                testsPassed: 5,
+                                totalTests: 5,
+                                user: { username: 'testuser', avatarUrl: null },
+                            },
+                        ],
+                    },
+                },
+            ];
+
+            prisma.user.findUnique.mockResolvedValue({ id: 'user-123' });
+            prisma.battleParticipant.findMany.mockResolvedValue(matchHistory);
+
+            const result = await service.getMatchHistory('user-123');
+
+            expect(result).toEqual(matchHistory);
+            expect(prisma.battleParticipant.findMany).toHaveBeenCalledWith({
+                where: { userId: 'user-123' },
+                take: 20,
+                orderBy: { battle: { createdAt: 'desc' } },
+                include: {
+                    battle: {
+                        include: {
+                            problem: {
+                                select: { title: true, difficulty: true },
+                            },
+                            participants: {
+                                select: {
+                                    userId: true,
+                                    testsPassed: true,
+                                    totalTests: true,
+                                    user: {
+                                        select: { username: true, avatarUrl: true },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+        });
+
+        it('should throw NotFoundException if user does not exist', async () => {
+            prisma.user.findUnique.mockResolvedValue(null);
+
+            await expect(service.getMatchHistory('nonexistent')).rejects.toThrow(
+                NotFoundException,
+            );
+        });
+
+        it('should respect custom limit parameter', async () => {
+            prisma.user.findUnique.mockResolvedValue({ id: 'user-123' });
+            prisma.battleParticipant.findMany.mockResolvedValue([]);
+
+            await service.getMatchHistory('user-123', 5);
+
+            expect(prisma.battleParticipant.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({ take: 5 }),
+            );
         });
     });
 });

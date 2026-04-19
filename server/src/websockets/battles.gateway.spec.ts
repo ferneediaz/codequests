@@ -176,19 +176,6 @@ describe('BattlesGateway', () => {
         gateway.server = mockServer as any;
     });
 
-    it('should be defined', () => {
-        expect(gateway).toBeDefined();
-    });
-
-    describe('Gateway Initialization', () => {
-        it('should initialize the server properly', () => {
-            const server = {} as Server;
-            gateway.afterInit(server);
-            // afterInit should complete without errors
-            expect(gateway).toBeDefined();
-        });
-    });
-
     describe('Connection Handling', () => {
         it('should accept connection with valid JWT token and attach user to socket', async () => {
             const socket = createMockSocket('user-1');
@@ -578,6 +565,41 @@ describe('BattlesGateway', () => {
 
             // Should auto-rejoin active battle rooms
             expect(socket.join).toHaveBeenCalledWith('battle:battle-1');
+        });
+    });
+
+    describe('Match Found Notification', () => {
+        it('should emit matchmaking.match_found to matched user socket', async () => {
+            const socket = createMockSocket('user-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
+
+            // Connect the user first
+            await gateway.handleConnection(socket);
+
+            // Emit match found
+            gateway.emitMatchFound('user-1', {
+                battleId: 'battle-1',
+                opponentId: 'user-2',
+            });
+
+            expect(socket.emit).toHaveBeenCalledWith(
+                'matchmaking.match_found',
+                expect.objectContaining({
+                    battleId: 'battle-1',
+                    opponentId: 'user-2',
+                    matchedAt: expect.any(Date),
+                }),
+            );
+        });
+
+        it('should not throw when user is not connected', () => {
+            // emitMatchFound for a user that's not connected
+            expect(() =>
+                gateway.emitMatchFound('non-connected-user', {
+                    battleId: 'battle-1',
+                    opponentId: 'user-2',
+                }),
+            ).not.toThrow();
         });
     });
 });

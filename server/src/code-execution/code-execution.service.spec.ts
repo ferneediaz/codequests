@@ -38,10 +38,6 @@ describe('CodeExecutionService', () => {
     pistonClient = module.get(PistonClient);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
   describe('executeCode', () => {
     it('should execute code against all test cases and return results', async () => {
       const problem = {
@@ -165,6 +161,97 @@ describe('CodeExecutionService', () => {
       expect(result.results[0].input).toBe('[Hidden]');
       expect(result.results[0].expectedOutput).toBe('[Hidden]');
       expect(result.results[0].actualOutput).toBe('[Hidden]');
+      expect(result.results[0].passed).toBe(false);
+      expect(result.allPassed).toBe(false);
+    });
+
+    it('should handle mixed pass/fail results', async () => {
+      const problem = {
+        id: 'problem-1',
+        testCases: [
+          { id: 'test-1', input: '[2,7]\n9', expectedOutput: '[0,1]', isHidden: false },
+          { id: 'test-2', input: '[3,3]\n6', expectedOutput: '[0,1]', isHidden: false },
+        ],
+      };
+
+      prisma.problem.findUnique.mockResolvedValue(problem);
+
+      pistonClient.executeCode
+        .mockResolvedValueOnce({
+          stdout: '[0,1]',
+          stderr: null,
+          compile_output: null,
+          message: null,
+          status: { id: 3, description: 'Accepted' },
+          time: '0.01',
+          memory: 1024,
+        })
+        .mockResolvedValueOnce({
+          stdout: '[1,0]',
+          stderr: null,
+          compile_output: null,
+          message: null,
+          status: { id: 3, description: 'Accepted' },
+          time: '0.01',
+          memory: 1024,
+        });
+
+      const result = await service.executeCode('problem-1', 'code', 'javascript');
+
+      expect(result.passed).toBe(1);
+      expect(result.total).toBe(2);
+      expect(result.allPassed).toBe(false);
+      expect(result.results[0].passed).toBe(true);
+      expect(result.results[1].passed).toBe(false);
+    });
+
+    it('should handle runtime errors', async () => {
+      const problem = {
+        id: 'problem-1',
+        testCases: [
+          { id: 'test-1', input: '', expectedOutput: 'hello', isHidden: false },
+        ],
+      };
+
+      prisma.problem.findUnique.mockResolvedValue(problem);
+
+      pistonClient.executeCode.mockResolvedValue({
+        stdout: null,
+        stderr: 'NameError: name "x" is not defined',
+        compile_output: null,
+        message: null,
+        status: { id: 11, description: 'Runtime Error (NZEC)' },
+        time: '0.01',
+        memory: 1024,
+      });
+
+      const result = await service.executeCode('problem-1', 'code', 'python');
+
+      expect(result.passed).toBe(0);
+      expect(result.allPassed).toBe(false);
+      expect(result.results[0].passed).toBe(false);
+      expect(result.results[0].error).toContain('NameError');
+    });
+
+    it('should handle execution exceptions gracefully', async () => {
+      const problem = {
+        id: 'problem-1',
+        testCases: [
+          { id: 'test-1', input: '', expectedOutput: 'hello', isHidden: false },
+          { id: 'test-2', input: '', expectedOutput: 'world', isHidden: false },
+        ],
+      };
+
+      prisma.problem.findUnique.mockResolvedValue(problem);
+      pistonClient.executeCode.mockRejectedValue(new Error('Connection timeout'));
+
+      const result = await service.executeCode('problem-1', 'code', 'javascript');
+
+      expect(result.passed).toBe(0);
+      expect(result.total).toBe(2);
+      expect(result.allPassed).toBe(false);
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0].error).toContain('Connection timeout');
     });
 
     it('should throw BadRequestException for unsupported language', async () => {

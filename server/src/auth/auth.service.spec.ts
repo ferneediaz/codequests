@@ -24,10 +24,6 @@ describe('AuthService', () => {
         prisma = module.get<MockPrismaService>(PrismaService);
     });
 
-    it('should be defined', () => {
-        expect(service).toBeDefined();
-    });
-
     describe('syncUser', () => {
         it('should create a new user when user does not exist', async () => {
             const userId = 'user-123';
@@ -218,6 +214,18 @@ describe('AuthService', () => {
             const result = await service.getUser(userId);
 
             expect(result?.clan).toBeNull();
+        });
+
+        it('should return null when user does not exist', async () => {
+            prisma.user.findUnique.mockResolvedValue(null);
+
+            const result = await service.getUser('nonexistent');
+
+            expect(result).toBeNull();
+            expect(prisma.user.findUnique).toHaveBeenCalledWith({
+                where: { id: 'nonexistent' },
+                include: { clan: true },
+            });
         });
     });
 });

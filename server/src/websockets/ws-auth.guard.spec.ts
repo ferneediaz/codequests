@@ -70,10 +70,6 @@ describe('WsAuthGuard', () => {
         guard = module.get<WsAuthGuard>(WsAuthGuard);
     });
 
-    it('should be defined', () => {
-        expect(guard).toBeDefined();
-    });
-
     describe('canActivate', () => {
         it('should return false when no token is provided', async () => {
             const context = createMockWsContext(undefined);

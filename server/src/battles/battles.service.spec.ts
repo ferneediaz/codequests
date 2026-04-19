@@ -117,10 +117,6 @@ describe('BattlesService', () => {
         codeExecutionService = module.get(CodeExecutionService);
     });
 
-    it('should be defined', () => {
-        expect(service).toBeDefined();
-    });
-
     describe('createBattle', () => {
         it('should create a battle with the creator as first participant', async () => {
             prisma.problem.findUnique.mockResolvedValue(mockProblem);
@@ -637,6 +633,147 @@ describe('BattlesService', () => {
             await expect(service.completeBattle(mockBattle.id)).rejects.toThrow(
                 BadRequestException,
             );
+        });
+
+        it('should result in draw when both have equal tests and same submission time', async () => {
+            const submittedAt = new Date('2024-01-01T10:00:05');
+            const battleWithDraw = {
+                ...mockBattle,
+                status: BattleStatus.IN_PROGRESS,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: mockUser1.id,
+                        teamId: null,
+                        user: { ...mockUser1, clan: null },
+                        testsPassed: 1,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt,
+                        mmrChange: null,
+                    },
+                    {
+                        id: 'p2',
+                        userId: mockUser2.id,
+                        teamId: null,
+                        user: { ...mockUser2, clan: null },
+                        testsPassed: 1,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt,
+                        mmrChange: null,
+                    },
+                ],
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(battleWithDraw)
+                .mockResolvedValueOnce({
+                    ...battleWithDraw,
+                    status: BattleStatus.COMPLETED,
+                    winnerId: null,
+                });
+
+            prisma.$transaction.mockImplementation(async (callback) => {
+                return callback(prisma);
+            });
+
+            const result = await service.completeBattle(mockBattle.id);
+
+            expect(result.winnerId).toBeNull();
+            expect(result.status).toBe(BattleStatus.COMPLETED);
+        });
+
+        it('should update user win/loss stats and MMR in transaction', async () => {
+            const battleWithSubmissions = {
+                ...mockBattle,
+                status: BattleStatus.IN_PROGRESS,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: mockUser1.id,
+                        teamId: null,
+                        user: { ...mockUser1, mmr: 1000, clan: null },
+                        testsPassed: 2,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:05'),
+                        mmrChange: null,
+                    },
+                    {
+                        id: 'p2',
+                        userId: mockUser2.id,
+                        teamId: null,
+                        user: { ...mockUser2, mmr: 1000, clan: null },
+                        testsPassed: 1,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:03'),
+                        mmrChange: null,
+                    },
+                ],
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(battleWithSubmissions)
+                .mockResolvedValueOnce({
+                    ...battleWithSubmissions,
+                    status: BattleStatus.COMPLETED,
+                    winnerId: mockUser1.id,
+                });
+
+            const txCalls: { method: string; args: any }[] = [];
+            prisma.$transaction.mockImplementation(async (callback) => {
+                const mockTx = {
+                    battle: {
+                        update: jest.fn().mockImplementation((args) => {
+                            txCalls.push({ method: 'battle.update', args });
+                            return Promise.resolve({});
+                        }),
+                    },
+                    battleParticipant: {
+                        update: jest.fn().mockImplementation((args) => {
+                            txCalls.push({ method: 'battleParticipant.update', args });
+                            return Promise.resolve({});
+                        }),
+                    },
+                    user: {
+                        update: jest.fn().mockImplementation((args) => {
+                            txCalls.push({ method: 'user.update', args });
+                            return Promise.resolve({});
+                        }),
+                    },
+                    clan: {
+                        update: jest.fn().mockResolvedValue({}),
+                    },
+                };
+                return callback(mockTx);
+            });
+
+            await service.completeBattle(mockBattle.id);
+
+            // Verify battle was marked COMPLETED with winner
+            const battleUpdate = txCalls.find(c => c.method === 'battle.update');
+            expect(battleUpdate).toBeDefined();
+            expect(battleUpdate!.args.data.status).toBe(BattleStatus.COMPLETED);
+            expect(battleUpdate!.args.data.winnerId).toBe(mockUser1.id);
+
+            // Verify winner gets wins incremented
+            const userUpdates = txCalls.filter(c => c.method === 'user.update');
+            expect(userUpdates).toHaveLength(2);
+
+            const winnerUpdate = userUpdates.find(
+                c => c.args.where.id === mockUser1.id,
+            );
+            expect(winnerUpdate).toBeDefined();
+            expect(winnerUpdate!.args.data.wins).toEqual({ increment: 1 });
+
+            // Verify loser gets losses incremented
+            const loserUpdate = userUpdates.find(
+                c => c.args.where.id === mockUser2.id,
+            );
+            expect(loserUpdate).toBeDefined();
+            expect(loserUpdate!.args.data.losses).toEqual({ increment: 1 });
         });
     });
 
