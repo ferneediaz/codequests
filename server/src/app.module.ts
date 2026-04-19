@@ -7,6 +7,7 @@ import { ProblemsModule } from './problems/problems.module';
 import { CodeExecutionModule } from './code-execution/code-execution.module';
 import { BattlesModule } from './battles/battles.module';
 import { ClansModule } from './clans/clans.module';
+import { WebsocketsModule } from './websockets/websockets.module';
 
 @Module({
     imports: [
@@ -26,6 +27,7 @@ import { ClansModule } from './clans/clans.module';
         CodeExecutionModule,
         BattlesModule,
         ClansModule,
+        WebsocketsModule,
 
         // TODO: Add these modules as we build them
         // MatchmakingModule,

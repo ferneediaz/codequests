@@ -9,6 +9,7 @@ import {
     MockPrismaService,
 } from '../__mocks__/prisma.service';
 import { BattleStatus } from '@prisma/client';
+import { JwtVerificationService } from '../auth/jwt-verification.service';
 
 describe('BattlesGateway', () => {
     let gateway: BattlesGateway;
@@ -24,6 +25,10 @@ describe('BattlesGateway', () => {
         to: jest.Mock;
         emit: jest.Mock;
         in: jest.Mock;
+    };
+    let mockJwtVerificationService: {
+        verifyToken: jest.Mock;
+        verifyAndGetUser: jest.Mock;
     };
 
     // Mock user data
@@ -137,6 +142,11 @@ describe('BattlesGateway', () => {
             in: jest.fn().mockReturnThis(),
         };
 
+        mockJwtVerificationService = {
+            verifyToken: jest.fn(),
+            verifyAndGetUser: jest.fn(),
+        };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 BattlesGateway,
@@ -148,12 +158,19 @@ describe('BattlesGateway', () => {
                     provide: BattlesService,
                     useValue: mockBattlesService,
                 },
+                {
+                    provide: JwtVerificationService,
+                    useValue: mockJwtVerificationService,
+                },
                 WsAuthGuard,
             ],
         }).compile();
 
         gateway = module.get<BattlesGateway>(BattlesGateway);
         prisma = module.get<MockPrismaService>(PrismaService);
+
+        // Default: no active battles to rejoin
+        prisma.battleParticipant.findMany.mockResolvedValue([]);
 
         // Inject mock server
         gateway.server = mockServer as any;
@@ -175,7 +192,7 @@ describe('BattlesGateway', () => {
     describe('Connection Handling', () => {
         it('should accept connection with valid JWT token and attach user to socket', async () => {
             const socket = createMockSocket('user-1');
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
 
             await gateway.handleConnection(socket);
 
@@ -195,8 +212,7 @@ describe('BattlesGateway', () => {
         it('should reject connection with invalid JWT token', async () => {
             const socket = createMockSocket('user-1');
             socket.handshake.auth = { token: 'invalid-token' };
-            // User lookup fails for invalid token
-            prisma.user.findUnique.mockResolvedValue(null);
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(null);
 
             await gateway.handleConnection(socket);
 
@@ -205,7 +221,7 @@ describe('BattlesGateway', () => {
 
         it('should track connected clients', async () => {
             const socket = createMockSocket('user-1');
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
 
             await gateway.handleConnection(socket);
 
@@ -216,7 +232,7 @@ describe('BattlesGateway', () => {
     describe('Disconnection Handling', () => {
         it('should handle disconnect and remove client from tracking', async () => {
             const socket = createMockSocket('user-1');
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
 
             // First connect
             await gateway.handleConnection(socket);
@@ -230,7 +246,7 @@ describe('BattlesGateway', () => {
         it('should notify battle room when player disconnects', async () => {
             const socket = createMockSocket('user-1');
             socket.rooms = new Set(['battle:battle-1']);
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
 
             await gateway.handleConnection(socket);
             await gateway.handleDisconnect(socket);
@@ -476,7 +492,7 @@ describe('BattlesGateway', () => {
         it('should track multiple connected clients', async () => {
             const socket1 = createMockSocket('user-1');
             const socket2 = createMockSocket('user-2');
-            prisma.user.findUnique
+            mockJwtVerificationService.verifyAndGetUser
                 .mockResolvedValueOnce(mockUser)
                 .mockResolvedValueOnce(mockUser2);
 
@@ -491,7 +507,7 @@ describe('BattlesGateway', () => {
 
         it('should get socket by user ID', async () => {
             const socket = createMockSocket('user-1');
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
 
             await gateway.handleConnection(socket);
 
@@ -556,7 +572,7 @@ describe('BattlesGateway', () => {
                     },
                 },
             ]);
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
 
             await gateway.handleConnection(socket);
 

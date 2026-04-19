@@ -9,9 +9,11 @@ import {
     MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Logger, UseGuards } from '@nestjs/common';
+import { WsAuthGuard } from './ws-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { BattlesService } from '../battles/battles.service';
+import { JwtVerificationService } from '../auth/jwt-verification.service';
 import { BattleStatus } from '@prisma/client';
 
 interface AuthenticatedSocket extends Socket {
@@ -55,19 +57,20 @@ export class BattlesGateway
     implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
     @WebSocketServer()
-    server: Server;
+    server!: Server;
 
     private readonly logger = new Logger(BattlesGateway.name);
     
     // Track connected clients: socketId -> socket
     private connectedClients = new Map<string, AuthenticatedSocket>();
     
-    // Track user to socket mapping: odp -> socketId
+    // Track user to socket mapping: userId -> socketId
     private userSocketMap = new Map<string, string>();
 
     constructor(
         private readonly prisma: PrismaService,
         private readonly battlesService: BattlesService,
+        private readonly jwtVerificationService: JwtVerificationService,
     ) {}
 
     afterInit(server: Server) {
@@ -76,7 +79,6 @@ export class BattlesGateway
 
     async handleConnection(client: AuthenticatedSocket) {
         try {
-            // Extract token from handshake
             const token = client.handshake.auth?.token;
             
             if (!token) {
@@ -85,24 +87,10 @@ export class BattlesGateway
                 return;
             }
 
-            // For now, extract user ID from token (simplified - in production, validate JWT)
-            // Token format: "valid-jwt-for-{userId}" for testing
-            const userIdMatch = token.match(/valid-jwt-for-(.+)/);
-            if (!userIdMatch) {
-                this.logger.warn(`Connection rejected: Invalid token format (${client.id})`);
-                client.disconnect();
-                return;
-            }
-
-            const userId = userIdMatch[1];
-            
-            // Verify user exists in database
-            const user = await this.prisma.user.findUnique({
-                where: { id: userId },
-            });
+            const user = await this.jwtVerificationService.verifyAndGetUser(token);
 
             if (!user) {
-                this.logger.warn(`Connection rejected: User not found (${client.id})`);
+                this.logger.warn(`Connection rejected: Invalid token or user not found (${client.id})`);
                 client.disconnect();
                 return;
             }
@@ -111,6 +99,8 @@ export class BattlesGateway
             client.data.user = {
                 id: user.id,
                 username: user.username,
+                email: user.email,
+                role: user.role,
                 mmr: user.mmr,
             };
 
@@ -124,7 +114,7 @@ export class BattlesGateway
             await this.rejoinActiveBattles(client);
 
         } catch (error) {
-            this.logger.error(`Connection error: ${error.message}`);
+            this.logger.error(`Connection error: ${(error as Error).message}`);
             client.disconnect();
         }
     }
@@ -178,6 +168,7 @@ export class BattlesGateway
     /**
      * Handle joining a battle room
      */
+    @UseGuards(WsAuthGuard)
     @SubscribeMessage('battle.join')
     async handleJoinBattleRoom(
         @ConnectedSocket() client: AuthenticatedSocket,
@@ -219,15 +210,16 @@ export class BattlesGateway
 
             return { success: true };
         } catch (error) {
-            this.logger.error(`Error joining battle room: ${error.message}`);
-            client.emit('error', { message: error.message });
-            return { success: false, error: error.message };
+            this.logger.error(`Error joining battle room: ${(error as Error).message}`);
+            client.emit('error', { message: (error as Error).message });
+            return { success: false, error: (error as Error).message };
         }
     }
 
     /**
      * Handle leaving a battle room
      */
+    @UseGuards(WsAuthGuard)
     @SubscribeMessage('battle.leave')
     async handleLeaveBattleRoom(
         @ConnectedSocket() client: AuthenticatedSocket,
@@ -342,7 +334,7 @@ export class BattlesGateway
                 this.logger.log(`Auto-rejoined user ${user.username} to battle room: ${participation.battleId}`);
             }
         } catch (error) {
-            this.logger.error(`Error auto-rejoining battles: ${error.message}`);
+            this.logger.error(`Error auto-rejoining battles: ${(error as Error).message}`);
         }
     }
 }

@@ -167,21 +167,25 @@ Real-time battle functionality is now implemented!
 
 ---
 
-## 📋 TODO - WsAuthGuard Implementation (NEXT UP)
+## ✅ WsAuthGuard Implementation - COMPLETED
 
-Need to implement authentication guard for WebSockets.
+WebSocket authentication guard is now fully implemented!
 
-### Task Breakdown:
+### Completed:
 
-#### 1. WsAuthGuard Tests & Implementation
-- [ ] Write tests for `WsAuthGuard`
-- [ ] Implement JWT validation in guard
-- [ ] Integrate with existing auth system
-- [ ] **Success Criteria:** All guard tests passing ✅
+#### 1. WsAuthGuard Tests & Implementation ✅
+- [x] Write tests for `WsAuthGuard` (8 tests passing)
+- [x] Implement JWT validation in guard via `JwtVerificationService`
+- [x] Integrate with existing auth system (`AuthModule` export)
+- [x] Apply `@UseGuards(WsAuthGuard)` to message handlers
+- [x] **Success Criteria:** All guard tests passing ✅
 
-#### 2. Register WebsocketsModule
-- [ ] Add WebsocketsModule to AppModule imports
-- [ ] Test full integration with running server
+#### 2. Register WebsocketsModule ✅
+- [x] Import `AuthModule` in `WebsocketsModule`
+- [x] Add `JwtVerificationService` to `AuthModule` providers & exports
+- [x] Replace stub token parsing in gateway with real JWT verification
+- [x] Consistent user data attachment across guard and gateway
+- [x] All 33 websocket tests passing ✅
 
 ---
 
