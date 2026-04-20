@@ -104,6 +104,52 @@ model Clan {
 
   members User[]
 
+  // Clan challenges
+  sentChallenges     ClanChallenge[] @relation("ChallengerClan")
+  receivedChallenges ClanChallenge[] @relation("ChallengedClan")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// CLAN CHALLENGES
+// ============================================
+
+enum ClanChallengeStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  COUNTERED
+  EXPIRED
+}
+
+model ClanChallenge {
+  id              String @id @default(uuid())
+  challengerClanId String
+  challengerClan   Clan   @relation("ChallengerClan", fields: [challengerClanId], references: [id], onDelete: Cascade)
+  challengedClanId String
+  challengedClan   Clan   @relation("ChallengedClan", fields: [challengedClanId], references: [id], onDelete: Cascade)
+
+  status  ClanChallengeStatus @default(PENDING)
+  message String?             // Optional challenge message (max 500 chars)
+
+  // Proposed battle config
+  teamSize         Int       @default(2)
+  timeLimitMinutes Int       @default(30)
+  enabledSkills    SkillType[] @default([])
+  preferredTopic   String?
+
+  // Counter-proposal config (set when status = COUNTERED)
+  counterTeamSize         Int?
+  counterTimeLimitMinutes Int?
+  counterEnabledSkills    SkillType[] @default([])
+  counterPreferredTopic   String?
+  counterMessage          String?
+
+  expiresAt   DateTime  // createdAt + 24h, reset on counter
+  respondedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

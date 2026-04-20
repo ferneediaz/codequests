@@ -553,6 +553,18 @@ export class BattlesGateway
     }
 
     /**
+     * Emit an event to all online members of a clan (by member IDs)
+     */
+    emitToClanMembers(memberIds: string[], event: string, data: any) {
+        for (const memberId of memberIds) {
+            const socket = this.getSocketByUserId(memberId);
+            if (socket) {
+                socket.emit(event, data);
+            }
+        }
+    }
+
+    /**
      * Notify a user's friends about their online/offline status
      */
     private async notifyFriendsPresence(userId: string, username: string, online: boolean) {

@@ -21,12 +21,25 @@ import {
     ApiQuery,
 } from '@nestjs/swagger';
 import { ClansService } from './clans.service';
-import { CreateClanDto, UpdateClanDto, ClanResponseDto } from './dto';
+import { ClanChallengeService } from './clan-challenges.service';
+import { BattlesGateway } from '../websockets/battles.gateway';
+import {
+    CreateClanDto,
+    UpdateClanDto,
+    ClanResponseDto,
+    SendChallengeDto,
+    CounterChallengeDto,
+    ChallengeResponseDto,
+} from './dto';
 
 @ApiTags('clans')
 @Controller('clans')
 export class ClansController {
-    constructor(private readonly clansService: ClansService) { }
+    constructor(
+        private readonly clansService: ClansService,
+        private readonly clanChallengeService: ClanChallengeService,
+        private readonly battlesGateway: BattlesGateway,
+    ) { }
 
     /**
      * Get all clans (sorted by MMR)
@@ -43,6 +56,169 @@ export class ClansController {
         });
     }
 
+    // ============================================
+    // CLAN CHALLENGE ENDPOINTS (static routes before :id)
+    // ============================================
+
+    /**
+     * Send a clan challenge
+     */
+    @Post('challenges')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Send a clan challenge' })
+    @ApiResponse({ status: 201, description: 'Challenge sent', type: ChallengeResponseDto })
+    @ApiResponse({ status: 400, description: 'Not in a clan or challenging own clan' })
+    @ApiResponse({ status: 403, description: 'Not the clan owner' })
+    @ApiResponse({ status: 404, description: 'Target clan not found' })
+    @ApiResponse({ status: 409, description: 'Active challenge already exists' })
+    async sendChallenge(
+        @Body() dto: SendChallengeDto,
+        @Req() req: Request & { user: { id: string } },
+    ) {
+        const challenge = await this.clanChallengeService.sendChallenge(req.user.id, dto);
+
+        // Notify all online members of the challenged clan
+        const memberIds = await this.clanChallengeService.getClanMemberIds(
+            challenge.challengedClanId,
+        );
+        this.battlesGateway.emitToClanMembers(memberIds, 'clan.challenge_received', {
+            challengeId: challenge.id,
+            challengerClan: challenge.challengerClan,
+            challengedClan: challenge.challengedClan,
+            message: challenge.message,
+            teamSize: challenge.teamSize,
+            timeLimitMinutes: challenge.timeLimitMinutes,
+            enabledSkills: challenge.enabledSkills,
+            preferredTopic: challenge.preferredTopic,
+            expiresAt: challenge.expiresAt,
+        });
+
+        return challenge;
+    }
+
+    /**
+     * Accept a clan challenge
+     */
+    @Post('challenges/:id/accept')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Accept a clan challenge' })
+    @ApiParam({ name: 'id', description: 'Challenge ID' })
+    @ApiResponse({ status: 200, description: 'Challenge accepted', type: ChallengeResponseDto })
+    @ApiResponse({ status: 400, description: 'Challenge expired or wrong status' })
+    @ApiResponse({ status: 403, description: 'Not the clan owner' })
+    @ApiResponse({ status: 404, description: 'Challenge not found' })
+    async acceptChallenge(
+        @Param('id') id: string,
+        @Req() req: Request & { user: { id: string } },
+    ) {
+        const challenge = await this.clanChallengeService.acceptChallenge(req.user.id, id);
+
+        // Notify both clans
+        const [challengerMembers, challengedMembers] = await Promise.all([
+            this.clanChallengeService.getClanMemberIds(challenge.challengerClanId),
+            this.clanChallengeService.getClanMemberIds(challenge.challengedClanId),
+        ]);
+        const allMembers = [...challengerMembers, ...challengedMembers];
+        this.battlesGateway.emitToClanMembers(allMembers, 'clan.challenge_accepted', {
+            challengeId: challenge.id,
+            challengerClan: challenge.challengerClan,
+            challengedClan: challenge.challengedClan,
+        });
+
+        return challenge;
+    }
+
+    /**
+     * Decline a clan challenge
+     */
+    @Post('challenges/:id/decline')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Decline a clan challenge' })
+    @ApiParam({ name: 'id', description: 'Challenge ID' })
+    @ApiResponse({ status: 200, description: 'Challenge declined', type: ChallengeResponseDto })
+    @ApiResponse({ status: 400, description: 'Challenge expired or wrong status' })
+    @ApiResponse({ status: 403, description: 'Not the clan owner' })
+    @ApiResponse({ status: 404, description: 'Challenge not found' })
+    async declineChallenge(
+        @Param('id') id: string,
+        @Req() req: Request & { user: { id: string } },
+    ) {
+        const challenge = await this.clanChallengeService.declineChallenge(req.user.id, id);
+
+        // Notify the other clan
+        const otherClanId =
+            challenge.challengerClanId === challenge.challengedClanId
+                ? challenge.challengerClanId
+                : challenge.challengerClanId; // Notify challenger
+        const memberIds = await this.clanChallengeService.getClanMemberIds(
+            challenge.challengerClanId,
+        );
+        // Also notify challenged clan
+        const challengedMemberIds = await this.clanChallengeService.getClanMemberIds(
+            challenge.challengedClanId,
+        );
+        this.battlesGateway.emitToClanMembers(
+            [...memberIds, ...challengedMemberIds],
+            'clan.challenge_declined',
+            {
+                challengeId: challenge.id,
+                challengerClan: challenge.challengerClan,
+                challengedClan: challenge.challengedClan,
+            },
+        );
+
+        return challenge;
+    }
+
+    /**
+     * Counter-propose a clan challenge
+     */
+    @Post('challenges/:id/counter')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Counter-propose a clan challenge' })
+    @ApiParam({ name: 'id', description: 'Challenge ID' })
+    @ApiResponse({ status: 200, description: 'Counter-proposal sent', type: ChallengeResponseDto })
+    @ApiResponse({ status: 400, description: 'Challenge not pending or expired' })
+    @ApiResponse({ status: 403, description: 'Not the challenged clan owner' })
+    @ApiResponse({ status: 404, description: 'Challenge not found' })
+    async counterChallenge(
+        @Param('id') id: string,
+        @Body() dto: CounterChallengeDto,
+        @Req() req: Request & { user: { id: string } },
+    ) {
+        const challenge = await this.clanChallengeService.counterChallenge(
+            req.user.id,
+            id,
+            dto,
+        );
+
+        // Notify challenger clan of counter-proposal
+        const memberIds = await this.clanChallengeService.getClanMemberIds(
+            challenge.challengerClanId,
+        );
+        this.battlesGateway.emitToClanMembers(memberIds, 'clan.challenge_countered', {
+            challengeId: challenge.id,
+            challengerClan: challenge.challengerClan,
+            challengedClan: challenge.challengedClan,
+            counterTeamSize: challenge.counterTeamSize,
+            counterTimeLimitMinutes: challenge.counterTimeLimitMinutes,
+            counterEnabledSkills: challenge.counterEnabledSkills,
+            counterPreferredTopic: challenge.counterPreferredTopic,
+            counterMessage: challenge.counterMessage,
+            expiresAt: challenge.expiresAt,
+        });
+
+        return challenge;
+    }
+
+    // ============================================
+    // PARAMETERIZED CLAN ROUTES (:id)
+    // ============================================
+
     /**
      * Get clan by ID
      */
@@ -53,6 +229,28 @@ export class ClansController {
     @ApiResponse({ status: 404, description: 'Clan not found' })
     findOne(@Param('id') id: string) {
         return this.clansService.findOne(id);
+    }
+
+    /**
+     * Get challenges for a clan
+     */
+    @Get(':id/challenges')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Get challenges for a clan' })
+    @ApiParam({ name: 'id', description: 'Clan ID' })
+    @ApiQuery({ name: 'pending', required: false, type: Boolean, description: 'Only show pending/countered challenges' })
+    @ApiResponse({ status: 200, description: 'List of challenges', type: [ChallengeResponseDto] })
+    @ApiResponse({ status: 403, description: 'Not a member of this clan' })
+    getChallenges(
+        @Param('id') id: string,
+        @Query('pending') pending: string,
+        @Req() req: Request & { user: { id: string } },
+    ) {
+        if (pending === 'true') {
+            return this.clanChallengeService.getPendingChallenges(id, req.user.id);
+        }
+        return this.clanChallengeService.getChallenges(id, req.user.id);
     }
 
     /**

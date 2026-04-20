@@ -1073,4 +1073,80 @@ describe('BattlesGateway', () => {
             expect(gateway.getOnlineUsers(['user-1', 'user-2', 'user-999'])).toEqual(['user-1']);
         });
     });
+
+    // ====================================================================
+    // emitToClanMembers
+    // ====================================================================
+
+    describe('emitToClanMembers', () => {
+        it('should emit event to all online clan members', async () => {
+            // Connect two users
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            const socket2 = createMockSocket('user-2', 'socket-2');
+
+            mockJwtVerificationService.verifyAndGetUser
+                .mockResolvedValueOnce(mockUser)
+                .mockResolvedValueOnce(mockUser2);
+            mockFriendsService.getFriendIds
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([]);
+
+            await gateway.handleConnection(socket1);
+            await gateway.handleConnection(socket2);
+
+            const payload = {
+                challengeId: 'challenge-1',
+                challengerClan: { id: 'clan-1', name: 'Alpha' },
+            };
+
+            gateway.emitToClanMembers(['user-1', 'user-2'], 'clan.challenge_received', payload);
+
+            expect(socket1.emit).toHaveBeenCalledWith('clan.challenge_received', payload);
+            expect(socket2.emit).toHaveBeenCalledWith('clan.challenge_received', payload);
+        });
+
+        it('should only emit to online members, skip offline ones', async () => {
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser);
+            mockFriendsService.getFriendIds.mockResolvedValueOnce([]);
+            await gateway.handleConnection(socket1);
+
+            const payload = { challengeId: 'challenge-1' };
+
+            gateway.emitToClanMembers(['user-1', 'user-offline'], 'clan.challenge_received', payload);
+
+            expect(socket1.emit).toHaveBeenCalledWith('clan.challenge_received', payload);
+            // user-offline has no socket — nothing should blow up
+        });
+
+        it('should not emit anything when no members are online', () => {
+            const payload = { challengeId: 'challenge-1' };
+
+            // Should not throw
+            gateway.emitToClanMembers(['user-offline-1', 'user-offline-2'], 'clan.challenge_accepted', payload);
+        });
+
+        it('should emit different clan challenge events correctly', async () => {
+            const socket1 = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser);
+            mockFriendsService.getFriendIds.mockResolvedValueOnce([]);
+            await gateway.handleConnection(socket1);
+
+            const acceptPayload = {
+                challengeId: 'challenge-1',
+                challengerClan: { id: 'clan-1' },
+                challengedClan: { id: 'clan-2' },
+            };
+            gateway.emitToClanMembers(['user-1'], 'clan.challenge_accepted', acceptPayload);
+            expect(socket1.emit).toHaveBeenCalledWith('clan.challenge_accepted', acceptPayload);
+
+            const counterPayload = {
+                challengeId: 'challenge-1',
+                counterTeamSize: 3,
+                counterTimeLimitMinutes: 60,
+            };
+            gateway.emitToClanMembers(['user-1'], 'clan.challenge_countered', counterPayload);
+            expect(socket1.emit).toHaveBeenCalledWith('clan.challenge_countered', counterPayload);
+        });
+    });
 });

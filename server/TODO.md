@@ -279,7 +279,7 @@ Team/guild functionality is now implemented!
 ### Remaining (Enhancement):
 - [ ] Clan invite system (invite codes)
 - [ ] Clan leaderboard API
-- [ ] Clan challenge system (see below)
+- [x] Clan challenge system ✅
 
 ---
 
@@ -602,42 +602,66 @@ Real-time messaging via Socket.IO with security hardening.
 
 ---
 
-## 📋 TODO - Clan Challenge System (MEDIUM PRIORITY)
+## ✅ Clan Challenge System - COMPLETED
 
-Clan vs Clan war challenges.
+Clan vs Clan war challenges with negotiable battle settings.
 
-### Task Breakdown:
+### Completed:
 
-#### 1. Prisma Schema Updates
-- [ ] Add `ClanChallenge` model (id, challengerClanId, challengedClanId, status: PENDING/ACCEPTED/DECLINED/COMPLETED, battleId, message, createdAt, respondedAt)
-- [ ] Run migration
-- [ ] **Success Criteria:** Schema compiles ✅
+#### 1. Prisma Schema Updates ✅
+- [x] Add `ClanChallengeStatus` enum (PENDING, ACCEPTED, DECLINED, COUNTERED, EXPIRED)
+- [x] Add `ClanChallenge` model (id, challengerClanId, challengedClanId, status, message, battle config, counter config, expiresAt, respondedAt)
+- [x] Add `sentChallenges`/`receivedChallenges` relations on Clan model
+- [x] Run `prisma generate`
+- [x] **Success Criteria:** Schema compiles ✅
 
-#### 2. Challenge Service
-- [ ] `sendChallenge(clanId, targetClanId, message?)` — Send clan challenge (owner only)
-- [ ] `acceptChallenge(challengeId, userId)` — Accept challenge (target clan owner)
-- [ ] `declineChallenge(challengeId, userId)` — Decline challenge
-- [ ] `getPendingChallenges(clanId)` — List incoming challenges
-- [ ] Auto-create CLAN_VS_CLAN battle on accept
-- [ ] **Success Criteria:** Challenge flow works ✅
+#### 2. Challenge Service ✅
+- [x] Create `ClanChallengeService` (separate from ClansService)
+- [x] `sendChallenge(userId, dto)` — Send clan challenge with proposed battle config (owner only)
+- [x] `acceptChallenge(userId, challengeId)` — Accept challenge (PENDING: challenged owner, COUNTERED: challenger owner)
+- [x] `declineChallenge(userId, challengeId)` — Decline challenge (respective clan owner)
+- [x] `counterChallenge(userId, challengeId, dto)` — Counter-propose with different settings (single counter, resets 24h expiry)
+- [x] `getChallenges(clanId, userId)` — List all challenges (marks expired in response)
+- [x] `getPendingChallenges(clanId, userId)` — List active (non-expired PENDING/COUNTERED) challenges
+- [x] `getClanMemberIds(clanId)` — Get member IDs for WebSocket notifications
+- [x] Validations: ownership, expiry, duplicate prevention, self-challenge, status checks
+- [x] Battle creation handled separately (not auto-created on accept)
+- [x] **Success Criteria:** Challenge flow works ✅
 
-#### 3. Challenge API
-- [ ] `POST /api/clans/:id/challenge` — Send challenge
-- [ ] `POST /api/clans/challenges/:id/accept` — Accept
-- [ ] `POST /api/clans/challenges/:id/decline` — Decline
-- [ ] `GET /api/clans/:id/challenges` — List challenges for clan
-- [ ] **Success Criteria:** API tests passing ✅
+#### 3. Challenge API ✅
+- [x] `POST /api/clans/challenges` — Send challenge (body: SendChallengeDto)
+- [x] `POST /api/clans/challenges/:id/accept` — Accept challenge
+- [x] `POST /api/clans/challenges/:id/decline` — Decline challenge
+- [x] `POST /api/clans/challenges/:id/counter` — Counter-propose (body: CounterChallengeDto)
+- [x] `GET /api/clans/:id/challenges` — List challenges for clan (?pending=true for active only)
+- [x] Swagger documentation
+- [x] Authentication guards
+- [x] **Success Criteria:** API working ✅
 
-#### 4. WebSocket Notifications
-- [ ] `clan.challenge_received` — Notify clan members of incoming challenge
-- [ ] `clan.challenge_accepted` — Notify both clans
-- [ ] **Success Criteria:** Notifications work ✅
+#### 4. WebSocket Notifications ✅
+- [x] `clan.challenge_received` — Notify all online members of challenged clan
+- [x] `clan.challenge_accepted` — Notify all online members of both clans
+- [x] `clan.challenge_declined` — Notify all online members of both clans
+- [x] `clan.challenge_countered` — Notify all online members of challenger clan
+- [x] `emitToClanMembers(memberIds, event, data)` — Reusable gateway helper
+- [x] **Success Criteria:** Notifications work ✅
 
-#### 5. Tests
-- [ ] Challenge send/accept/decline tests
-- [ ] Owner-only validation tests
-- [ ] Battle creation on accept tests
-- [ ] **Success Criteria:** All challenge tests passing ✅
+#### 5. DTOs ✅
+- [x] `SendChallengeDto` — targetClanId, message (max 500), teamSize (2/3/5), timeLimitMinutes (1-120), enabledSkills, preferredTopic
+- [x] `CounterChallengeDto` — counterMessage, teamSize, timeLimitMinutes, enabledSkills, preferredTopic
+- [x] `ChallengeResponseDto` — Full response with both original and counter config, clan info, status
+
+#### 6. Tests ✅
+- [x] 30 clan-challenges.service.spec.ts tests passing
+  - [x] sendChallenge: success, no clan, not owner, self-challenge, target not found, duplicate active challenge
+  - [x] acceptChallenge: PENDING (challenged owner), COUNTERED (challenger owner), not found, expired, wrong owner, wrong status
+  - [x] declineChallenge: PENDING, COUNTERED, not found, expired, wrong owner
+  - [x] counterChallenge: success, not PENDING, expired, wrong owner, not found, expiry reset
+  - [x] getChallenges: returns all, marks expired, forbidden if not member
+  - [x] getPendingChallenges: filters active, forbidden if not member
+  - [x] getClanMemberIds: returns IDs, empty array
+- [x] 4 gateway tests (emitToClanMembers: all online, skip offline, no online, multiple events)
+- [x] **Success Criteria:** All 34 challenge tests passing ✅
 
 ---
 
@@ -1033,7 +1057,7 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [x] Problems: All tests passing ✅ (15 tests)
 - [x] Code Execution: All tests passing ✅ (9 unit + 17 integration = 26 tests)
 - [x] **Battles: All tests passing ✅ (88 tests - includes invites, skills, clan wins/losses)**
-- [x] **WebSockets (BattlesGateway): All tests passing ✅ (48 tests - includes invites, skills, presence)**
+- [x] **WebSockets (BattlesGateway): All tests passing ✅ (52 tests - includes invites, skills, presence, clan challenges)**
 - [x] **Matchmaking: All tests passing ✅ (40 tests)**
 - [x] **WsAuthGuard: All tests passing ✅ (8 tests)**
 - [x] **Clans: All tests passing ✅ (5 tests)**
@@ -1041,13 +1065,13 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [x] **Seasons: All tests passing ✅ (30 tests)**
 - [x] **Friends: All tests passing ✅ (22 tests)**
 - [x] **Chat: All tests passing ✅ (38 tests - 19 service + 19 gateway)**
-- [ ] **Clan Challenges: All tests passing** ⏳
+- [x] **Clan Challenges: All tests passing ✅ (30 service + 4 gateway = 34 tests)**
 - [ ] **Battle Royale Elimination: All tests passing** ⏳
 - [ ] **Achievements: All tests passing** ⏳
 - [ ] **Notifications: All tests passing** ⏳
 - [ ] **E2E Tests: Full flow working** ⏳
 
-**Total: 398 tests passing** ✅
+**Total: 432 tests passing** ✅
 
 ### E2E Test Scenarios:
 - [ ] User signs up → syncs to DB → appears on leaderboard
@@ -1142,7 +1166,7 @@ Track daily activity for GitHub-style heatmap on profiles.
 ### Phase 4: Social Features
 - [x] Friends system working (request/accept/remove, online status) ✅
 - [ ] Chat system working (battle, lobby, DM)
-- [ ] Clan challenges working (send/accept/play)
+- [x] Clan challenges working (send/accept/decline/counter, negotiable settings) ✅
 - [ ] Push notifications working
 - [ ] **All tests passing**
 
@@ -1181,7 +1205,7 @@ Track daily activity for GitHub-style heatmap on profiles.
 | Rank Tiers | HIGH | — |
 | Friends System | MEDIUM | — |
 | Chat System | MEDIUM | WebSockets (done) |
-| Clan Challenges | MEDIUM | Clans (done) |
+| Clan Challenges | ~~MEDIUM~~ ✅ | Clans (done) |
 | Push Notifications | MEDIUM | — |
 | Battle Royale Elimination | MEDIUM | Battles (done) |
 | Advanced Rankings | MEDIUM | Friends |
