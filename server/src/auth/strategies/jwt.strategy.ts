@@ -57,15 +57,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       where: { id: payload.sub },
     });
 
-    // If user exists in our DB, return the full user object
+    // If user exists in our DB, return the full user object with sub alias
     if (user) {
-      return user;
+      return { ...user, sub: user.id };
     }
 
     // If user doesn't exist yet (first login, hasn't called /auth/sync),
     // return the JWT payload so /auth/sync can create them
     return {
       id: payload.sub,
+      sub: payload.sub,
       email: payload.email,
       role: payload.role || 'user',
     };

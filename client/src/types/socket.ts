@@ -91,3 +91,9 @@ export interface InviteReceivedPayload {
     battleMode: string;
     inviteCode: string;
 }
+
+export interface PlayerReadyPayload {
+    userId: string;
+    username: string;
+    isReady: boolean;
+}

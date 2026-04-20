@@ -6,6 +6,7 @@ import { CodeExecutionModule } from '../code-execution/code-execution.module';
 @Module({
   imports: [CodeExecutionModule],
   providers: [ProblemsService],
-  controllers: [ProblemsController]
+  controllers: [ProblemsController],
+  exports: [ProblemsService],
 })
 export class ProblemsModule { }

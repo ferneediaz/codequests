@@ -5,6 +5,7 @@ import Landing from '@/pages/Landing';
 import Login from '@/pages/Login';
 import AuthCallback from '@/pages/AuthCallback';
 import Dashboard from '@/pages/Dashboard';
+import Play from '@/pages/Play';
 import Matchmaking from '@/pages/Matchmaking';
 import Battle from '@/pages/Battle';
 import Results from '@/pages/Results';
@@ -31,6 +32,10 @@ export const router = createBrowserRouter([
                     {
                         path: '/dashboard',
                         element: <Dashboard />,
+                    },
+                    {
+                        path: '/play',
+                        element: <Play />,
                     },
                     {
                         path: '/matchmaking',

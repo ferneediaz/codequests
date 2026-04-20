@@ -17,6 +17,8 @@ import type {
     BattleStartedPayload,
     BattleSubmissionPayload,
     BattleCompletedPayload,
+    PlayerJoinedPayload,
+    PlayerReadyPayload,
 } from '@/types/socket';
 
 export function useBattle(battleId: string) {
@@ -117,10 +119,48 @@ export function useBattle(battleId: string) {
         socket.on('battle.submission', handleSubmission);
         socket.on('battle.completed', handleCompleted);
 
+        const handlePlayerJoined = (data: PlayerJoinedPayload) => {
+            if (!battle) return;
+            // Add new participant if not already present
+            const exists = battle.participants.some((p) => p.userId === data.userId);
+            if (!exists) {
+                dispatch(setBattle({
+                    ...battle,
+                    participants: [
+                        ...battle.participants,
+                        {
+                            id: data.userId,
+                            userId: data.userId,
+                            username: data.username,
+                            testsPassed: 0,
+                            totalTests: 0,
+                            pointsEarned: 0,
+                            isReady: false,
+                        },
+                    ],
+                }));
+            }
+        };
+
+        const handlePlayerReady = (data: PlayerReadyPayload) => {
+            if (!battle) return;
+            dispatch(setBattle({
+                ...battle,
+                participants: battle.participants.map((p) =>
+                    p.userId === data.userId ? { ...p, isReady: data.isReady } : p,
+                ),
+            }));
+        };
+
+        socket.on('battle.player_joined', handlePlayerJoined);
+        socket.on('battle.player_ready', handlePlayerReady);
+
         return () => {
             socket.off('battle.started', handleStarted);
             socket.off('battle.submission', handleSubmission);
             socket.off('battle.completed', handleCompleted);
+            socket.off('battle.player_joined', handlePlayerJoined);
+            socket.off('battle.player_ready', handlePlayerReady);
         };
     }, [battle, battleId, userId, dispatch, navigate]);
 
@@ -147,6 +187,20 @@ export function useBattle(battleId: string) {
         }
     }, [battleId]);
 
+    const readyUp = useCallback(() => {
+        const socket = getSocket();
+        if (socket) {
+            socket.emit('battle.ready', { battleId });
+        }
+    }, [battleId]);
+
+    const unready = useCallback(() => {
+        const socket = getSocket();
+        if (socket) {
+            socket.emit('battle.unready', { battleId });
+        }
+    }, [battleId]);
+
     return {
         battle,
         problem,
@@ -155,5 +209,7 @@ export function useBattle(battleId: string) {
         isSubmitting,
         submitCode,
         completeBattle: completeBattleManually,
+        readyUp,
+        unready,
     };
 }

@@ -3,6 +3,19 @@
 # https://github.com/engineer-man/piston
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: codequest-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: codequest
+      POSTGRES_PASSWORD: codequest
+      POSTGRES_DB: codequest
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   piston:
     image: ghcr.io/engineer-man/piston
     container_name: piston
@@ -43,4 +56,5 @@ services:
       - piston
 
 volumes:
+  postgres-data:
   piston-packages:

@@ -5,6 +5,7 @@ import { setQueued, setMatched, resetQueue } from '@/store/slices/matchmakingSli
 import { getSocket } from '@/services/socket';
 import api from '@/services/api';
 import type { MatchFoundPayload } from '@/types/socket';
+import type { MatchConfig } from '@/types/api';
 
 export function useMatchmaking() {
     const dispatch = useAppDispatch();
@@ -31,9 +32,13 @@ export function useMatchmaking() {
         };
     }, [dispatch, navigate]);
 
-    const joinQueue = useCallback(async () => {
+    const joinQueue = useCallback(async (config?: MatchConfig) => {
         try {
-            await api.post('/matchmaking/queue', { mode: 'ONE_V_ONE' });
+            await api.post('/matchmaking/queue', {
+                mode: config?.mode ?? 'ONE_V_ONE',
+                preferredDifficulty: config?.preferredDifficulty,
+                preferredTopic: config?.preferredTopic,
+            });
             dispatch(setQueued());
             navigatedRef.current = false;
         } catch (error) {

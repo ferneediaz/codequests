@@ -9,7 +9,6 @@ import {
     Users,
     Code,
     Timer,
-    TrendingUp,
     Shield,
     ChevronRight,
     Terminal,
@@ -131,7 +130,7 @@ function Hero() {
             <AnimateIn direction="scale" className="relative z-10 text-center">
                 <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm text-primary">
                     <Flame className="h-4 w-4" />
-                    Real-time 1v1 coding battles
+                    Real-time coding battles — 1v1, Battle Royale &amp; Clan Wars
                 </div>
 
                 <h1 className="mx-auto max-w-4xl text-5xl font-extrabold leading-tight tracking-tight sm:text-6xl lg:text-7xl">
@@ -150,7 +149,7 @@ function Hero() {
                 <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
                     <Link to="/login">
                         <Button size="lg" className="text-base px-8 py-6">
-                            Start Battling — it&apos;s free
+                            Start Battling — 1 free game daily
                             <Swords className="h-5 w-5" />
                         </Button>
                     </Link>
@@ -215,13 +214,10 @@ function LogoTicker() {
         'Python',
         'JavaScript',
         'TypeScript',
-        'Go',
-        'Rust',
-        'C++',
         'Java',
-        'C#',
-        'Ruby',
-        'Swift',
+        'C++',
+        'C',
+        'Rust',
     ];
 
     return (
@@ -269,7 +265,7 @@ function HowItWorks() {
         {
             icon: Trophy,
             title: 'Climb the Ranks',
-            desc: 'Win battles, earn rating, and climb through Bronze → Silver → Gold → Diamond → Champion.',
+            desc: 'Win battles, earn MMR, and climb from Bug 🐛 through Intern, Copy Paster, Code Monkey, 10x Dev, all the way to Cracked 💀.',
         },
     ];
 
@@ -334,14 +330,14 @@ function Features() {
             desc: 'Form clans with friends and challenge rival teams. Coordinate strategies and dominate the leaderboard together.',
         },
         {
-            icon: TrendingUp,
-            title: 'Detailed Analytics',
-            desc: 'Track your win rate, average solve time, language proficiency, and rating history over time.',
+            icon: Zap,
+            title: 'In-Battle Skills',
+            desc: 'Use power-ups like Freeze, Scramble, Blind, Time Steal, and Fog of War to sabotage opponents mid-battle.',
         },
         {
             icon: Code,
-            title: 'Multi-Language Support',
-            desc: 'Battle in Python, JavaScript, TypeScript, Go, Rust, C++, Java, and more. Use the language you know best.',
+            title: '7 Languages Supported',
+            desc: 'Battle in Python, JavaScript, TypeScript, Java, C++, C, and Rust. Pick the language you know best.',
         },
     ];
 
@@ -386,10 +382,10 @@ function Features() {
 /* ------------------------------------------------------------------ */
 function Stats() {
     const stats = [
-        { value: '50K+', label: 'Battles fought' },
-        { value: '12K+', label: 'Active players' },
-        { value: '200+', label: 'Coding challenges' },
-        { value: '<2s', label: 'Avg. match time' },
+        { value: '4', label: 'Game modes' },
+        { value: '7', label: 'Languages' },
+        { value: '7', label: 'Rank tiers' },
+        { value: '5', label: 'Battle skills' },
     ];
 
     return (
@@ -475,23 +471,31 @@ function FAQ() {
     const faqs = [
         {
             q: 'Is CodeQuest Battles free?',
-            a: 'Yes! You can sign up and start battling for free. We may offer premium features in the future, but the core battle experience will always be free.',
+            a: 'You get 1 free game per day. For unlimited games, DMs, clan creation, and season record tracking, upgrade to Pro at $5 every 2 months or $24.99/year. A 7-day free trial is available.',
         },
         {
             q: 'What languages are supported?',
-            a: 'We support Python, JavaScript, TypeScript, Go, Rust, C++, Java, C#, Ruby, and Swift — with more on the way.',
+            a: 'We support Python, JavaScript, TypeScript, Java, C++, C, and Rust — powered by the Piston code execution engine.',
         },
         {
             q: 'How does matchmaking work?',
-            a: 'We use an ELO-based rating system to pair you with opponents of similar skill. As you win, your rating rises and you face tougher competition.',
+            a: 'We use an Elo-based MMR system to pair you with opponents of similar skill. The search starts within ±100 MMR and gradually widens until a match is found.',
+        },
+        {
+            q: 'What game modes are available?',
+            a: '1v1 duels, Battle Royale (6 or 8 players with elimination rounds), Clan vs Clan wars, and Group battles with MMR auto-balance.',
         },
         {
             q: 'Can I play with friends?',
-            a: 'Absolutely. You can add friends, create clans, and challenge each other directly — or team up for clan wars.',
+            a: 'Yes! Add friends, see who\'s online in real-time, invite them to battles with invite codes, create clans, and challenge rival clans to wars.',
+        },
+        {
+            q: 'What are battle skills?',
+            a: 'Optional power-ups you can toggle per game: Freeze (lock editor), Scramble (shuffle code), Blind (hide test results), Time Steal (-60s), and Fog of War (blur screen).',
         },
         {
             q: 'How are solutions judged?',
-            a: 'Your code runs against a hidden test suite. We check correctness first, then speed. Partial credit is given for passing some tests.',
+            a: 'Your code runs against visible and hidden test cases. We rank by tests passed first, then by speed. Partial credit is given for passing some tests.',
         },
     ];
 
@@ -551,19 +555,19 @@ function FinalCTA() {
                         Ready to <span className="text-primary">battle</span>?
                     </h2>
                     <p className="relative mt-6 text-lg text-muted-foreground max-w-xl mx-auto">
-                        Join thousands of developers sharpening their skills through
-                        head-to-head competition. Sign up in seconds.
+                        Sharpen your skills through head-to-head competition.
+                        Sign up in seconds — 1 free game every day.
                     </p>
                     <div className="relative mt-10 flex flex-wrap justify-center gap-4">
                         <Link to="/login">
                             <Button size="lg" className="text-base px-8 py-6">
-                                Get Started — Free
+                                Get Started
                                 <Swords className="h-5 w-5" />
                             </Button>
                         </Link>
                     </div>
                     <p className="relative mt-6 text-xs text-muted-foreground">
-                        No credit card required • Sign in with GitHub or Google
+                        1 free game daily • Pro from $5/2mo • Sign in with GitHub or Google
                     </p>
                 </div>
             </AnimateIn>

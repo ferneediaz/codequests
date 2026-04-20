@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SeasonsService } from '../seasons/seasons.service';
+import { ProblemsService } from '../problems/problems.service';
 import {
     createMockPrismaService,
     MockPrismaService,
@@ -142,6 +143,17 @@ describe('BattlesService', () => {
                         getActiveSeason: jest.fn().mockResolvedValue({ id: 'season-1' }),
                         updatePeakMmr: jest.fn().mockResolvedValue(undefined),
                         incrementSeasonStats: jest.fn().mockResolvedValue(undefined),
+                    },
+                },
+                {
+                    provide: ProblemsService,
+                    useValue: {
+                        findRandom: jest.fn().mockResolvedValue({
+                            id: 'problem-1',
+                            title: 'Two Sum',
+                            difficulty: Difficulty.EASY,
+                            testCases: [],
+                        }),
                     },
                 },
             ],
@@ -2063,18 +2075,18 @@ describe('BattlesService', () => {
             // No collision for invite code (now uses findFirst)
             prisma.battle.findFirst.mockResolvedValue(null);
             prisma.battle.findUnique.mockResolvedValue({         // getBattleDetails
-                    ...mockBattle,
-                    inviteCode: 'ABCD1234',
-                    inviteExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-                    participants: [{
-                        id: 'p1', battleId: 'battle-1', userId: 'user-1',
-                        user: mockUser1, teamId: null, testsPassed: 0,
-                        totalTests: 2, pointsEarned: 0, isReady: false,
-                        submittedAt: null, mmrChange: null,
-                    }],
-                    problem: mockProblem,
-                    skillUses: [],
-                });
+                ...mockBattle,
+                inviteCode: 'ABCD1234',
+                inviteExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                participants: [{
+                    id: 'p1', battleId: 'battle-1', userId: 'user-1',
+                    user: mockUser1, teamId: null, testsPassed: 0,
+                    totalTests: 2, pointsEarned: 0, isReady: false,
+                    submittedAt: null, mmrChange: null,
+                }],
+                problem: mockProblem,
+                skillUses: [],
+            });
 
             prisma.battle.create.mockResolvedValue({
                 ...mockBattle,

@@ -4,6 +4,23 @@ export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export type MatchmakingStatus = 'QUEUED' | 'MATCHED' | 'EXPIRED';
 export type SkillType = 'FREEZE' | 'SCRAMBLE' | 'BLIND' | 'TIME_STEAL' | 'FOG_OF_WAR';
 
+export interface MatchConfig {
+    mode: BattleMode;
+    preferredDifficulty?: Difficulty;
+    preferredTopic?: string;
+    timeLimitMinutes: number;
+    enabledSkills: SkillType[];
+}
+
+export interface CreateBattleRequest {
+    mode?: BattleMode;
+    teamSize?: number;
+    timeLimitMinutes?: number;
+    enabledSkills?: SkillType[];
+    withInviteCode?: boolean;
+    preferredTopic?: string;
+}
+
 export interface RankTier {
     name: string;
     icon: string;

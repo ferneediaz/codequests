@@ -1,25 +1,36 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useMatchmaking } from '@/hooks/useMatchmaking';
+import { useAppDispatch } from '@/store/hooks';
+import { resetQueue } from '@/store/slices/matchmakingSlice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Loader2, X } from 'lucide-react';
+import type { MatchConfig } from '@/types/api';
 
 export default function Matchmaking() {
     const navigate = useNavigate();
-    const { queueStatus, joinQueue, leaveQueue } = useMatchmaking();
+    const location = useLocation();
+    const dispatch = useAppDispatch();
+    const { joinQueue, leaveQueue } = useMatchmaking();
+    const joinedRef = useRef(false);
+
+    const config = (location.state as { config?: MatchConfig })?.config;
 
     useEffect(() => {
-        if (queueStatus === 'idle') {
-            joinQueue().catch(() => {
-                navigate('/dashboard');
+        if (!joinedRef.current) {
+            joinedRef.current = true;
+            dispatch(resetQueue());
+            joinQueue(config).catch(() => {
+                navigate('/play');
             });
         }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [dispatch, joinQueue, navigate, config]);
 
     const handleCancel = async () => {
         await leaveQueue();
-        navigate('/dashboard');
+        navigate('/play');
     };
 
     return (
@@ -41,6 +52,31 @@ export default function Matchmaking() {
                             Finding a player near your skill level
                         </p>
                     </div>
+
+                    {/* Show config summary while queuing */}
+                    {config && (
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                            <Badge variant="secondary">
+                                {config.mode === 'ONE_V_ONE'
+                                    ? '1v1'
+                                    : config.mode === 'BATTLE_ROYALE'
+                                      ? 'Battle Royale'
+                                      : 'Group'}
+                            </Badge>
+                            {config.preferredDifficulty && (
+                                <Badge variant="outline">{config.preferredDifficulty}</Badge>
+                            )}
+                            <Badge variant="outline">{config.timeLimitMinutes} min</Badge>
+                            {config.preferredTopic && (
+                                <Badge variant="outline">{config.preferredTopic}</Badge>
+                            )}
+                            {config.enabledSkills.length > 0 && (
+                                <Badge variant="outline">
+                                    {config.enabledSkills.length} skill{config.enabledSkills.length > 1 ? 's' : ''}
+                                </Badge>
+                            )}
+                        </div>
+                    )}
 
                     <Button variant="outline" onClick={handleCancel}>
                         <X className="mr-2 h-4 w-4" />

@@ -41,10 +41,10 @@ export default function Dashboard() {
                 <Button
                     size="lg"
                     className="h-14 px-12 text-lg"
-                    onClick={() => navigate('/matchmaking')}
+                    onClick={() => navigate('/play')}
                 >
                     <Swords className="mr-2 h-5 w-5" />
-                    Find Match
+                    Play
                 </Button>
             </div>
 
@@ -132,10 +132,10 @@ export default function Dashboard() {
                                         <div className="flex items-center gap-3">
                                             <span
                                                 className={`inline-flex h-6 w-6 items-center justify-center rounded text-xs font-bold ${isDraw
-                                                        ? 'bg-muted text-muted-foreground'
-                                                        : won
-                                                            ? 'bg-green-500/20 text-green-500'
-                                                            : 'bg-red-500/20 text-red-500'
+                                                    ? 'bg-muted text-muted-foreground'
+                                                    : won
+                                                        ? 'bg-green-500/20 text-green-500'
+                                                        : 'bg-red-500/20 text-red-500'
                                                     }`}
                                             >
                                                 {isDraw ? 'D' : won ? 'W' : 'L'}

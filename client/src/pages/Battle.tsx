@@ -6,6 +6,7 @@ import { ProblemPanel } from '@/components/battle/ProblemPanel';
 import { CodeEditor } from '@/components/battle/CodeEditor';
 import { Timer } from '@/components/battle/Timer';
 import { OpponentProgress } from '@/components/battle/OpponentProgress';
+import { BattleLobby } from '@/components/battle/BattleLobby';
 import { Button } from '@/components/ui/button';
 import { Loader2, Send } from 'lucide-react';
 
@@ -20,6 +21,8 @@ export default function Battle() {
         isSubmitting,
         submitCode,
         completeBattle: completeBattleAction,
+        readyUp,
+        unready,
     } = useBattle(id!);
 
     const [language, setLanguage] = useState('javascript');
@@ -66,12 +69,12 @@ export default function Battle() {
 
     if (battle.status === 'WAITING') {
         return (
-            <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
-                <div className="text-center">
-                    <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
-                    <p className="text-lg text-foreground">Waiting for opponent...</p>
-                </div>
-            </div>
+            <BattleLobby
+                battle={battle}
+                currentUserId={userId!}
+                onReady={readyUp}
+                onUnready={unready}
+            />
         );
     }
 
@@ -143,8 +146,8 @@ export default function Battle() {
                     {lastSubmissionResult && (
                         <div
                             className={`border-t px-4 py-2 text-sm ${lastSubmissionResult.allPassed
-                                    ? 'border-green-500/50 bg-green-500/10 text-green-400'
-                                    : 'border-red-500/50 bg-red-500/10 text-red-400'
+                                ? 'border-green-500/50 bg-green-500/10 text-green-400'
+                                : 'border-red-500/50 bg-red-500/10 text-red-400'
                                 }`}
                         >
                             {lastSubmissionResult.allPassed

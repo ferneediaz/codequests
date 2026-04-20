@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SeasonsService } from '../seasons/seasons.service';
+import { ProblemsService } from '../problems/problems.service';
 import { BattleMode, BattleStatus, Difficulty, SkillType } from '@prisma/client';
 import { CreateBattleDto } from './dto/create-battle.dto';
 import { getRankTier } from '../common/utils/rank-tiers';
@@ -50,6 +51,7 @@ export class BattlesService {
         private codeExecutionService: CodeExecutionService,
         private subscriptionsService: SubscriptionsService,
         private seasonsService: SeasonsService,
+        private problemsService: ProblemsService,
     ) { }
 
     /**
@@ -104,12 +106,6 @@ export class BattlesService {
         const isTeam = this.isTeamMode(mode);
 
         // Validation based on mode
-        if (!isTeam && !dto.problemId) {
-            throw new BadRequestException(
-                'problemId is required for 1v1 and battle royale modes',
-            );
-        }
-
         if (isTeam && !dto.teamSize) {
             throw new BadRequestException(
                 'teamSize is required for team battle modes',
@@ -133,7 +129,7 @@ export class BattlesService {
             );
         }
 
-        // For single-problem modes, verify problem exists
+        // Resolve problem: use provided problemId, or auto-select a random one
         let problem = null;
         if (dto.problemId) {
             problem = await this.prisma.problem.findUnique({
@@ -146,6 +142,27 @@ export class BattlesService {
                     `Problem with ID ${dto.problemId} not found`,
                 );
             }
+        } else if (!isTeam) {
+            // Auto-select a random problem based on preferred difficulty and topic
+            const difficulty = dto.preferredDifficulty
+                ? (dto.preferredDifficulty as Difficulty)
+                : undefined;
+            const tags = dto.preferredTopic ? [dto.preferredTopic] : undefined;
+
+            try {
+                problem = await this.problemsService.findRandom(difficulty, tags);
+            } catch {
+                // Fallback: try without filters if filtered search found nothing
+                try {
+                    problem = await this.problemsService.findRandom();
+                } catch {
+                    throw new BadRequestException(
+                        'No problems available. Please try again later.',
+                    );
+                }
+            }
+
+            dto.problemId = problem.id;
         }
 
         // Generate invite code if requested

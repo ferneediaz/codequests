@@ -99,4 +99,12 @@ export class CreateBattleDto {
     @IsString()
     @IsOptional()
     preferredTopic?: string;
+
+    @ApiPropertyOptional({
+        description: 'Preferred difficulty for random problem selection',
+        enum: ['EASY', 'MEDIUM', 'HARD'],
+    })
+    @IsString()
+    @IsOptional()
+    preferredDifficulty?: 'EASY' | 'MEDIUM' | 'HARD';
 }
