@@ -80,26 +80,26 @@ const SKILL_DURATIONS: Record<SkillType, number> = {
     namespace: '/battles',
 })
 export class BattlesGateway
-    implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-{
+    implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
     server!: Server;
 
     private readonly logger = new Logger(BattlesGateway.name);
-    
+
     // Track connected clients: socketId -> socket
     private connectedClients = new Map<string, AuthenticatedSocket>();
-    
+
     // Track user to socket mapping: userId -> socketId
     private userSocketMap = new Map<string, string>();
 
     constructor(
         private readonly prisma: PrismaService,
+        @Inject(forwardRef(() => BattlesService))
         private readonly battlesService: BattlesService,
         private readonly jwtVerificationService: JwtVerificationService,
         @Inject(forwardRef(() => FriendsService))
         private readonly friendsService: FriendsService,
-    ) {}
+    ) { }
 
     afterInit(server: Server) {
         this.logger.log('WebSocket Gateway initialized');
@@ -108,7 +108,7 @@ export class BattlesGateway
     async handleConnection(client: AuthenticatedSocket) {
         try {
             const token = client.handshake.auth?.token;
-            
+
             if (!token) {
                 this.logger.warn(`Connection rejected: No token provided (${client.id})`);
                 client.disconnect();
@@ -152,7 +152,7 @@ export class BattlesGateway
 
     async handleDisconnect(client: AuthenticatedSocket) {
         const user = client.data.user;
-        
+
         // Notify battle rooms about disconnection
         if (user) {
             // Get all rooms the client was in (excluding the socket's own room)
@@ -177,7 +177,7 @@ export class BattlesGateway
 
         // Remove from connected clients
         this.connectedClients.delete(client.id);
-        
+
         this.logger.log(`Client disconnected: ${client.id}`);
     }
 
@@ -218,7 +218,7 @@ export class BattlesGateway
         try {
             // Verify the user is a participant in this battle
             const battle = await this.battlesService.getBattleDetails(battleId);
-            
+
             const isParticipant = battle.participants.some(
                 (p: any) => p.userId === user.id
             );

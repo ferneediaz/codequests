@@ -7,8 +7,8 @@ import { AuthModule } from '../auth/auth.module';
 import { FriendsModule } from '../friends/friends.module';
 
 @Module({
-    imports: [PrismaModule, BattlesModule, AuthModule, forwardRef(() => FriendsModule)],
+    imports: [PrismaModule, forwardRef(() => BattlesModule), AuthModule, forwardRef(() => FriendsModule)],
     providers: [BattlesGateway, WsAuthGuard],
     exports: [BattlesGateway],
 })
-export class WebsocketsModule {}
+export class WebsocketsModule { }

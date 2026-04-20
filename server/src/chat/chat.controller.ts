@@ -25,7 +25,7 @@ import { ChatRoomType } from '@prisma/client';
 @ApiTags('chat')
 @Controller('chat')
 export class ChatController {
-    constructor(private readonly chatService: ChatService) {}
+    constructor(private readonly chatService: ChatService) { }
 
     /**
      * Get user's DM conversations
@@ -79,7 +79,7 @@ export class ChatController {
         // Validate the user has access to this room
         await this.chatService.validateRoomAccess(req.user.id, roomType, roomId);
 
-        const parsedLimit = Math.min(parseInt(limit, 10) || 50, 100);
+        const parsedLimit = Math.min(parseInt(limit ?? '50', 10) || 50, 100);
         return this.chatService.getMessages(
             roomType,
             roomId,
