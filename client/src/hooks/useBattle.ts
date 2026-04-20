@@ -6,27 +6,43 @@ import {
     setProblem,
     setOpponentProgress,
     setSubmissionResult,
+    setRunResult,
     setIsSubmitting,
+    setIsRunning,
+    addUsedSkill,
+    addActiveEffect,
+    removeActiveEffect,
     completeBattle,
     resetBattle,
 } from '@/store/slices/battleSlice';
 import { getSocket } from '@/services/socket';
 import api from '@/services/api';
-import type { BattleResponse, ProblemResponse } from '@/types/api';
+import type { BattleResponse, ProblemResponse, SkillType } from '@/types/api';
 import type {
     BattleStartedPayload,
     BattleSubmissionPayload,
     BattleCompletedPayload,
     PlayerJoinedPayload,
     PlayerReadyPayload,
+    SkillEffectPayload,
+    SkillUsedPayload,
 } from '@/types/socket';
 
 export function useBattle(battleId: string) {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const userId = useAppSelector((state) => state.auth.user?.id);
-    const { battle, problem, opponentProgress, lastSubmissionResult, isSubmitting } =
-        useAppSelector((state) => state.battle);
+    const {
+        battle,
+        problem,
+        opponentProgress,
+        lastSubmissionResult,
+        runResult,
+        isSubmitting,
+        isRunning,
+        usedSkills,
+        activeEffects,
+    } = useAppSelector((state) => state.battle);
 
     // Fetch battle data and join room
     useEffect(() => {
@@ -155,12 +171,31 @@ export function useBattle(battleId: string) {
         socket.on('battle.player_joined', handlePlayerJoined);
         socket.on('battle.player_ready', handlePlayerReady);
 
+        const handleSkillEffect = (data: SkillEffectPayload) => {
+            const expiresAt = Date.now() + data.duration * 1000;
+            dispatch(addActiveEffect({ skillType: data.skillType, expiresAt }));
+            setTimeout(() => {
+                dispatch(removeActiveEffect(data.skillType));
+            }, data.duration * 1000);
+        };
+
+        const handleSkillUsed = (data: SkillUsedPayload) => {
+            if (data.userId === userId) {
+                dispatch(addUsedSkill(data.skillType));
+            }
+        };
+
+        socket.on('skill.effect', handleSkillEffect);
+        socket.on('skill.used', handleSkillUsed);
+
         return () => {
             socket.off('battle.started', handleStarted);
             socket.off('battle.submission', handleSubmission);
             socket.off('battle.completed', handleCompleted);
             socket.off('battle.player_joined', handlePlayerJoined);
             socket.off('battle.player_ready', handlePlayerReady);
+            socket.off('skill.effect', handleSkillEffect);
+            socket.off('skill.used', handleSkillUsed);
         };
     }, [battle, battleId, userId, dispatch, navigate]);
 
@@ -177,6 +212,35 @@ export function useBattle(battleId: string) {
             }
         },
         [battleId, dispatch],
+    );
+
+    const runCode = useCallback(
+        async (code: string, language: string) => {
+            if (!problem) return;
+            dispatch(setIsRunning(true));
+            try {
+                const { data } = await api.post(`/problems/${problem.id}/execute`, {
+                    code,
+                    language,
+                });
+                dispatch(setRunResult(data));
+                return data;
+            } catch (error) {
+                dispatch(setIsRunning(false));
+                throw error;
+            }
+        },
+        [problem, dispatch],
+    );
+
+    const useSkill = useCallback(
+        (skillType: SkillType, targetUserId: string) => {
+            const socket = getSocket();
+            if (socket) {
+                socket.emit('skill.use', { battleId, targetUserId, skillType });
+            }
+        },
+        [battleId],
     );
 
     const completeBattleManually = useCallback(async () => {
@@ -206,8 +270,14 @@ export function useBattle(battleId: string) {
         problem,
         opponentProgress,
         lastSubmissionResult,
+        runResult,
         isSubmitting,
+        isRunning,
+        usedSkills,
+        activeEffects,
         submitCode,
+        runCode,
+        useSkill,
         completeBattle: completeBattleManually,
         readyUp,
         unready,

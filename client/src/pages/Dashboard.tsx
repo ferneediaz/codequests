@@ -115,10 +115,11 @@ export default function Dashboard() {
                     ) : (
                         <div className="space-y-2">
                             {history.map((match) => {
-                                const myParticipant = match.participants.find(
+                                const participants = match.participants ?? [];
+                                const myParticipant = participants.find(
                                     (p) => p.userId === user?.id,
                                 );
-                                const opponent = match.participants.find(
+                                const opponent = participants.find(
                                     (p) => p.userId !== user?.id,
                                 );
                                 const won = match.winnerId === user?.id;

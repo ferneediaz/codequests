@@ -162,7 +162,9 @@ export class BattlesService {
                 }
             }
 
-            dto.problemId = problem.id;
+            if (problem) {
+                dto.problemId = problem.id;
+            }
         }
 
         // Generate invite code if requested

@@ -93,17 +93,19 @@ export function BattleLobby({ battle, currentUserId, onReady, onUnready }: Battl
                         <h3 className="text-sm font-medium text-muted-foreground">
                             Players ({battle.participants.length})
                         </h3>
-                        {battle.participants.map((p) => (
+                        {battle.participants.map((p) => {
+                            const username = p.username || (p as any).user?.username || 'Unknown';
+                            return (
                             <div
                                 key={p.userId}
                                 className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-bold">
-                                        {p.username.charAt(0).toUpperCase()}
+                                        {username.charAt(0).toUpperCase()}
                                     </div>
                                     <span className="font-medium text-foreground">
-                                        {p.username}
+                                        {username}
                                         {p.userId === currentUserId && (
                                             <span className="ml-1 text-xs text-muted-foreground">(you)</span>
                                         )}
@@ -121,7 +123,8 @@ export function BattleLobby({ battle, currentUserId, onReady, onUnready }: Battl
                                     </Badge>
                                 )}
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {/* Ready / Unready */}
