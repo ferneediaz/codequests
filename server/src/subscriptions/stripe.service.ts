@@ -1,16 +1,35 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe = require('stripe');
 
 @Injectable()
 export class StripeService {
+  private readonly logger = new Logger(StripeService.name);
   private stripe: InstanceType<typeof Stripe>;
 
   constructor(private configService: ConfigService) {
-    this.stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY')!);
+    const apiKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    if (!apiKey) {
+      this.logger.warn(
+        'STRIPE_SECRET_KEY not set — StripeService running in disabled mode. Subscription endpoints will throw at runtime.',
+      );
+      // Placeholder key so constructor does not throw; any actual API call will fail.
+      this.stripe = new Stripe('sk_test_disabled_placeholder');
+      return;
+    }
+    this.stripe = new Stripe(apiKey);
+  }
+
+  private ensureConfigured(): void {
+    if (!this.configService.get<string>('STRIPE_SECRET_KEY')) {
+      throw new InternalServerErrorException(
+        'Stripe is not configured on this server (missing STRIPE_SECRET_KEY).',
+      );
+    }
   }
 
   async createCustomer(email: string, userId: string): Promise<string> {
+    this.ensureConfigured();
     const customer = await this.stripe.customers.create({
       email,
       metadata: { userId },
@@ -23,6 +42,7 @@ export class StripeService {
     priceId: string,
     userId: string,
   ): Promise<string> {
+    this.ensureConfigured();
     const clientUrl = this.configService.get<string>('CLIENT_URL') || 'http://localhost:5173';
 
     const session = await this.stripe.checkout.sessions.create({
@@ -43,6 +63,7 @@ export class StripeService {
   }
 
   async createPortalSession(customerId: string): Promise<string> {
+    this.ensureConfigured();
     const clientUrl = this.configService.get<string>('CLIENT_URL') || 'http://localhost:5173';
 
     const session = await this.stripe.billingPortal.sessions.create({
@@ -57,6 +78,7 @@ export class StripeService {
     body: Buffer,
     signature: string,
   ): any {
+    this.ensureConfigured();
     const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET')!;
     return this.stripe.webhooks.constructEvent(body, signature, webhookSecret);
   }

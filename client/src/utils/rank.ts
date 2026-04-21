@@ -18,3 +18,22 @@ export function getRankTier(mmr: number): RankTier {
     }
     return RANK_TIERS[0];
 }
+
+export function getNextRankTier(mmr: number): RankTier | null {
+    const current = getRankTier(mmr);
+    const idx = RANK_TIERS.findIndex((t) => t.name === current.name);
+    if (idx === -1 || idx === RANK_TIERS.length - 1) return null;
+    return RANK_TIERS[idx + 1];
+}
+
+/**
+ * Returns a 0-100 percentage of MMR progress toward the next tier.
+ * Returns 100 for the top tier.
+ */
+export function getRankProgress(mmr: number): number {
+    const current = getRankTier(mmr);
+    if (current.maxMmr == null) return 100;
+    const span = current.maxMmr - current.minMmr + 1;
+    const into = mmr - current.minMmr;
+    return Math.max(0, Math.min(100, Math.round((into / span) * 100)));
+}
