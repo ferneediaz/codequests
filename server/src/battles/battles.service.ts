@@ -1086,6 +1086,13 @@ export class BattlesService {
             throw new BadRequestException('You cannot use a skill on yourself');
         }
 
+        // Gate: caller must have passed at least one test case in this battle
+        if ((userParticipant.testsPassed ?? 0) < 1) {
+            throw new ForbiddenException(
+                'Skills unlock after you pass at least one test case',
+            );
+        }
+
         // Each skill can only be used once per user per battle
         const alreadyUsed = battle.skillUses.find(
             (su) => su.userId === userId && su.skillType === skillType,
@@ -1096,8 +1103,36 @@ export class BattlesService {
             );
         }
 
+        // TIME_STEAL: shift the battle's startedAt earlier so all remaining time
+        // computations drop. Clamp so the target retains at least 10s.
+        let updatedStartedAt: Date | undefined;
+        if (skillType === SkillType.TIME_STEAL && battle.startedAt) {
+            const TIME_STEAL_SECONDS = 300; // 5 minutes
+            const MIN_REMAINING_SECONDS = 10;
+            const now = Date.now();
+            const totalMs = battle.timeLimitMinutes * 60 * 1000;
+            const endMs = battle.startedAt.getTime() + totalMs;
+            const remainingMs = Math.max(0, endMs - now);
+            const maxStealMs = Math.max(
+                0,
+                remainingMs - MIN_REMAINING_SECONDS * 1000,
+            );
+            const stealMs = Math.min(TIME_STEAL_SECONDS * 1000, maxStealMs);
+
+            if (stealMs > 0) {
+                const newStartedAt = new Date(
+                    battle.startedAt.getTime() - stealMs,
+                );
+                await this.prisma.battle.update({
+                    where: { id: battleId },
+                    data: { startedAt: newStartedAt },
+                });
+                updatedStartedAt = newStartedAt;
+            }
+        }
+
         // Record the skill use
-        return this.prisma.battleSkillUse.create({
+        const skillUse = await this.prisma.battleSkillUse.create({
             data: {
                 battleId,
                 userId,
@@ -1105,6 +1140,8 @@ export class BattlesService {
                 skillType,
             },
         });
+
+        return { ...skillUse, updatedStartedAt };
     }
 
     /**

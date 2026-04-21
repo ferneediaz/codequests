@@ -13,6 +13,7 @@ import {
     addActiveEffect,
     removeActiveEffect,
     completeBattle,
+    setBattleStartedAt,
     resetBattle,
 } from '@/store/slices/battleSlice';
 import { getSocket } from '@/services/socket';
@@ -26,6 +27,7 @@ import type {
     PlayerReadyPayload,
     SkillEffectPayload,
     SkillUsedPayload,
+    BattleTimeUpdatedPayload,
 } from '@/types/socket';
 
 export function useBattle(battleId: string) {
@@ -172,11 +174,13 @@ export function useBattle(battleId: string) {
         socket.on('battle.player_ready', handlePlayerReady);
 
         const handleSkillEffect = (data: SkillEffectPayload) => {
-            const expiresAt = Date.now() + data.duration * 1000;
+            // Instant skills (duration = 0) still get a brief visual flash
+            const durationSec = data.duration > 0 ? data.duration : 3;
+            const expiresAt = Date.now() + durationSec * 1000;
             dispatch(addActiveEffect({ skillType: data.skillType, expiresAt }));
             setTimeout(() => {
                 dispatch(removeActiveEffect(data.skillType));
-            }, data.duration * 1000);
+            }, durationSec * 1000);
         };
 
         const handleSkillUsed = (data: SkillUsedPayload) => {
@@ -185,8 +189,13 @@ export function useBattle(battleId: string) {
             }
         };
 
+        const handleTimeUpdated = (data: BattleTimeUpdatedPayload) => {
+            dispatch(setBattleStartedAt(data.startedAt));
+        };
+
         socket.on('skill.effect', handleSkillEffect);
         socket.on('skill.used', handleSkillUsed);
+        socket.on('battle.time_updated', handleTimeUpdated);
 
         return () => {
             socket.off('battle.started', handleStarted);
@@ -196,6 +205,7 @@ export function useBattle(battleId: string) {
             socket.off('battle.player_ready', handlePlayerReady);
             socket.off('skill.effect', handleSkillEffect);
             socket.off('skill.used', handleSkillUsed);
+            socket.off('battle.time_updated', handleTimeUpdated);
         };
     }, [battle, battleId, userId, dispatch, navigate]);
 

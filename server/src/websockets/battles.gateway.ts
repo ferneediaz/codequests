@@ -65,10 +65,12 @@ interface InviteUserPayload {
 }
 
 // Duration in seconds for each skill effect (0 = instant)
+// TIME_STEAL deducts this many seconds from the target's remaining time.
+const TIME_STEAL_SECONDS = 300; // 5 minutes
 const SKILL_DURATIONS: Record<SkillType, number> = {
     FREEZE: 10,
-    SCRAMBLE: 0,
-    BLIND: 0,
+    SCRAMBLE: 15,
+    BLIND: 0, // Deprecated — kept for enum compatibility, not surfaced in UI
     TIME_STEAL: 0,
     FOG_OF_WAR: 20,
 };
@@ -325,6 +327,18 @@ export class BattlesGateway
                 skillType,
                 targetUserId,
             });
+
+            // Special handling for TIME_STEAL — broadcast new startedAt so
+            // every participant's Timer recomputes.
+            if (skillType === SkillType.TIME_STEAL && skillUse?.updatedStartedAt) {
+                this.server.to(`battle:${battleId}`).emit('battle.time_updated', {
+                    battleId,
+                    startedAt: skillUse.updatedStartedAt,
+                    stolenSeconds: TIME_STEAL_SECONDS,
+                    targetUserId,
+                    fromUserId: user.id,
+                });
+            }
 
             return { success: true };
         } catch (error) {

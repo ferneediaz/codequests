@@ -332,7 +332,7 @@ function Features() {
         {
             icon: Zap,
             title: 'In-Battle Skills',
-            desc: 'Use power-ups like Freeze, Scramble, Blind, Time Steal, and Fog of War to sabotage opponents mid-battle.',
+            desc: 'Use power-ups like Freeze, Scramble, Time Steal, and Fog of War to sabotage opponents mid-battle.',
         },
         {
             icon: Code,
@@ -491,7 +491,7 @@ function FAQ() {
         },
         {
             q: 'What are battle skills?',
-            a: 'Optional power-ups you can toggle per game: Freeze (lock editor), Scramble (shuffle code), Blind (hide test results), Time Steal (-60s), and Fog of War (blur screen).',
+            a: 'Optional power-ups you can toggle per game: Freeze (lock editor), Scramble (shuffle code, no undo), Time Steal (-5 min), and Fog of War (pulsating blur). Unlocks after you pass your first test case.',
         },
         {
             q: 'How are solutions judged?',

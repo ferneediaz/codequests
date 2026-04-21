@@ -84,3 +84,19 @@
     transform: translateX(-50%);
   }
 }
+@keyframes fogPulse {
+  0%, 100% {
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+    opacity: 0.4;
+  }
+  50% {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    opacity: 1;
+  }
+}
+
+.animate-fog-pulse {
+  animation: fogPulse 1.8s ease-in-out infinite;
+}

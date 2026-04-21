@@ -221,23 +221,24 @@ _Nothing currently in progress_
 
 ### 2.2 Skills System UI ✅
 - [x] Skill bar component (`SkillBar.tsx`) displayed during battle:
-  - [x] 5 skill buttons: Freeze ❄️, Scramble 🔀, Blind 🌑, Time Steal ⏰, Fog 🌫️
+  - [x] 4 skill buttons: Freeze ❄️, Scramble 🔀, Time Steal ⏰, Fog 🌫️
   - [x] Greyed out / disabled after use (single-use per battle via `usedSkills` state)
+  - [x] Locked state shown until player passes at least 1 test case
   - [x] Click to activate → emit `skill.use` WebSocket event
   - [x] Only visible if skills are enabled for this battle
 - [x] Skill visual effects (`SkillEffectOverlay.tsx`) when opponent uses skill on you:
   - [x] **Freeze**: Blue overlay with ❄️ icon + "FROZEN!" text + countdown
-  - [x] **Scramble**: Yellow overlay with 🔀 icon + "CODE SCRAMBLED!" text
-  - [x] **Blind**: Dark overlay with 🌑 icon + "BLINDED!" text + countdown
-  - [x] **Time Steal**: Red overlay with ⏰ icon + "TIME STOLEN!" text
-  - [x] **Fog of War**: Gray/blur overlay with 🌫️ icon + "FOG OF WAR!" text + countdown
+  - [x] **Scramble**: Editor text scramble effect with no undo recovery
+  - [x] **Time Steal**: Red flash overlay + server-driven timer sync (`battle.time_updated`)
+  - [x] **Fog of War**: Pulsing blur overlay (no center badge to increase disruption)
 - [ ] Skill notification toast: "🐒 CodeMonkey used Freeze on you!" with opponent's username
 - [x] WebSocket events:
   - [x] Emit `skill.use` when activating a skill: `{ battleId, targetUserId, skillType }`
   - [x] Listen `skill.effect` for incoming skill effects: `{ skillType, fromUserId, duration }`
   - [x] Listen `skill.used` for room-wide broadcast
+  - [x] Listen `battle.time_updated` to update countdown after Time Steal
 - [x] Skill selection in game creation wizard (Step 3 in Play.tsx):
-  - [x] Checklist of all 5 skills, toggle each ON/OFF
+  - [x] Checklist of available skills, toggle each ON/OFF
   - [x] "Enable All" / "Disable All" buttons
   - [x] Default: all disabled (no skills)
   - [x] Skill descriptions on hover
@@ -359,8 +360,9 @@ _Nothing currently in progress_
   - [ ] `ChatInput` — text input with send button (Enter to send)
   - [ ] `ChatWindow` — full page chat for DMs (`/messages`)
 - [ ] Battle chat:
-  - [ ] Chat panel on battle page (collapsible side panel or bottom panel)
-  - [ ] Auto-join battle chat room on battle start
+  - [x] Chat panel on battle page (floating, collapsible `BattleChat`)
+  - [x] Auto-join battle chat room on battle start (`useBattleChat` + `chat.join_room`)
+  - [x] Send/receive real-time messages in battle room (`chat.send`, `chat.message`)
   - [ ] Chat history loads from `GET /api/chat/battle/:battleId`
 - [ ] Post-game chat:
   - [ ] Chat persists on results page

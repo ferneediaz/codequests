@@ -752,7 +752,7 @@ describe('BattlesGateway', () => {
 
         it.each([
             { skill: SkillType.FREEZE, expectedDuration: 10 },
-            { skill: SkillType.SCRAMBLE, expectedDuration: 0 },
+            { skill: SkillType.SCRAMBLE, expectedDuration: 15 },
             { skill: SkillType.BLIND, expectedDuration: 0 },
             { skill: SkillType.TIME_STEAL, expectedDuration: 0 },
             { skill: SkillType.FOG_OF_WAR, expectedDuration: 20 },

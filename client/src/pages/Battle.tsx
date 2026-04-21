@@ -3,13 +3,14 @@ import { useParams } from 'react-router-dom';
 import { useAppSelector } from '@/store/hooks';
 import { useBattle } from '@/hooks/useBattle';
 import { ProblemPanel } from '@/components/battle/ProblemPanel';
-import { CodeEditor } from '@/components/battle/CodeEditor';
+import { CodeEditor, type CodeEditorHandle } from '@/components/battle/CodeEditor';
 import { ConsolePanel } from '@/components/battle/ConsolePanel';
 import { Timer } from '@/components/battle/Timer';
 import { OpponentProgress } from '@/components/battle/OpponentProgress';
 import { SkillBar } from '@/components/battle/SkillBar';
 import { SkillEffectOverlay } from '@/components/battle/SkillEffectOverlay';
 import { BattleLobby } from '@/components/battle/BattleLobby';
+import { BattleChat } from '@/components/battle/BattleChat';
 import { Button } from '@/components/ui/button';
 import { Loader2, Play, Send } from 'lucide-react';
 
@@ -80,6 +81,9 @@ export default function Battle() {
     const [code, setCode] = useState('');
     const [codeInitialized, setCodeInitialized] = useState(false);
     const [lastAction, setLastAction] = useState<'run' | 'submit' | null>(null);
+    const [skillsEverUnlocked, setSkillsEverUnlocked] = useState(false);
+    const editorHandleRef = useRef<CodeEditorHandle>(null);
+    const scrambledOnceRef = useRef(false);
 
     // Resizable panels
     const hSplit = useResizable(0.4, 'horizontal');
@@ -104,6 +108,39 @@ export default function Battle() {
     }, [problem, codeInitialized, starterCodeMap, language]);
 
     const opponent = battle?.participants.find((p) => p.userId !== userId);
+    const selfParticipant = battle?.participants.find((p) => p.userId === userId);
+
+    // Derived skill-effect flags
+    const now = Date.now();
+    const isFrozen = activeEffects.some(
+        (e) => e.skillType === 'FREEZE' && e.expiresAt > now,
+    );
+
+    // Skills unlock after passing at least one test case (sticky for the battle).
+    // Server payload uses testsPassed/totalTests, existing client type says passed/total — accept either.
+    const sub = lastSubmissionResult as
+        | (typeof lastSubmissionResult & { testsPassed?: number; totalTests?: number })
+        | null;
+    const localTestsPassed = sub?.testsPassed ?? sub?.passed ?? 0;
+    const localTotalTests = sub?.totalTests ?? sub?.total ?? 0;
+    useEffect(() => {
+        if (!skillsEverUnlocked && localTestsPassed >= 1) {
+            setSkillsEverUnlocked(true);
+        }
+    }, [localTestsPassed, skillsEverUnlocked]);
+
+    // Trigger scramble exactly once per SCRAMBLE effect reception
+    useEffect(() => {
+        const hasScramble = activeEffects.some(
+            (e) => e.skillType === 'SCRAMBLE' && e.expiresAt > Date.now(),
+        );
+        if (hasScramble && !scrambledOnceRef.current) {
+            scrambledOnceRef.current = true;
+            editorHandleRef.current?.scrambleCode();
+        } else if (!hasScramble && scrambledOnceRef.current) {
+            scrambledOnceRef.current = false;
+        }
+    }, [activeEffects]);
 
     const handleRun = useCallback(async () => {
         try {
@@ -167,17 +204,18 @@ export default function Battle() {
             <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
                 {/* Left: opponent progress */}
                 <div className="flex items-center gap-4">
-                    {opponent && opponentProgress ? (
+                    {opponent && (
                         <OpponentProgress
                             username={opponent.username}
-                            testsPassed={opponentProgress.testsPassed}
-                            totalTests={opponentProgress.totalTests}
+                            testsPassed={opponentProgress?.testsPassed ?? 0}
+                            totalTests={
+                                opponentProgress?.totalTests ??
+                                problem.testCases?.length ??
+                                0
+                            }
+                            label={`vs ${opponent.username}`}
                         />
-                    ) : opponent ? (
-                        <span className="text-sm text-muted-foreground">
-                            vs {opponent.username}
-                        </span>
-                    ) : null}
+                    )}
                 </div>
 
                 {/* Center: timer */}
@@ -191,14 +229,28 @@ export default function Battle() {
                     )}
                 </div>
 
-                {/* Right: skills + run + submit */}
+                {/* Right: self progress + skills + run + submit */}
                 <div className="flex items-center gap-3">
+                    {selfParticipant && (
+                        <OpponentProgress
+                            username={selfParticipant.username}
+                            testsPassed={localTestsPassed}
+                            totalTests={
+                                localTotalTests ||
+                                problem.testCases?.length ||
+                                0
+                            }
+                            label="You"
+                            align="right"
+                        />
+                    )}
                     {battle.enabledSkills && opponent && (
                         <SkillBar
                             enabledSkills={battle.enabledSkills}
                             usedSkills={usedSkills}
                             opponentUserId={opponent.userId}
                             onUseSkill={useSkill}
+                            unlocked={skillsEverUnlocked}
                         />
                     )}
 
@@ -262,11 +314,13 @@ export default function Battle() {
                         style={{ height: `${vSplit.fraction * 100}%` }}
                     >
                         <CodeEditor
+                            ref={editorHandleRef}
                             language={language}
                             onLanguageChange={setLanguage}
                             code={code}
                             onCodeChange={setCode}
                             starterCode={problem.starterCode}
+                            readOnly={isFrozen}
                         />
                     </div>
 
@@ -293,6 +347,9 @@ export default function Battle() {
                     </div>
                 </div>
             </div>
+
+            {/* Floating trash-talk chat */}
+            {userId && <BattleChat battleId={battle.id} currentUserId={userId} />}
         </div>
     );
 }

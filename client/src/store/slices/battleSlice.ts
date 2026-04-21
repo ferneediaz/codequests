@@ -85,6 +85,11 @@ const battleSlice = createSlice({
         completeBattle(state, action: PayloadAction<BattleResponse>) {
             state.battle = action.payload;
         },
+        setBattleStartedAt(state, action: PayloadAction<string>) {
+            if (state.battle) {
+                state.battle.startedAt = action.payload;
+            }
+        },
         resetBattle() {
             return initialState;
         },
@@ -104,6 +109,7 @@ export const {
     removeActiveEffect,
     updateBattleStatus,
     completeBattle,
+    setBattleStartedAt,
     resetBattle,
 } = battleSlice.actions;
 export default battleSlice.reducer;

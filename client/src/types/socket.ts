@@ -97,3 +97,22 @@ export interface PlayerReadyPayload {
     username: string;
     isReady: boolean;
 }
+
+export interface BattleTimeUpdatedPayload {
+    battleId: string;
+    startedAt: string;
+    stolenSeconds: number;
+    targetUserId: string;
+    fromUserId: string;
+}
+
+export interface ChatMessagePayload {
+    id: string;
+    senderId: string;
+    senderUsername: string;
+    senderAvatarUrl?: string | null;
+    content: string;
+    roomType: 'LOBBY' | 'BATTLE' | 'DM';
+    roomId: string;
+    createdAt: string;
+}
