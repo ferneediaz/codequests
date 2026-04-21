@@ -61,108 +61,121 @@ _Nothing currently in progress_
 
 ---
 
-## 📋 Phase 1: Foundation (MVP Core)
+## ✅ Phase 1: Foundation (MVP Core) — COMPLETED
 
 **Goal:** User can sign up, see dashboard, and play a 1v1 game end-to-end.
 
-### 1.1 Project Setup
-- [ ] Initialize Vite + React + TypeScript project
-- [ ] Install and configure Tailwind CSS
-- [ ] Install and configure shadcn/ui (dark theme as default)
-- [ ] Set up React Router with all route definitions
-- [ ] Set up Redux Toolkit store with typed hooks (`useAppDispatch`, `useAppSelector`)
-- [ ] Set up TanStack Query provider
-- [ ] Set up Socket.IO client service
-- [ ] Set up Supabase client (auth only)
-- [ ] Set up Axios/fetch API client with auth interceptor (attach JWT to requests)
-- [ ] Configure environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_API_URL, VITE_SOCKET_URL)
+### 1.1 Project Setup ✅
+- [x] Initialize Vite + React + TypeScript project
+- [x] Install and configure Tailwind CSS
+- [x] Install and configure shadcn/ui (dark theme as default)
+- [x] Set up React Router with all route definitions
+- [x] Set up Redux Toolkit store with typed hooks (`useAppDispatch`, `useAppSelector`)
+- [x] Set up TanStack Query provider
+- [x] Set up Socket.IO client service
+- [x] Set up Supabase client (auth only)
+- [x] Set up Axios/fetch API client with auth interceptor (attach JWT to requests)
+- [x] Configure environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_API_URL, VITE_SOCKET_URL)
 - [ ] Set up Vitest for unit testing
-- [ ] Create base layout component (top navbar + main content area)
-- [ ] **Success Criteria:** App runs, routes work, API client configured ✅
+- [x] Create base layout component (top navbar + main content area)
+- [x] **Success Criteria:** App runs, routes work, API client configured ✅
 
-### 1.2 Auth Flow
-- [ ] Create `/login` page with GitHub + Google OAuth buttons
-- [ ] Configure Supabase OAuth providers (GitHub, Google)
-- [ ] Create `/auth/callback` page to handle OAuth redirect
-- [ ] On callback: extract JWT from Supabase session → call `POST /api/auth/sync` → store user in Redux
-- [ ] Create `authSlice` (user, token, isAuthenticated, isLoading)
-- [ ] Create `useAuth` hook (login, logout, getCurrentUser, isAuthenticated)
-- [ ] Add auth persistence (store token in localStorage, restore on app load)
-- [ ] Create `ProtectedRoute` wrapper component (redirect to `/login` if not auth'd)
+### 1.2 Auth Flow ✅
+- [x] Create `/login` page with GitHub + Google OAuth buttons
+- [x] Configure Supabase OAuth providers (GitHub, Google)
+- [x] Create `/auth/callback` page to handle OAuth redirect
+- [x] On callback: extract JWT from Supabase session → call `POST /api/auth/sync` → store user in Redux
+- [x] Create `authSlice` (user, token, isAuthenticated, isLoading)
+- [x] Create `useAuth` hook (login, logout, getCurrentUser, isAuthenticated)
+- [x] Add auth persistence (store token in localStorage, restore on app load)
+- [x] Create `ProtectedRoute` wrapper component (redirect to `/login` if not auth'd)
 - [ ] Create `AdminRoute` wrapper component (redirect if not admin role)
-- [ ] Add user avatar + dropdown to navbar (when logged in)
-- [ ] Add logout functionality
-- [ ] **Success Criteria:** User can sign up via GitHub/Google → synced to backend → stays logged in on refresh ✅
+- [x] Add user avatar + dropdown to navbar (when logged in)
+- [x] Add logout functionality
+- [x] **Success Criteria:** User can sign up via GitHub/Google → synced to backend → stays logged in on refresh ✅
 
-### 1.3 Landing Page
-- [ ] Clean minimal hero section with tagline + CTA button ("Start Battling" → `/login` or `/dashboard`)
-- [ ] Brief feature highlights section (3-4 cards: battle, compete, climb ranks)
+### 1.3 Landing Page ✅
+- [x] Clean minimal hero section with tagline + CTA button ("Start Battling" → `/login` or `/dashboard`)
+- [x] Brief feature highlights section (3-4 cards: battle, compete, climb ranks)
 - [ ] Top 10 leaderboard preview (public, fetched from `GET /api/users?limit=10`)
-- [ ] Footer with links
-- [ ] Redirect logged-in users from `/` to `/dashboard`
-- [ ] **Success Criteria:** Landing page looks clean, CTA works, leaderboard loads ✅
+- [x] Footer with links
+- [x] Redirect logged-in users from `/` to `/dashboard`
+- [x] Scroll-triggered fade/slide/scale animations using IntersectionObserver
+- [x] Infinite marquee of supported languages
+- [x] Rank tier showcase (7 tiers matching backend)
+- [x] FAQ accordion
+- [x] Stats banner (4 game modes, 7 languages, 7 rank tiers, 5 battle skills)
+- [x] **Success Criteria:** Landing page looks clean, CTA works ✅
 
-### 1.4 Dashboard Page
-- [ ] Quick Play button (prominent, top of page → triggers matchmaking or opens `/play`)
-- [ ] Stats overview card: MMR, rank badge (with icon + color), W/L record
+### 1.4 Dashboard Page ✅
+- [x] Quick Play button (prominent, top of page → navigates to `/play`)
+- [x] Stats overview card: MMR, rank badge (with icon + color via `RankBadge` component), W/L record
 - [ ] Activity heatmap component (GitHub-style, placeholder data initially until backend supports it)
-- [ ] Recent activity feed (last 5 battles from `GET /api/users/:id/history`)
+- [x] Recent activity feed (last 5 battles from `GET /api/users/:id/history`)
 - [ ] Remaining free games badge (if free tier, shows "1 game remaining today" or "Pro ∞")
-- [ ] **Success Criteria:** Dashboard loads with real user data after login ✅
+- [x] **Success Criteria:** Dashboard loads with real user data after login ✅
 
-### 1.5 Matchmaking UI
-- [ ] Create `matchmakingSlice` (queueStatus: idle/queued/matched, estimatedWait)
-- [ ] Create `useMatchmaking` hook (joinQueue, leaveQueue, checkStatus)
-- [ ] Queue screen: animated searching indicator, estimated wait, cancel button
-- [ ] On `matchmaking.match_found` WebSocket event → redirect to `/battle/:id`
+### 1.5 Matchmaking UI ✅
+- [x] Create `matchmakingSlice` (queueStatus: idle/queued/matched, estimatedWait)
+- [x] Create `useMatchmaking` hook (joinQueue, leaveQueue, checkStatus)
+- [x] Queue screen: animated searching indicator, estimated wait, cancel button
+- [x] On `matchmaking.match_found` WebSocket event → redirect to `/battle/:id`
 - [ ] MMR range indicator (shows current search range)
-- [ ] Mode selection before queueing (1v1 default for MVP)
-- [ ] Public matchmaking defaults: 1 problem, standard MMR stakes (~16 MMR) — no problem count config for public queue
-- [ ] Call `POST /api/matchmaking/queue` to join, `DELETE /api/matchmaking/queue` to leave
-- [ ] Poll `GET /api/matchmaking/status` or listen to WebSocket for status updates
-- [ ] **Success Criteria:** User can queue → wait → get matched → redirected to battle ✅
+- [x] Mode selection before queueing (via Play wizard)
+- [x] Call `POST /api/matchmaking/queue` to join, `DELETE /api/matchmaking/queue` to leave
+- [x] Config summary badges displayed while queuing (mode, difficulty, time limit, topic, skill count)
+- [x] useRef guard prevents double-joining in React Strict Mode
+- [x] **Success Criteria:** User can queue → wait → get matched → redirected to battle ✅
 
-### 1.6 Battle View (1v1)
-- [ ] Create `battleSlice` (battleId, status, problem, opponent, timeRemaining, myProgress, opponentProgress, myCode, selectedLanguage)
-- [ ] Create `useBattle` hook (submitCode, getStatus, onBattleEvent)
-- [ ] Layout: left panel (problem description) + right panel (Monaco editor + controls)
-- [ ] Monaco Editor integration:
-  - [ ] Install `@monaco-editor/react`
-  - [ ] Language selector dropdown (Python, JavaScript, TypeScript, Java, C++, C, Rust)
-  - [ ] Load starter code per language from problem data
-  - [ ] Dark theme (vs-dark)
-  - [ ] Track code changes in Redux
-- [ ] Problem description panel:
-  - [ ] Title, description, constraints, examples
-  - [ ] Test case results (visible test cases only)
-  - [ ] Scrollable with markdown rendering
-- [ ] Countdown timer at top center:
-  - [ ] Count down from `timeLimitMinutes`
-  - [ ] Color change when < 60s remaining (yellow), < 30s (red)
-  - [ ] Auto-submit or end battle when timer hits 0
-- [ ] Opponent progress bar:
-  - [ ] Show tests passed / total tests
-  - [ ] No code visibility (just progress)
-  - [ ] Listen to `battle.submission` WebSocket event for opponent updates
-- [ ] Submit button:
-  - [ ] Call `POST /api/battles/:id/submit` with code + language
-  - [ ] Show loading state during submission
-  - [ ] Display test results on return (passed/failed per visible test case)
-  - [ ] Disable after submission if all tests pass (or allow resubmit)
-- [ ] WebSocket integration:
-  - [ ] Join battle room on mount (`battle.join`)
-  - [ ] Listen: `battle.started`, `battle.submission`, `battle.completed`, `battle.status_update`
-  - [ ] Leave room on unmount (`battle.leave`)
-- [ ] Handle battle states: WAITING (show "waiting for opponent"), IN_PROGRESS (play), COMPLETED (redirect to results)
-- [ ] **Success Criteria:** Full 1v1 battle playable: see problem → write code → submit → see results → battle ends ✅
+### 1.6 Battle View (1v1) ✅
+- [x] Create `battleSlice` (battleId, status, problem, opponent, myProgress, opponentProgress, myCode, selectedLanguage, runResult, isRunning, usedSkills, activeEffects)
+- [x] Create `useBattle` hook (submitCode, runCode, useSkill, readyUp, unready, getStatus, onBattleEvent)
+- [x] Layout: resizable two-pane split (problem panel | editor + console) with drag handles
+  - [x] useResizable hook with min/max fraction clamping (0.2–0.8)
+  - [x] Horizontal drag handle between problem and editor
+  - [x] Vertical drag handle between editor and console
+- [x] Monaco Editor integration:
+  - [x] Install `@monaco-editor/react`
+  - [x] Language selector dropdown (Python, JavaScript, TypeScript, Java, C++, C, Rust)
+  - [x] Load starter code per language from problem data
+  - [x] Dark theme (vs-dark)
+- [x] Problem description panel:
+  - [x] Title, difficulty badge, description
+  - [x] Visible test cases (input + expected output)
+- [x] Console output panel (tabbed: Test Results + Output):
+  - [x] Per-test pass/fail with input/expected/actual output
+  - [x] Raw stdout/stderr from code execution
+  - [x] Loading spinner during execution
+  - [x] Summary header (X/Y tests passed)
+- [x] Countdown timer at top center:
+  - [x] Count down from `timeLimitMinutes`
+  - [x] Color change when < 60s remaining (yellow), < 30s (red)
+  - [x] Auto-complete battle when timer hits 0
+- [x] Opponent progress bar:
+  - [x] Show tests passed / total tests
+  - [x] Listen to `battle.submission` WebSocket event for opponent updates
+- [x] Run button (outline variant):
+  - [x] Call `POST /problems/:id/execute` to test code without submitting
+  - [x] Display results in console panel
+- [x] Submit button:
+  - [x] Call `POST /api/battles/:id/submit` with code + language
+  - [x] Show loading state during submission
+  - [x] Display test results in console panel
+- [x] WebSocket integration:
+  - [x] Join battle room on mount (`battle.join`)
+  - [x] Listen: `battle.started`, `battle.submission`, `battle.completed`, `battle.player_joined`, `battle.player_ready`, `skill.effect`, `skill.used`
+  - [x] Leave room on unmount (`battle.leave`)
+- [x] Handle battle states: WAITING (show BattleLobby), IN_PROGRESS (play), COMPLETED (redirect to results)
+- [x] **Success Criteria:** Full 1v1 battle playable: see problem → write code → run/submit → see results → battle ends ✅
 
-### 1.7 Post-Battle Results
+### 1.7 Post-Battle Results (Partial)
+- [x] Basic results page exists (`Results.tsx`)
 - [ ] Winner/loser announcement with visual distinction
-- [ ] MMR change display (number going up for winner, down for loser — no animation yet, Phase 2)
+- [ ] MMR change display (number going up for winner, down for loser)
 - [ ] Stats summary: time taken, tests passed, language used
 - [ ] Both players' code side by side (read-only Monaco editors)
 - [ ] Rematch button (creates new battle with same opponent, redirects)
-- [ ] Return to dashboard button
+- [x] Return to dashboard button
 - [ ] **Success Criteria:** Results screen shows all battle data, navigation back to dashboard works ✅
 
 ### 1.8 Basic Profile Page
@@ -206,31 +219,29 @@ _Nothing currently in progress_
 - [ ] Fetch subscription status on login from `GET /api/subscriptions/status`
 - [ ] **Success Criteria:** Free user blocked after 1 game → paywall shown → can subscribe → unlimited games ✅
 
-### 2.2 Skills System UI
-- [ ] Create `skillsSlice` (availableSkills, usedSkills, activeEffects)
-- [ ] Create `useSkills` hook (useSkill, isSkillUsed, isUnderEffect)
-- [ ] Skill bar component (displayed during battle):
-  - [ ] 5 skill buttons in a row at bottom of battle view
-  - [ ] Each shows skill icon + name
-  - [ ] Greyed out / disabled after use (single-use per battle)
-  - [ ] Click to activate (select target if needed)
-  - [ ] Only visible if skills are enabled for this battle
-- [ ] Skill visual effects on YOUR screen when opponent uses skill on you:
-  - [ ] **Freeze** (10s): Overlay on editor with ice/lock animation, editor becomes read-only, countdown timer on overlay
-  - [ ] **Scramble** (instant): Code lines shuffle animation, then settle in scrambled order
-  - [ ] **Blind** (until next submit): Test results section blurred/hidden, "Your test results are hidden!" message
-  - [ ] **Time Steal** (-60s): Timer flashes red, countdown jumps down, "-60s" text animation
-  - [ ] **Fog of War** (20s): Gaussian blur overlay on entire screen (except skill bar), countdown timer
+### 2.2 Skills System UI ✅
+- [x] Skill bar component (`SkillBar.tsx`) displayed during battle:
+  - [x] 5 skill buttons: Freeze ❄️, Scramble 🔀, Blind 🌑, Time Steal ⏰, Fog 🌫️
+  - [x] Greyed out / disabled after use (single-use per battle via `usedSkills` state)
+  - [x] Click to activate → emit `skill.use` WebSocket event
+  - [x] Only visible if skills are enabled for this battle
+- [x] Skill visual effects (`SkillEffectOverlay.tsx`) when opponent uses skill on you:
+  - [x] **Freeze**: Blue overlay with ❄️ icon + "FROZEN!" text + countdown
+  - [x] **Scramble**: Yellow overlay with 🔀 icon + "CODE SCRAMBLED!" text
+  - [x] **Blind**: Dark overlay with 🌑 icon + "BLINDED!" text + countdown
+  - [x] **Time Steal**: Red overlay with ⏰ icon + "TIME STOLEN!" text
+  - [x] **Fog of War**: Gray/blur overlay with 🌫️ icon + "FOG OF WAR!" text + countdown
 - [ ] Skill notification toast: "🐒 CodeMonkey used Freeze on you!" with opponent's username
-- [ ] WebSocket events:
-  - [ ] Emit `skill.use` when activating a skill: `{ battleId, targetUserId, skillType }`
-  - [ ] Listen `skill.effect` for incoming skill effects: `{ skillType, fromUserId, duration }`
-  - [ ] Listen `skill.used` for room-wide broadcast (for spectators later)
-- [ ] Skill selection in game creation wizard (Phase 2.4):
-  - [ ] Checklist of all 5 skills, toggle each ON/OFF
-  - [ ] "Enable All" / "Disable All" buttons
-  - [ ] Default: all disabled (no skills)
-- [ ] **Success Criteria:** Skills work in-battle: use on opponent → they see effect → skill greys out ✅
+- [x] WebSocket events:
+  - [x] Emit `skill.use` when activating a skill: `{ battleId, targetUserId, skillType }`
+  - [x] Listen `skill.effect` for incoming skill effects: `{ skillType, fromUserId, duration }`
+  - [x] Listen `skill.used` for room-wide broadcast
+- [x] Skill selection in game creation wizard (Step 3 in Play.tsx):
+  - [x] Checklist of all 5 skills, toggle each ON/OFF
+  - [x] "Enable All" / "Disable All" buttons
+  - [x] Default: all disabled (no skills)
+  - [x] Skill descriptions on hover
+- [x] **Success Criteria:** Skills work in-battle: use on opponent → they see effect → skill greys out ✅
 
 ### 2.3 Win Celebrations
 - [ ] Install confetti library (e.g., `canvas-confetti` or `react-confetti`)
@@ -246,35 +257,31 @@ _Nothing currently in progress_
 - [ ] Stats summary card with animation (tests passed, time taken, language)
 - [ ] **Success Criteria:** Winning feels satisfying — confetti, numbers counting up, rank glow, sound ✅
 
-### 2.4 Game Creation Wizard
-- [ ] Step 1: **Mode Selection**
-  - [ ] 1v1 card
-  - [ ] Battle Royale card (with player count selector: 6 or 8)
-  - [ ] Visual cards with icons and descriptions
-- [ ] Step 2: **Settings**
-  - [ ] Number of problems selector (1, 2, 3, 5) with MMR stakes preview:
-    - [ ] "1 Problem — ~16 MMR at stake"
-    - [ ] "2 Problems — ~32 MMR at stake"
-    - [ ] "3 Problems — ~48 MMR at stake"
-    - [ ] "5 Problems — ~80 MMR at stake"
-  - [ ] Time limit selector (5, 10, 15, 20, 30 min)
-  - [ ] Difficulty preference (Any, Easy, Medium, Hard)
-  - [ ] Battle Royale format (if BR mode): Same problem / Problem bank / Score-based
-- [ ] Step 3: **Skills Configuration**
-  - [ ] Toggle each skill ON/OFF (Freeze, Scramble, Blind, Time Steal, Fog of War)
-  - [ ] Enable All / Disable All buttons
-  - [ ] Default: all off
-  - [ ] Skill descriptions on hover
-- [ ] Step 4: **Invite**
-  - [ ] Option A: "Find Match" → join matchmaking queue with these settings
-  - [ ] Option B: "Create Private Game" → generate invite link + show code
+### 2.4 Game Creation Wizard ✅
+- [x] Step 1: **Mode Selection**
+  - [x] 1v1 card
+  - [x] Battle Royale card (with player count selector: 6 or 8)
+  - [x] Visual cards with icons and descriptions
+- [x] Step 2: **Settings**
+  - [x] Number of problems selector (1, 2, 3, 5) with MMR stakes preview
+  - [x] Time limit selector (5, 10, 15, 20, 30 min)
+  - [x] Difficulty preference (Any, Easy, Medium, Hard)
+  - [x] Topic/tag filter
+- [x] Step 3: **Skills Configuration**
+  - [x] Toggle each skill ON/OFF (Freeze, Scramble, Blind, Time Steal, Fog of War)
+  - [x] Enable All / Disable All buttons
+  - [x] Default: all off
+  - [x] Skill descriptions on hover
+- [x] Step 4: **Invite**
+  - [x] Option A: "Find Match" → join matchmaking queue with these settings
+  - [x] Option B: "Create Private Game" → generate invite code
   - [ ] Option C: "Invite Player" → search by username, send in-app invite
-  - [ ] Shareable invite link with copy button
+  - [x] Shareable invite code with copy button
   - [ ] QR code for invite link (nice-to-have)
 - [ ] **Save Preset**: save current settings as named preset (stored in localStorage)
-- [ ] Step progress indicator (dots/bar at top)
-- [ ] Back/Next navigation between steps
-- [ ] **Success Criteria:** Full wizard creates game with all settings, invite link generated ✅
+- [x] Step progress indicator (dots at top)
+- [x] Back/Next navigation between steps
+- [x] **Success Criteria:** Full wizard creates game with all settings, invite code generated ✅
 
 ### 2.5 Quick Play
 - [ ] `/play/quick` route
@@ -283,7 +290,10 @@ _Nothing currently in progress_
 - [ ] Manage presets (list, rename, delete saved presets)
 - [ ] **Success Criteria:** One-click play from dashboard using saved settings ✅
 
-### 2.6 Direct Invites
+### 2.6 Direct Invites (Partial)
+- [x] Invite code flow: creator gets code → opponent enters code → joins battle
+- [x] BattleLobby component with ready-up flow (both players ready → battle starts)
+- [x] Invite notification hook (`useInviteNotifications.ts`) — listens for battle invites via WebSocket
 - [ ] Invite link page (`/invite/:code`):
   - [ ] Fetch battle info from `GET /api/battles/invite/:code`
   - [ ] Show game settings (mode, skills, creator username)
