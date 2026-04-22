@@ -181,8 +181,38 @@ export function ConsolePanel({
                             </div>
                         )}
 
-                        {/* Error */}
-                        {selectedResult?.error && (
+                        {/* Console Output (user's console.log / print) */}
+                        {selectedResult && (
+                            <div>
+                                <div className="mb-1 text-xs font-medium text-muted-foreground">
+                                    Console Output
+                                </div>
+                                {selectedResult.stdout ? (
+                                    <div className="rounded-md bg-muted/50 px-3 py-2 font-mono text-xs text-foreground whitespace-pre-wrap">
+                                        {selectedResult.stdout}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-md bg-muted/30 px-3 py-2 font-mono text-xs italic text-muted-foreground">
+                                        No output. Use console.log / print to debug.
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Stderr (captured separately; shown in red) */}
+                        {selectedResult?.stderr && (
+                            <div>
+                                <div className="mb-1 text-xs font-medium text-red-400">
+                                    Stderr
+                                </div>
+                                <div className="rounded-md bg-red-500/10 px-3 py-2 font-mono text-xs text-red-400 whitespace-pre-wrap">
+                                    {selectedResult.stderr}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Error (execution-level, e.g. timeout / network) */}
+                        {selectedResult?.error && selectedResult.error !== selectedResult.stderr && (
                             <div>
                                 <div className="mb-1 text-xs font-medium text-red-400">
                                     Error

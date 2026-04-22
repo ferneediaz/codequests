@@ -9,53 +9,37 @@ description: |
 
   You must write an algorithm with O(log n) runtime complexity.
 
-  **Input format:** Line 1 is a JSON array of integers. Line 2 is the target integer.
-  **Output format:** A single integer index (or `-1`).
-
   **Example 1:**
   ```
-  Input:
-  [-1,0,3,5,9,12]
-  9
+  Input: nums = [-1,0,3,5,9,12], target = 9
   Output: 4
   ```
 
   **Example 2:**
   ```
-  Input:
-  [-1,0,3,5,9,12]
-  2
+  Input: nums = [-1,0,3,5,9,12], target = 2
   Output: -1
   ```
-languages:
-  javascript:
-    prefix: |
-      const input = require('fs').readFileSync(0, 'utf8');
-      const [numsLine, targetLine] = input.split('\n');
-      const nums = JSON.parse(numsLine);
-      const target = parseInt(targetLine, 10);
-    body: |
-      function search(nums, target) {
-        // Your code here
-        return -1;
-      }
-    suffix: |
-      console.log(search(nums, target));
-  python:
-    prefix: |
-      import sys, json
-
-      lines = sys.stdin.read().split('\n')
-      nums = json.loads(lines[0])
-      target = int(lines[1])
-    body: |
-      def search(nums, target):
-          # Your code here
-          return -1
-    suffix: |
-      print(search(nums, target))
-testCases:
-  - { input: "[-1,0,3,5,9,12]\n9",           expectedOutput: "4",  hidden: false }
-  - { input: "[-1,0,3,5,9,12]\n2",           expectedOutput: "-1", hidden: false }
-  - { input: "[5]\n5",                        expectedOutput: "0",  hidden: true }
-  - { input: "[1,2,3,4,5,6,7,8,9,10]\n7",     expectedOutput: "6",  hidden: true }
+signature:
+  name:
+    javascript: search
+    python: search
+  params:
+    - { name: nums,   type: 'int[]' }
+    - { name: target, type: int }
+  returns: int
+starter:
+  javascript: |
+    function search(nums, target) {
+      // Your code here
+      return -1;
+    }
+  python: |
+    def search(nums, target):
+        # Your code here
+        return -1
+tests:
+  - { args: [[-1, 0, 3, 5, 9, 12], 9],          expected: 4 }
+  - { args: [[-1, 0, 3, 5, 9, 12], 2],          expected: -1 }
+  - { args: [[5], 5],                           expected: 0,  hidden: true }
+  - { args: [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 7], expected: 6, hidden: true }

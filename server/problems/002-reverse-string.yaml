@@ -9,9 +9,6 @@ description: |
 
   You must do this by modifying the input array in-place with O(1) extra memory.
 
-  **Input format:** A JSON array of single-character strings.
-  **Output format:** The reversed array as compact JSON, e.g. `["o","l","l","e","h"]`.
-
   **Example 1:**
   ```
   Input: ["h","e","l","l","o"]
@@ -23,31 +20,27 @@ description: |
   Input: ["H","a","n","n","a","h"]
   Output: ["h","a","n","n","a","H"]
   ```
-languages:
-  javascript:
-    prefix: |
-      const input = require('fs').readFileSync(0, 'utf8');
-      const s = JSON.parse(input.trim());
-    body: |
-      function reverseString(s) {
-        // Modify s in-place. Return value is ignored.
-      }
-    suffix: |
-      reverseString(s);
-      console.log(JSON.stringify(s));
-  python:
-    prefix: |
-      import sys, json
-
-      s = json.loads(sys.stdin.read().strip())
-    body: |
-      def reverse_string(s):
-          # Modify s in-place. Return value is ignored.
-          pass
-    suffix: |
-      reverse_string(s)
-      print(json.dumps(s, separators=(',', ':')))
-testCases:
-  - { input: '["h","e","l","l","o"]',         expectedOutput: '["o","l","l","e","h"]',         hidden: false }
-  - { input: '["H","a","n","n","a","h"]',     expectedOutput: '["h","a","n","n","a","H"]',     hidden: false }
-  - { input: '["a"]',                          expectedOutput: '["a"]',                          hidden: true }
+signature:
+  name:
+    javascript: reverseString
+    python: reverse_string
+  params:
+    - { name: s, type: 'string[]' }
+  returns: 'string[]'
+  # The function mutates s in-place and returns nothing useful.
+  # The generated suffix emits s (args[0]) after the call, so we grade
+  # the post-mutation array.
+  mutatesArg: 0
+starter:
+  javascript: |
+    function reverseString(s) {
+      // Modify s in-place. Return value is ignored.
+    }
+  python: |
+    def reverse_string(s):
+        # Modify s in-place. Return value is ignored.
+        pass
+tests:
+  - { args: [["h", "e", "l", "l", "o"]],         expected: ["o", "l", "l", "e", "h"] }
+  - { args: [["H", "a", "n", "n", "a", "h"]],    expected: ["h", "a", "n", "n", "a", "H"] }
+  - { args: [["a"]],                              expected: ["a"], hidden: true }

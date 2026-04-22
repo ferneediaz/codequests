@@ -111,6 +111,8 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
   - New `{ lang: { prefix, body, suffix } }`
 - [x] Updated `CodeEditor` to expose/edit only `body` while preserving hidden IO harness server-side
 - [x] Updated battle/practice flow to use parsed body starters consistently
+- [x] Upgraded authoring model to v2 signature-based YAMLs (`signature`, `starter`, `tests`) while keeping v1 compatibility
+- [x] Console panel now shows per-test debug `stdout` and `stderr` separately from graded answer output
 
 ### Follow-ups:
 

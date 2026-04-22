@@ -12,54 +12,43 @@ description: |
   2. Open brackets must be closed in the correct order.
   3. Every close bracket has a corresponding open bracket of the same type.
 
-  **Input format:** A single line containing the string `s`.
-  **Output format:** Literal `true` or `false`.
-
   **Example 1:**
   ```
-  Input: ()
+  Input: "()"
   Output: true
   ```
 
   **Example 2:**
   ```
-  Input: ()[]{}
+  Input: "()[]{}"
   Output: true
   ```
 
   **Example 3:**
   ```
-  Input: (]
+  Input: "(]"
   Output: false
   ```
-languages:
-  javascript:
-    prefix: |
-      const input = require('fs').readFileSync(0, 'utf8');
-      const s = input.replace(/\n$/, '');
-    body: |
-      function isValid(s) {
-        // Your code here
-        return false;
-      }
-    suffix: |
-      console.log(isValid(s) ? 'true' : 'false');
-  python:
-    prefix: |
-      import sys
-
-      s = sys.stdin.read()
-      if s.endswith('\n'):
-          s = s[:-1]
-    body: |
-      def is_valid(s):
-          # Your code here
-          return False
-    suffix: |
-      print('true' if is_valid(s) else 'false')
-testCases:
-  - { input: "()",       expectedOutput: "true",  hidden: false }
-  - { input: "()[]{}",   expectedOutput: "true",  hidden: false }
-  - { input: "(]",       expectedOutput: "false", hidden: false }
-  - { input: "{[()]}",   expectedOutput: "true",  hidden: true }
-  - { input: "([)]",     expectedOutput: "false", hidden: true }
+signature:
+  name:
+    javascript: isValid
+    python: is_valid
+  params:
+    - { name: s, type: string }
+  returns: bool
+starter:
+  javascript: |
+    function isValid(s) {
+      // Your code here
+      return false;
+    }
+  python: |
+    def is_valid(s):
+        # Your code here
+        return False
+tests:
+  - { args: ["()"],        expected: true }
+  - { args: ["()[]{}"],    expected: true }
+  - { args: ["(]"],        expected: false }
+  - { args: ["{[()]}"],    expected: true,  hidden: true }
+  - { args: ["([)]"],      expected: false, hidden: true }

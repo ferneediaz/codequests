@@ -137,7 +137,16 @@ npm run test:integration
 
 Problems live in YAML files under [`server/problems/`](./problems). Each file is the source of truth for one problem — the importer upserts it into the DB by stable `id`.
 
-### Workflow
+**Full authoring guide (v2 format, supported types, in-place mutation, adding a language):** [`server/problems/README.md`](./problems/README.md).
+
+### Two formats at a glance
+
+- **v2 (signature)** — recommended. Declare a typed function signature and structured `tests: [{ args, expected }]`. The server generates the IO harness. Zero stdin/stdout plumbing in the YAML.
+- **v1 (harness)** — legacy. You write `prefix`/`body`/`suffix` plus raw stdin/stdout test cases by hand. Kept working, but do not use it for new problems.
+
+The two are discriminated by the presence of a top-level `signature` block.
+
+### v2 workflow
 
 1. **Write the YAML.** Copy an existing file (e.g. [`problems/001-two-sum.yaml`](./problems/001-two-sum.yaml)) and edit. The schema lives in [`src/problems/authoring/problem-yaml.schema.ts`](./src/problems/authoring/problem-yaml.schema.ts).
 
@@ -148,32 +157,25 @@ Problems live in YAML files under [`server/problems/`](./problems). Each file is
     tags: [arrays]
     description: |
       Markdown-formatted problem statement...
-    languages:
-      javascript:
-        prefix: |                        # reads stdin, prepares variables
-          const input = require('fs').readFileSync(0, 'utf8');
-          const n = parseInt(input, 10);
-        body: |                          # what the solver sees + edits
-          function solve(n) {
-            return 0;
-          }
-        suffix: |                        # calls the function, prints result
-          console.log(solve(n));
-      python:
-        prefix: |
-          import sys
-          n = int(sys.stdin.read())
-        body: |
-          def solve(n):
-              return 0
-        suffix: |
-          print(solve(n))
-    testCases:
-      - { input: "1", expectedOutput: "0", hidden: false }
-      - { input: "5", expectedOutput: "4", hidden: true }
+    signature:
+      name: { javascript: solve, python: solve }
+      params:
+        - { name: n, type: int }
+      returns: int
+    starter:
+      javascript: |
+        function solve(n) {
+          return 0;
+        }
+      python: |
+        def solve(n):
+            return 0
+    tests:
+      - { args: [1], expected: 0 }
+      - { args: [5], expected: 4, hidden: true }
     ```
 
-    Only `body` is shown in the editor; `prefix + body + suffix` is stitched server-side and run through Piston.
+    Only the body of your function is shown in the editor; the server stitches a generated `prefix`/`suffix` around it before running Piston. Users can freely `console.log` / `print` to debug — output is captured separately from the answer via a `<<<CQ_ANSWER>>>` sentinel and routed to the Console tab, so debug output never breaks grading.
 
 2. **Try it locally in the author preview UI.** Start server and client with the author flag:
 
@@ -185,7 +187,7 @@ Problems live in YAML files under [`server/problems/`](./problems). Each file is
     npm run dev
     ```
 
-    Open <http://localhost:5173/author> for the list, or jump straight to `/author/problems/<id>`. The page shows three Monaco panes (prefix read-only, body editable, suffix read-only), an editable test-case table, and a "Run all tests" button that hits `POST /api/author/dry-run`. No DB writes happen during a dry-run. Without `ENABLE_AUTHOR_TOOLS=true` the endpoints 404.
+    Open <http://localhost:5173/author> for the list, or jump straight to `/author/problems/<id>`. The `POST /api/author/dry-run` endpoint accepts both the v2 payload (`{signature, body, tests}`) and the legacy v1 payload (`{prefix, body, suffix, testCases}`). No DB writes happen during a dry-run. Without `ENABLE_AUTHOR_TOOLS=true` the endpoints 404.
 
 3. **Import into the DB.** Once the dry-run looks good:
 
@@ -202,7 +204,8 @@ Problems live in YAML files under [`server/problems/`](./problems). Each file is
 - IDs must be unique across all files. Duplicate IDs fail the importer loudly.
 - Test cases are delete-and-created on every import — do not store anything else under the `TestCase` relation that you care about preserving.
 - `hidden: true` test cases are not shown to solvers on failure.
-- Supported languages today: `javascript`, `python`. Add new ones by extending `SUPPORTED_LANGUAGES` in `problem-yaml.schema.ts`.
+- Supported languages today: `javascript`, `python`. See [`server/problems/README.md`](./problems/README.md#adding-a-new-language) for how to add a new one (it's a single template function in `harness-codegen.ts`; no YAML edits needed).
+- For problems that mutate an argument in-place (e.g. Reverse String), set `signature.mutatesArg: <paramIndex>` and the generated suffix will grade the post-call value of that argument instead of the function's return.
 
 ---
 

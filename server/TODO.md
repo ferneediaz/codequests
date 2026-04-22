@@ -118,6 +118,14 @@ Local-first authoring workflow for defining problems in YAML, previewing them, a
 - [ ] Add CI job to run YAML validation + importer dry-run on PRs
 - [ ] Add reference-solution verification per YAML problem before import
 
+### v2 authoring + console UX improvements (newly completed):
+
+- [x] Migrated all seed YAMLs from v1 `{languages.{prefix,body,suffix}, testCases}` to v2 `{signature, starter, tests}`
+- [x] Added v2 codegen (`harness-codegen.ts`) for JS/Python with `<<<CQ_ANSWER>>>` marker protocol
+- [x] Kept v1 backward compatibility in schema/loader/importer and dry-run endpoint
+- [x] Added JSON-canonical output comparison to avoid whitespace/formatting false negatives
+- [x] Split debug stdout from graded answer and surfaced per-test `stdout`/`stderr` in API + UI Console panel
+
 ---
 
 ## ✅ Battle System - COMPLETED
@@ -1235,15 +1243,15 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [x] Subscription/Stripe module working ✅
 - [x] Skills system working (5 skills, single-use, toggleable per game) ✅
 - [x] Rank tiers implemented (Bug → Cracked) ✅
-- [ ] Direct invite system working (link + in-app)
+- [x] Direct invite system working (link + in-app) ✅
 - [x] MMR rebalance (K=16, floor at 0)
 - [x] Topic tags and filtering
 - [x] Seasons system (3-month cycles, hard reset, leaderboards)
-- [ ] **All tests passing**
+- [x] **All tests passing** ✅
 
 ### Phase 4: Social Features
 - [x] Friends system working (request/accept/remove, online status) ✅
-- [ ] Chat system working (battle, lobby, DM)
+- [x] Chat system working (battle, lobby, DM) ✅
 - [x] Clan challenges working (send/accept/decline/counter, negotiable settings) ✅
 - [ ] Push notifications working
 - [ ] **All tests passing**

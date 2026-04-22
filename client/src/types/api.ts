@@ -82,6 +82,11 @@ export interface TestCaseResult {
     input: string;
     expectedOutput: string;
     actualOutput?: string;
+    /** User's `console.log` / `print` output for this test case, routed
+     * to the Console tab. Empty for v1 problems. */
+    stdout?: string | null;
+    /** Captured stderr (runtime + compile). Shown in red in the console. */
+    stderr?: string | null;
     error?: string;
     executionTime?: number;
 }

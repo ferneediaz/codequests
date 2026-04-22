@@ -9,46 +9,35 @@ description: |
 
   Given a string `s`, return `true` if it is a palindrome, or `false` otherwise.
 
-  **Input format:** A single line containing the string `s`.
-  **Output format:** Literal `true` or `false`.
-
   **Example 1:**
   ```
-  Input: A man, a plan, a canal: Panama
+  Input: "A man, a plan, a canal: Panama"
   Output: true
   ```
 
   **Example 2:**
   ```
-  Input: race a car
+  Input: "race a car"
   Output: false
   ```
-languages:
-  javascript:
-    prefix: |
-      const input = require('fs').readFileSync(0, 'utf8');
-      const s = input.replace(/\n$/, '');
-    body: |
-      function isPalindrome(s) {
-        // Your code here
-        return false;
-      }
-    suffix: |
-      console.log(isPalindrome(s) ? 'true' : 'false');
-  python:
-    prefix: |
-      import sys
-
-      s = sys.stdin.read()
-      if s.endswith('\n'):
-          s = s[:-1]
-    body: |
-      def is_palindrome(s):
-          # Your code here
-          return False
-    suffix: |
-      print('true' if is_palindrome(s) else 'false')
-testCases:
-  - { input: "A man, a plan, a canal: Panama", expectedOutput: "true",  hidden: false }
-  - { input: "race a car",                     expectedOutput: "false", hidden: false }
-  - { input: " ",                              expectedOutput: "true",  hidden: true }
+signature:
+  name:
+    javascript: isPalindrome
+    python: is_palindrome
+  params:
+    - { name: s, type: string }
+  returns: bool
+starter:
+  javascript: |
+    function isPalindrome(s) {
+      // Your code here
+      return false;
+    }
+  python: |
+    def is_palindrome(s):
+        # Your code here
+        return False
+tests:
+  - { args: ["A man, a plan, a canal: Panama"], expected: true }
+  - { args: ["race a car"],                     expected: false }
+  - { args: [" "],                              expected: true, hidden: true }

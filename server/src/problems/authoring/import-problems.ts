@@ -1,6 +1,11 @@
 #!/usr/bin/env ts-node
 import { PrismaClient } from '@prisma/client';
-import { loadAllProblems, toStarterCodeMap } from './problem-loader';
+import {
+    loadAllProblems,
+    problemFormatLabel,
+    toImportTestCases,
+    toStarterCodeMap,
+} from './problem-loader';
 import { serializeStarterCode } from '../../code-execution/starter-code';
 
 /**
@@ -11,6 +16,10 @@ import { serializeStarterCode } from '../../code-execution/starter-code';
  *   - Test cases are replaced wholesale (delete-then-create). This keeps
  *     semantics simple: the YAML file is the source of truth, importing it
  *     always produces the same DB state regardless of prior runs.
+ *
+ * Both v1 (hand-written harness) and v2 (signature + structured tests)
+ * YAML formats feed through the same helpers in `problem-loader.ts`, so
+ * this CLI does not care which format the author used.
  *
  * Exits non-zero on the first validation failure so CI can block deploys
  * on a malformed problem file.
@@ -28,6 +37,7 @@ async function main() {
 
         for (const { filename, problem } of loaded) {
             const starterCode = serializeStarterCode(toStarterCodeMap(problem));
+            const testCases = toImportTestCases(problem);
 
             await prisma.problem.upsert({
                 where: { id: problem.id },
@@ -50,7 +60,7 @@ async function main() {
 
             await prisma.testCase.deleteMany({ where: { problemId: problem.id } });
             await prisma.testCase.createMany({
-                data: problem.testCases.map((tc) => ({
+                data: testCases.map((tc) => ({
                     problemId: problem.id,
                     input: tc.input,
                     expectedOutput: tc.expectedOutput,
@@ -59,7 +69,7 @@ async function main() {
             });
 
             console.log(
-                `  ✓ ${filename} -> ${problem.id} (${problem.difficulty}, ${problem.testCases.length} tests)`,
+                `  ✓ ${filename} -> ${problem.id} (${problem.difficulty}, ${testCases.length} tests, ${problemFormatLabel(problem)})`,
             );
         }
 

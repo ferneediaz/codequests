@@ -1,8 +1,17 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { ProblemYaml, ProblemYamlSchema } from './problem-yaml.schema';
+import {
+    ProblemYaml,
+    ProblemYamlSchema,
+    isV2Problem,
+} from './problem-yaml.schema';
 import { StarterCodeMap } from '../../code-execution/starter-code';
+import {
+    encodeTestExpected,
+    encodeTestInput,
+    generateStarterCodeMap,
+} from './harness-codegen';
 
 /**
  * Location of YAML problem definitions, resolved relative to the repo root
@@ -14,6 +23,13 @@ export const PROBLEMS_DIR = path.resolve(__dirname, '../../../problems');
 export interface LoadedProblem {
     filename: string;
     problem: ProblemYaml;
+}
+
+/** Test case as stored in the DB / sent to Piston (stdin + expected stdout). */
+export interface ImportTestCase {
+    input: string;
+    expectedOutput: string;
+    hidden: boolean;
 }
 
 /**
@@ -92,10 +108,14 @@ export function loadProblemById(
 }
 
 /**
- * Convert the YAML `languages` block into the JSON shape we store in
- * `Problem.starterCode` on the DB row.
+ * Convert a parsed problem (v1 or v2) into the JSON shape we store in
+ * `Problem.starterCode`. v1 is a direct copy; v2 is compiled via codegen.
  */
 export function toStarterCodeMap(problem: ProblemYaml): StarterCodeMap {
+    if (isV2Problem(problem)) {
+        return generateStarterCodeMap(problem);
+    }
+
     const map: StarterCodeMap = {};
     for (const [lang, starter] of Object.entries(problem.languages)) {
         if (!starter) continue;
@@ -106,4 +126,30 @@ export function toStarterCodeMap(problem: ProblemYaml): StarterCodeMap {
         };
     }
     return map;
+}
+
+/**
+ * Convert a parsed problem (v1 or v2) into the flat list of test cases
+ * stored in the `TestCase` table. v2 tests have their `args`/`expected`
+ * JSON-encoded into the same `input`/`expectedOutput` strings the legacy
+ * pipeline already understands.
+ */
+export function toImportTestCases(problem: ProblemYaml): ImportTestCase[] {
+    if (isV2Problem(problem)) {
+        return problem.tests.map((t) => ({
+            input: encodeTestInput(t.args),
+            expectedOutput: encodeTestExpected(t.expected),
+            hidden: t.hidden,
+        }));
+    }
+    return problem.testCases.map((tc) => ({
+        input: tc.input,
+        expectedOutput: tc.expectedOutput,
+        hidden: tc.hidden,
+    }));
+}
+
+/** Human-facing label for logs: "(v2 signature)" vs "(v1 harness)". */
+export function problemFormatLabel(problem: ProblemYaml): string {
+    return isV2Problem(problem) ? 'v2 signature' : 'v1 harness';
 }

@@ -8,54 +8,43 @@ tags:
 description: |
   Given a string `s`, find the length of the longest substring without repeating characters.
 
-  **Input format:** A single line containing the string `s` (may be empty).
-  **Output format:** A single integer.
-
   **Example 1:**
   ```
-  Input: abcabcbb
+  Input: "abcabcbb"
   Output: 3
   ```
 
   **Example 2:**
   ```
-  Input: bbbbb
+  Input: "bbbbb"
   Output: 1
   ```
 
   **Example 3:**
   ```
-  Input: pwwkew
+  Input: "pwwkew"
   Output: 3
   ```
-languages:
-  javascript:
-    prefix: |
-      const input = require('fs').readFileSync(0, 'utf8');
-      const s = input.replace(/\n$/, '');
-    body: |
-      function lengthOfLongestSubstring(s) {
-        // Your code here
-        return 0;
-      }
-    suffix: |
-      console.log(lengthOfLongestSubstring(s));
-  python:
-    prefix: |
-      import sys
-
-      s = sys.stdin.read()
-      if s.endswith('\n'):
-          s = s[:-1]
-    body: |
-      def length_of_longest_substring(s):
-          # Your code here
-          return 0
-    suffix: |
-      print(length_of_longest_substring(s))
-testCases:
-  - { input: "abcabcbb", expectedOutput: "3", hidden: false }
-  - { input: "bbbbb",    expectedOutput: "1", hidden: false }
-  - { input: "pwwkew",   expectedOutput: "3", hidden: false }
-  - { input: "dvdf",     expectedOutput: "3", hidden: true }
-  - { input: "",         expectedOutput: "0", hidden: true }
+signature:
+  name:
+    javascript: lengthOfLongestSubstring
+    python: length_of_longest_substring
+  params:
+    - { name: s, type: string }
+  returns: int
+starter:
+  javascript: |
+    function lengthOfLongestSubstring(s) {
+      // Your code here
+      return 0;
+    }
+  python: |
+    def length_of_longest_substring(s):
+        # Your code here
+        return 0
+tests:
+  - { args: ["abcabcbb"], expected: 3 }
+  - { args: ["bbbbb"],    expected: 1 }
+  - { args: ["pwwkew"],   expected: 3 }
+  - { args: ["dvdf"],     expected: 3, hidden: true }
+  - { args: [""],         expected: 0, hidden: true }
