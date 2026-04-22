@@ -144,7 +144,7 @@ export class CreateBattleDto {
         type: [RoundConfigDto],
     })
     @IsArray()
-    @ArrayMinSize(1)
+    @ArrayMinSize(2)
     @ValidateNested({ each: true })
     @Type(() => RoundConfigDto)
     @IsOptional()

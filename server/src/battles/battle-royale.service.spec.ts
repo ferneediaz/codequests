@@ -209,6 +209,14 @@ describe('BattleRoyaleService', () => {
             expect(() => service.validateConfig(dto)).toThrow(/rounds/);
         });
 
+        it('rejects single-round configs (Battle Royale requires at least 2 rounds)', () => {
+            const dto = makeConfig({
+                maxPlayers: 8,
+                rounds: [{ timeLimitSeconds: 600, eliminateCount: 7 }],
+            });
+            expect(() => service.validateConfig(dto)).toThrow(/at least two round/);
+        });
+
         it('rejects rounds.length > maxPlayers - 1', () => {
             const dto = makeConfig({
                 maxPlayers: 3,
@@ -309,14 +317,12 @@ describe('BattleRoyaleService', () => {
             expect(() => service.validateConfig(dto)).not.toThrow();
         });
 
-        it('rejects a single-round config that skips the 1v1 finale (e.g., 8p [7])', () => {
-            // This used to be allowed, but Battle Royale must end in a 1v1 —
-            // a single round of 8→1 is not a 1v1 finale.
+        it('rejects a single-round config (e.g., 8p [7]) even if eliminations sum correctly', () => {
             const dto = makeConfig({
                 maxPlayers: 8,
                 rounds: [{ timeLimitSeconds: 600, eliminateCount: 7 }],
             });
-            expect(() => service.validateConfig(dto)).toThrow(/1v1/);
+            expect(() => service.validateConfig(dto)).toThrow(/at least two round/);
         });
 
         it('rejects a config where the last round eliminates more than 1 (not a 1v1)', () => {

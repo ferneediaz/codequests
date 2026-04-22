@@ -164,7 +164,7 @@ export class BattleRoyaleService {
      *  - mode === BATTLE_ROYALE
      *  - battleRoyaleFormat provided
      *  - maxPlayers in [3, 50]
-     *  - rounds.length >= 1 and <= maxPlayers - 1
+     *  - rounds.length >= 2 and <= maxPlayers - 1
      *  - every timeLimitSeconds in [10, 7200]
      *  - every eliminateCount >= 0
      *  - sum(eliminateCount) === maxPlayers - 1 (exactly one winner)
@@ -197,9 +197,9 @@ export class BattleRoyaleService {
             );
         }
         const rounds = dto.rounds;
-        if (!rounds || rounds.length === 0) {
+        if (!rounds || rounds.length < 2) {
             throw new BadRequestException(
-                'rounds must contain at least one round configuration',
+                'rounds must contain at least two round configurations',
             );
         }
         if (rounds.length > dto.maxPlayers - 1) {
