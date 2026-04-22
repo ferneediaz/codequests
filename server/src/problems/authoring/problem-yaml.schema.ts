@@ -3,38 +3,16 @@ import { z } from 'zod';
 /**
  * Schema for a YAML problem definition in `server/problems/*.yaml`.
  *
- * Two authoring formats are accepted side-by-side:
- *
- * v1 ("harness") — legacy. The author writes the full IO harness per
- * language: `prefix` (reads stdin) + `body` (function shell) + `suffix`
- * (calls the function, prints the answer). Test cases are raw stdin/stdout
- * strings. Duplicative to maintain at scale.
- *
- * v2 ("signature") — LeetCode-style. The author declares a typed function
- * signature, the per-language `starter` function body, and structured
- * `tests` (actual arg values + expected return). The server generates the
- * IO harness from the signature, so authors never touch stdin/stdout.
- *
- * The two shapes are discriminated by the presence of a top-level
- * `signature` field. Both compile down to the same on-disk storage
- * (`starterCode` JSON + `TestCase` rows), so the DB never needs to know
- * which format was used.
+ * v2 (signature) — the only supported format. The author declares a typed
+ * function signature, the per-language `starter` function body, and
+ * structured `tests` (args + expected return). The server generates the IO
+ * harness from the signature via `harness-codegen.ts`.
  */
-
-// =============================================================================
-// v1 (legacy harness) schema
-// =============================================================================
 
 const LanguageStarterSchema = z.object({
     prefix: z.string(),
     body: z.string(),
     suffix: z.string(),
-});
-
-const TestCaseSchema = z.object({
-    input: z.string(),
-    expectedOutput: z.string(),
-    hidden: z.boolean().default(false),
 });
 
 export const DifficultyEnum = z.enum(['EASY', 'MEDIUM', 'HARD']);
@@ -57,7 +35,6 @@ const BaseProblemSchema = z.object({
 });
 
 /**
- * Helper: build a "pick one or more of the supported languages" schema.
  * zod v4's `z.record(z.enum(...))` treats every enum key as required, so
  * we use an explicit object-with-optionals + a non-empty refinement.
  */
@@ -73,25 +50,8 @@ function languageMapSchema<T extends z.ZodTypeAny>(valueSchema: T) {
         );
 }
 
-export const ProblemYamlV1Schema = BaseProblemSchema.extend({
-    languages: languageMapSchema(LanguageStarterSchema),
-    testCases: z.array(TestCaseSchema).min(1, 'At least one test case required'),
-});
-
-// =============================================================================
-// v2 (signature) schema
-// =============================================================================
-
 /**
  * Supported parameter/return types for generated harnesses.
- *
- * Both JS and Python consume/emit JSON natively, so at runtime these names
- * are documentation for the author plus a hint for the codegen to pick the
- * right helper (e.g. `float` forces `float()` cast in Python to avoid
- * accidental `int` when the JSON literal happens to be whole).
- *
- * `any` is an escape hatch for problems where the argument shape is
- * richer than the cheap type system here (e.g. heterogeneous tuples).
  */
 export const PARAM_TYPES = [
     'int',
@@ -125,12 +85,6 @@ const SignatureSchema = z.object({
     name: SignatureNameSchema,
     params: z.array(ParamSchema),
     returns: ParamTypeSchema,
-    /**
-     * Index into `params` of an argument that the user's function mutates
-     * in-place (e.g. `reverseString`). When set, the generated suffix
-     * ignores the function's return value and emits the post-call value of
-     * that argument instead.
-     */
     mutatesArg: z.number().int().nonnegative().optional(),
 });
 
@@ -178,31 +132,11 @@ export const ProblemYamlV2Schema = BaseProblemSchema.extend({
     }
 });
 
-// =============================================================================
-// Union + helpers
-// =============================================================================
+/** Alias — all problems on disk are v2. */
+export const ProblemYamlSchema = ProblemYamlV2Schema;
 
-/**
- * The union accepted by the importer/loader. Discriminated by presence of
- * the top-level `signature` key: v2 when present, v1 otherwise.
- */
-export const ProblemYamlSchema = z.union([
-    ProblemYamlV2Schema,
-    ProblemYamlV1Schema,
-]);
-
-export type ProblemYamlV1 = z.infer<typeof ProblemYamlV1Schema>;
 export type ProblemYamlV2 = z.infer<typeof ProblemYamlV2Schema>;
-export type ProblemYaml = ProblemYamlV1 | ProblemYamlV2;
+export type ProblemYaml = ProblemYamlV2;
 export type LanguageStarterDefinition = z.infer<typeof LanguageStarterSchema>;
-export type TestCaseDefinition = z.infer<typeof TestCaseSchema>;
 export type SignatureDefinition = z.infer<typeof SignatureSchema>;
 export type StructuredTestCase = z.infer<typeof StructuredTestCaseSchema>;
-
-/**
- * Narrow a parsed problem to v2. Useful for importer/controller code that
- * wants to branch on format.
- */
-export function isV2Problem(problem: ProblemYaml): problem is ProblemYamlV2 {
-    return 'signature' in problem;
-}

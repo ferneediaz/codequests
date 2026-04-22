@@ -1,11 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import {
-    ProblemYaml,
-    ProblemYamlSchema,
-    isV2Problem,
-} from './problem-yaml.schema';
+import { ProblemYaml, ProblemYamlSchema } from './problem-yaml.schema';
 import { StarterCodeMap } from '../../code-execution/starter-code';
 import {
     encodeTestExpected,
@@ -108,48 +104,20 @@ export function loadProblemById(
 }
 
 /**
- * Convert a parsed problem (v1 or v2) into the JSON shape we store in
- * `Problem.starterCode`. v1 is a direct copy; v2 is compiled via codegen.
+ * Compile signature YAML into the JSON shape stored in `Problem.starterCode`.
  */
 export function toStarterCodeMap(problem: ProblemYaml): StarterCodeMap {
-    if (isV2Problem(problem)) {
-        return generateStarterCodeMap(problem);
-    }
-
-    const map: StarterCodeMap = {};
-    for (const [lang, starter] of Object.entries(problem.languages)) {
-        if (!starter) continue;
-        map[lang] = {
-            prefix: starter.prefix,
-            body: starter.body,
-            suffix: starter.suffix,
-        };
-    }
-    return map;
+    return generateStarterCodeMap(problem);
 }
 
 /**
- * Convert a parsed problem (v1 or v2) into the flat list of test cases
- * stored in the `TestCase` table. v2 tests have their `args`/`expected`
- * JSON-encoded into the same `input`/`expectedOutput` strings the legacy
- * pipeline already understands.
+ * Map structured tests to the flat rows stored in `TestCase` (JSON stdin +
+ * expected JSON stdout).
  */
 export function toImportTestCases(problem: ProblemYaml): ImportTestCase[] {
-    if (isV2Problem(problem)) {
-        return problem.tests.map((t) => ({
-            input: encodeTestInput(t.args),
-            expectedOutput: encodeTestExpected(t.expected),
-            hidden: t.hidden,
-        }));
-    }
-    return problem.testCases.map((tc) => ({
-        input: tc.input,
-        expectedOutput: tc.expectedOutput,
-        hidden: tc.hidden,
+    return problem.tests.map((t) => ({
+        input: encodeTestInput(t.args),
+        expectedOutput: encodeTestExpected(t.expected),
+        hidden: t.hidden,
     }));
-}
-
-/** Human-facing label for logs: "(v2 signature)" vs "(v1 harness)". */
-export function problemFormatLabel(problem: ProblemYaml): string {
-    return isV2Problem(problem) ? 'v2 signature' : 'v1 harness';
 }

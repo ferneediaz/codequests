@@ -3,6 +3,8 @@ import {
     NotFoundException,
     BadRequestException,
     ForbiddenException,
+    Inject,
+    forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
@@ -13,6 +15,7 @@ import { BattleMode, BattleStatus, Difficulty, SkillType } from '@prisma/client'
 import { CreateBattleDto } from './dto/create-battle.dto';
 import { getRankTier } from '../common/utils/rank-tiers';
 import { randomBytes } from 'crypto';
+import { BattleRoyaleService } from './battle-royale.service';
 
 // K-factor for Elo calculation (higher = more volatile ratings)
 const ELO_K_FACTOR = 16;
@@ -52,6 +55,8 @@ export class BattlesService {
         private subscriptionsService: SubscriptionsService,
         private seasonsService: SeasonsService,
         private problemsService: ProblemsService,
+        @Inject(forwardRef(() => BattleRoyaleService))
+        private battleRoyaleService: BattleRoyaleService,
     ) { }
 
     /**
@@ -94,6 +99,17 @@ export class BattlesService {
      * Create a new battle
      */
     async createBattle(userId: string, dto: CreateBattleDto) {
+        const mode = dto.mode || BattleMode.ONE_V_ONE;
+
+        // Battle Royale: delegate to the dedicated service. It handles the
+        // subscription gate, config validation, and round creation.
+        if (mode === BattleMode.BATTLE_ROYALE) {
+            return this.battleRoyaleService.createRoyaleBattle(userId, {
+                ...dto,
+                mode: BattleMode.BATTLE_ROYALE,
+            });
+        }
+
         // Check if user can play (subscription / daily limit)
         const canPlay = await this.subscriptionsService.canPlay(userId);
         if (!canPlay) {
@@ -101,8 +117,6 @@ export class BattlesService {
                 'Daily free game limit reached. Upgrade to Pro for unlimited games.',
             );
         }
-
-        const mode = dto.mode || BattleMode.ONE_V_ONE;
         const isTeam = this.isTeamMode(mode);
 
         // Validation based on mode
@@ -346,6 +360,10 @@ export class BattlesService {
             }
         }
 
+        if (battle.mode === BattleMode.BATTLE_ROYALE) {
+            this.battleRoyaleService.enforceRoyaleJoinCap(battle);
+        }
+
         // Determine team assignment for team modes
         let teamId: string | null = null;
         if (isTeam && battle.teamSize) {
@@ -535,6 +553,18 @@ export class BattlesService {
 
         if (!battle) {
             throw new NotFoundException(`Battle with ID ${battleId} not found`);
+        }
+
+        // Battle Royale: delegate to the dedicated service for round-aware
+        // submission handling, upsert-best semantics, and round-end evaluation.
+        if (battle.mode === BattleMode.BATTLE_ROYALE) {
+            return this.battleRoyaleService.submitRoyaleRound(
+                battleId,
+                userId,
+                code,
+                language,
+                problemId,
+            );
         }
 
         // Check battle is in progress
@@ -1251,7 +1281,7 @@ export class BattlesService {
      */
     async readyUp(battleId: string, userId: string) {
         // Use a transaction to prevent race conditions when multiple players ready up simultaneously
-        const allReady = await this.prisma.$transaction(async (tx) => {
+        const { allReady, isRoyale } = await this.prisma.$transaction(async (tx) => {
             const battle = await tx.battle.findUnique({
                 where: { id: battleId },
                 include: {
@@ -1281,6 +1311,15 @@ export class BattlesService {
                 throw new BadRequestException('Not enough players to ready up');
             }
 
+            // For Battle Royale, require full lobby before anyone can ready up so
+            // the game always starts with maxPlayers exactly.
+            const royale = battle.mode === BattleMode.BATTLE_ROYALE;
+            if (royale && battle.maxPlayers && battle.participants.length < battle.maxPlayers) {
+                throw new BadRequestException(
+                    `Battle Royale lobby is not full (${battle.participants.length}/${battle.maxPlayers})`,
+                );
+            }
+
             // Mark this participant as ready
             await tx.battleParticipant.update({
                 where: { id: participant.id },
@@ -1292,8 +1331,9 @@ export class BattlesService {
                 .filter((p) => p.userId !== userId)
                 .every((p) => p.isReady);
 
-            if (otherReady) {
-                // Increment daily game counts for all participants
+            if (otherReady && !royale) {
+                // Increment daily game counts for all participants (BR does this
+                // inside startRoyale to keep the BR path self-contained).
                 for (const p of battle.participants) {
                     await this.subscriptionsService.incrementGamesPlayed(p.userId);
                 }
@@ -1308,8 +1348,14 @@ export class BattlesService {
                 });
             }
 
-            return otherReady;
+            return { allReady: otherReady, isRoyale: royale };
         });
+
+        // Start BR outside the tx since startRoyale itself persists a bunch of
+        // state, schedules timers, and emits websocket events.
+        if (allReady && isRoyale) {
+            await this.battleRoyaleService.startRoyale(battleId);
+        }
 
         return {
             battle: await this.getBattleDetails(battleId),

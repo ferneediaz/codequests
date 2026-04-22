@@ -5,31 +5,31 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import api from '@/services/api';
-import type { SubmissionResult } from '@/types/api';
+import type { LanguageStarter, SubmissionResult } from '@/types/api';
 
 type AuthoringLanguage = 'javascript' | 'python';
 const LANGUAGES: AuthoringLanguage[] = ['javascript', 'python'];
 
-interface LanguageStarter {
-    prefix: string;
-    body: string;
-    suffix: string;
-}
-
-interface ProblemYaml {
+/**
+ * v2 problem YAML + server-generated `harness` (prefix/body/suffix per
+ * language) from `GET /author/problems/:id`.
+ */
+interface AuthorProblemPayload {
     id: string;
     title: string;
     difficulty: 'EASY' | 'MEDIUM' | 'HARD';
     tags: string[];
     description: string;
-    languages: Partial<Record<AuthoringLanguage, LanguageStarter>>;
-    testCases: Array<{ input: string; expectedOutput: string; hidden?: boolean }>;
+    signature: unknown;
+    starter: Partial<Record<AuthoringLanguage, string>>;
+    tests: Array<{ args: unknown[]; expected: unknown; hidden: boolean }>;
+    harness: Record<string, LanguageStarter>;
 }
 
 interface TestRow {
     id: string;
-    input: string;
-    expectedOutput: string;
+    argsJson: string;
+    expectedJson: string;
 }
 
 const MONACO_LANG: Record<AuthoringLanguage, string> = {
@@ -37,11 +37,11 @@ const MONACO_LANG: Record<AuthoringLanguage, string> = {
     python: 'python',
 };
 
-function newRow(input = '', expected = ''): TestRow {
+function newRow(args: unknown[] = [], expected: unknown = null): TestRow {
     return {
         id: `row-${Math.random().toString(36).slice(2, 8)}`,
-        input,
-        expectedOutput: expected,
+        argsJson: JSON.stringify(args),
+        expectedJson: JSON.stringify(expected),
     };
 }
 
@@ -54,7 +54,7 @@ export default function AuthorPreview() {
     const { slug } = useParams<{ slug: string }>();
     const navigate = useNavigate();
 
-    const [problem, setProblem] = useState<ProblemYaml | null>(null);
+    const [problem, setProblem] = useState<AuthorProblemPayload | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [language, setLanguage] = useState<AuthoringLanguage>('javascript');
     const [body, setBody] = useState('');
@@ -63,11 +63,16 @@ export default function AuthorPreview() {
     const [result, setResult] = useState<SubmissionResult | null>(null);
     const initializedRef = useRef(false);
 
+    const availableLangs = useMemo(() => {
+        if (!problem) return LANGUAGES;
+        return LANGUAGES.filter((l) => problem.starter[l] != null);
+    }, [problem]);
+
     useEffect(() => {
         if (!slug) return;
         let cancelled = false;
         setLoadError(null);
-        api.get<ProblemYaml>(`/author/problems/${slug}`)
+        api.get<AuthorProblemPayload>(`/author/problems/${slug}`)
             .then(({ data }) => {
                 if (cancelled) return;
                 setProblem(data);
@@ -87,46 +92,73 @@ export default function AuthorPreview() {
         };
     }, [slug]);
 
-    // Seed body + test-case rows from the YAML the first time the problem loads
-    // or whenever the author switches language.
+    // Seed default language to first with a starter entry
     useEffect(() => {
         if (!problem) return;
-        const entry = problem.languages[language];
-        if (!entry) return;
-        setBody(entry.body);
+        if (!problem.starter[language] && availableLangs.length > 0) {
+            setLanguage(availableLangs[0]!);
+        }
+    }, [problem, language, availableLangs]);
+
+    // Seed body + test rows from the YAML the first time the problem loads
+    // or when the author switches language (body only).
+    useEffect(() => {
+        if (!problem) return;
+        const fnBody = problem.starter[language];
+        if (fnBody == null) return;
+        setBody(fnBody);
         if (!initializedRef.current) {
             setRows(
-                problem.testCases.length > 0
-                    ? problem.testCases.map((tc) => newRow(tc.input, tc.expectedOutput))
+                problem.tests.length > 0
+                    ? problem.tests.map((t) => newRow(t.args, t.expected))
                     : [newRow()],
             );
             initializedRef.current = true;
         }
     }, [problem, language]);
 
-    const currentStarter = useMemo<LanguageStarter | null>(() => {
+    const currentHarness = useMemo<LanguageStarter | null>(() => {
         if (!problem) return null;
-        return problem.languages[language] ?? null;
+        return problem.harness[language] ?? null;
     }, [problem, language]);
 
     const handleRun = useCallback(async () => {
-        if (!currentStarter) return;
-        const nonEmpty = rows.filter((r) => r.input.length > 0 || r.expectedOutput.length > 0);
-        if (nonEmpty.length === 0) {
-            toast.error('Add at least one test case with input or expected output');
+        if (!problem || !currentHarness) return;
+        if (rows.length === 0) {
+            toast.error('Add at least one test');
             return;
         }
+
+        const parsedTests: { args: unknown[]; expected: unknown }[] = [];
+        for (const row of rows) {
+            let args: unknown;
+            let expected: unknown;
+            try {
+                args = JSON.parse(row.argsJson) as unknown;
+            } catch {
+                toast.error('Invalid JSON in test args (must be a JSON array matching signature params)');
+                return;
+            }
+            if (!Array.isArray(args)) {
+                toast.error('Test args must be a JSON array');
+                return;
+            }
+            try {
+                expected = JSON.parse(row.expectedJson) as unknown;
+            } catch {
+                toast.error('Invalid JSON in expected value');
+                return;
+            }
+            parsedTests.push({ args, expected });
+        }
+
         try {
             setIsRunning(true);
             const { data } = await api.post<SubmissionResult>('/author/dry-run', {
                 language,
-                prefix: currentStarter.prefix,
+                signature: problem.signature,
                 body,
-                suffix: currentStarter.suffix,
-                testCases: nonEmpty.map((r) => ({
-                    input: r.input,
-                    expectedOutput: r.expectedOutput,
-                })),
+                tests: parsedTests,
             });
             setResult(data);
             if (data.allPassed) {
@@ -141,7 +173,7 @@ export default function AuthorPreview() {
         } finally {
             setIsRunning(false);
         }
-    }, [currentStarter, rows, body, language]);
+    }, [currentHarness, rows, body, language, problem]);
 
     const addRow = () => setRows((prev) => [...prev, newRow()]);
     const removeRow = (id: string) =>
@@ -160,7 +192,7 @@ export default function AuthorPreview() {
         );
     }
 
-    if (!problem || !currentStarter) {
+    if (!problem || !currentHarness) {
         return (
             <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -190,7 +222,7 @@ export default function AuthorPreview() {
                         onChange={(e) => setLanguage(e.target.value as AuthoringLanguage)}
                         className="rounded border border-border bg-background px-2 py-1 text-xs"
                     >
-                        {LANGUAGES.filter((l) => problem.languages[l]).map((lang) => (
+                        {availableLangs.map((lang) => (
                             <option key={lang} value={lang}>
                                 {lang}
                             </option>
@@ -217,13 +249,13 @@ export default function AuthorPreview() {
 
                 <div className="flex flex-col overflow-hidden">
                     <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-                        Prefix (read-only)
+                        Prefix (read-only, generated harness)
                     </div>
                     <div className="h-32 shrink-0 border-b border-border">
                         <Editor
                             height="100%"
                             language={MONACO_LANG[language]}
-                            value={currentStarter.prefix}
+                            value={currentHarness.prefix}
                             theme="vs-dark"
                             options={{
                                 readOnly: true,
@@ -254,13 +286,13 @@ export default function AuthorPreview() {
                         />
                     </div>
                     <div className="border-y border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-                        Suffix (read-only)
+                        Suffix (read-only, generated harness)
                     </div>
                     <div className="h-28 shrink-0">
                         <Editor
                             height="100%"
                             language={MONACO_LANG[language]}
-                            value={currentStarter.suffix}
+                            value={currentHarness.suffix}
                             theme="vs-dark"
                             options={{
                                 readOnly: true,
@@ -276,7 +308,7 @@ export default function AuthorPreview() {
                 <div className="flex flex-col overflow-hidden border-l border-border">
                     <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
                         <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                            Test cases ({rows.length})
+                            Tests: args (JSON) + expected (JSON)
                         </span>
                         <Button variant="ghost" size="sm" onClick={addRow}>
                             <Plus className="mr-1 h-3 w-3" /> Add
@@ -311,20 +343,22 @@ export default function AuthorPreview() {
                                         </button>
                                     </div>
                                     <label className="text-[10px] uppercase text-muted-foreground">
-                                        stdin
+                                        args
                                     </label>
                                     <textarea
-                                        value={row.input}
-                                        onChange={(e) => updateRow(row.id, { input: e.target.value })}
+                                        value={row.argsJson}
+                                        onChange={(e) =>
+                                            updateRow(row.id, { argsJson: e.target.value })
+                                        }
                                         className="mb-1 h-14 w-full resize-y rounded border border-border bg-background px-2 py-1 font-mono text-xs"
                                     />
                                     <label className="text-[10px] uppercase text-muted-foreground">
-                                        expected stdout
+                                        expected
                                     </label>
                                     <textarea
-                                        value={row.expectedOutput}
+                                        value={row.expectedJson}
                                         onChange={(e) =>
-                                            updateRow(row.id, { expectedOutput: e.target.value })
+                                            updateRow(row.id, { expectedJson: e.target.value })
                                         }
                                         className="h-10 w-full resize-y rounded border border-border bg-background px-2 py-1 font-mono text-xs"
                                     />

@@ -104,11 +104,9 @@ export interface ProblemResponse {
     description: string;
     difficulty: Difficulty;
     /**
-     * JSON string keyed by language. New shape is
-     * `{ javascript: { prefix, body, suffix }, ... }`. The editor only
-     * shows `body`; the server stitches prefix + body + suffix before
-     * executing. Legacy rows may still contain a flat `{ lang: fullProgram }`
-     * string — the shared parser handles both.
+     * JSON string keyed by language: `{ lang: { prefix, body, suffix } }` as
+     * written by the v2 problem importer. The editor only shows `body`;
+     * the server stitches prefix + body + suffix before execution.
      */
     starterCode: string;
     testCases?: {

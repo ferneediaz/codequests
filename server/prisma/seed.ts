@@ -1,8 +1,6 @@
+import '../src/load-server-env';
 import { PrismaClient } from '@prisma/client';
-import {
-    loadAllProblems,
-    toStarterCodeMap,
-} from '../src/problems/authoring/problem-loader';
+import { loadAllProblems, toImportTestCases, toStarterCodeMap } from '../src/problems/authoring/problem-loader';
 import { serializeStarterCode } from '../src/code-execution/starter-code';
 
 const prisma = new PrismaClient();
@@ -111,6 +109,7 @@ async function main() {
     const loaded = loadAllProblems();
     for (const { problem } of loaded) {
         const starterCode = serializeStarterCode(toStarterCodeMap(problem));
+        const testRows = toImportTestCases(problem);
 
         await prisma.problem.upsert({
             where: { id: problem.id },
@@ -133,7 +132,7 @@ async function main() {
 
         await prisma.testCase.deleteMany({ where: { problemId: problem.id } });
         await prisma.testCase.createMany({
-            data: problem.testCases.map((tc) => ({
+            data: testRows.map((tc) => ({
                 problemId: problem.id,
                 input: tc.input,
                 expectedOutput: tc.expectedOutput,
@@ -142,7 +141,7 @@ async function main() {
         });
 
         console.log(
-            `✅ Seeded problem: ${problem.title} (${problem.difficulty}) — ${problem.testCases.length} tests`,
+            `✅ Seeded problem: ${problem.title} (${problem.difficulty}) — ${testRows.length} tests`,
         );
     }
 

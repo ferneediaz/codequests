@@ -1,16 +1,12 @@
 /**
  * Starter code representation.
  *
- * Historically `Problem.starterCode` stored one full program string per
- * language (JSON-encoded `{ javascript: "<full program>", ... }`). The user
- * pasted their function inside markers and submitted the whole thing.
+ * `Problem.starterCode` is a JSON string:
+ * `{ javascript: { prefix, body, suffix }, python: { ... } }`.
+ * The client editor shows only `body`; the server stitches
+ * `prefix + userBody + suffix` before Piston runs.
  *
- * New shape: `{ javascript: { prefix, body, suffix }, ... }`. The editor
- * only shows the `body`; the server stitches `prefix + body + suffix` before
- * executing. This prevents users from accidentally deleting the IO harness.
- *
- * For safety during rollout we also accept the legacy string format and
- * auto-split it on the `YOUR CODE START/END` markers.
+ * Only this object shape is supported (v2 import output).
  */
 
 export interface LanguageStarter {
@@ -21,14 +17,9 @@ export interface LanguageStarter {
 
 export type StarterCodeMap = Record<string, LanguageStarter>;
 
-const MARKERS: Array<{ start: string; end: string }> = [
-    { start: '// ==== YOUR CODE START ====', end: '// ==== YOUR CODE END ====' },
-    { start: '# ==== YOUR CODE START ====', end: '# ==== YOUR CODE END ====' },
-];
-
 /**
- * Parse the JSON string stored in `Problem.starterCode`. Returns an empty map
- * when the string is missing or malformed so callers can treat it uniformly.
+ * Parse the JSON string stored in `Problem.starterCode`. Returns an empty
+ * map when the string is missing, malformed, or not an object of harnesses.
  */
 export function parseStarterCode(raw: string | null | undefined): StarterCodeMap {
     if (!raw) return {};
@@ -44,40 +35,15 @@ export function parseStarterCode(raw: string | null | undefined): StarterCodeMap
 
     const out: StarterCodeMap = {};
     for (const [lang, value] of Object.entries(parsed as Record<string, unknown>)) {
-        if (typeof value === 'string') {
-            out[lang] = splitLegacyProgram(value);
-        } else if (value && typeof value === 'object') {
-            const v = value as Partial<LanguageStarter>;
-            out[lang] = {
-                prefix: typeof v.prefix === 'string' ? v.prefix : '',
-                body: typeof v.body === 'string' ? v.body : '',
-                suffix: typeof v.suffix === 'string' ? v.suffix : '',
-            };
-        }
+        if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+        const v = value as Partial<LanguageStarter>;
+        out[lang] = {
+            prefix: typeof v.prefix === 'string' ? v.prefix : '',
+            body: typeof v.body === 'string' ? v.body : '',
+            suffix: typeof v.suffix === 'string' ? v.suffix : '',
+        };
     }
     return out;
-}
-
-/**
- * Split a legacy full-program string on the YOUR CODE markers.
- * Falls back to treating the entire program as `prefix` if markers are absent.
- */
-function splitLegacyProgram(program: string): LanguageStarter {
-    for (const { start, end } of MARKERS) {
-        const startIdx = program.indexOf(start);
-        const endIdx = program.indexOf(end);
-        if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) continue;
-
-        const prefix = program.slice(0, startIdx);
-        const startLineEnd = program.indexOf('\n', startIdx);
-        const bodyStart = startLineEnd === -1 ? startIdx + start.length : startLineEnd + 1;
-        const body = program.slice(bodyStart, endIdx);
-        const endLineEnd = program.indexOf('\n', endIdx);
-        const suffixStart = endLineEnd === -1 ? endIdx + end.length : endLineEnd + 1;
-        const suffix = program.slice(suffixStart);
-        return { prefix, body, suffix };
-    }
-    return { prefix: program, body: '', suffix: '' };
 }
 
 /**

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BattlesService } from './battles.service';
+import { BattleRoyaleService } from './battle-royale.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -22,6 +23,12 @@ describe('BattlesService', () => {
     let prisma: MockPrismaService;
     let codeExecutionService: jest.Mocked<CodeExecutionService>;
     let subscriptionsService: jest.Mocked<SubscriptionsService>;
+    let battleRoyaleService: {
+        createRoyaleBattle: jest.Mock;
+        enforceRoyaleJoinCap: jest.Mock;
+        startRoyale: jest.Mock;
+        submitRoyaleRound: jest.Mock;
+    };
 
     // Mock data
     const mockUser1 = {
@@ -156,6 +163,15 @@ describe('BattlesService', () => {
                         }),
                     },
                 },
+                {
+                    provide: BattleRoyaleService,
+                    useValue: {
+                        createRoyaleBattle: jest.fn(),
+                        enforceRoyaleJoinCap: jest.fn(),
+                        startRoyale: jest.fn(),
+                        submitRoyaleRound: jest.fn(),
+                    },
+                },
             ],
         }).compile();
 
@@ -163,6 +179,7 @@ describe('BattlesService', () => {
         prisma = module.get<MockPrismaService>(PrismaService);
         codeExecutionService = module.get(CodeExecutionService);
         subscriptionsService = module.get(SubscriptionsService);
+        battleRoyaleService = module.get(BattleRoyaleService) as any;
     });
 
     describe('createBattle', () => {
@@ -2753,6 +2770,234 @@ describe('BattlesService', () => {
             );
             // Should have incremented game counts
             expect(subscriptionsService.incrementGamesPlayed).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe('BATTLE_ROYALE delegation', () => {
+        it('createBattle delegates to BattleRoyaleService.createRoyaleBattle when mode is BATTLE_ROYALE', async () => {
+            battleRoyaleService.createRoyaleBattle.mockResolvedValue({
+                id: 'battle-br',
+            } as any);
+
+            const dto: CreateBattleDto = {
+                mode: BattleMode.BATTLE_ROYALE,
+                battleRoyaleFormat: 'SAME_PROBLEM' as any,
+                maxPlayers: 4,
+                rounds: [
+                    { timeLimitSeconds: 300, eliminateCount: 1 },
+                    { timeLimitSeconds: 300, eliminateCount: 1 },
+                    { timeLimitSeconds: 300, eliminateCount: 1 },
+                ],
+            } as any;
+
+            const result = await service.createBattle('user-1', dto);
+
+            expect(battleRoyaleService.createRoyaleBattle).toHaveBeenCalledWith(
+                'user-1',
+                expect.objectContaining({
+                    mode: BattleMode.BATTLE_ROYALE,
+                    battleRoyaleFormat: 'SAME_PROBLEM',
+                    maxPlayers: 4,
+                }),
+            );
+            expect(result).toEqual({ id: 'battle-br' });
+            // The non-BR create path should NOT be taken
+            expect(prisma.battle.create).not.toHaveBeenCalled();
+        });
+
+        it('joinBattle calls enforceRoyaleJoinCap for BR battles', async () => {
+            const royaleBattle = {
+                ...mockBattle,
+                mode: BattleMode.BATTLE_ROYALE,
+                maxPlayers: 4,
+                participants: [
+                    {
+                        id: 'p1',
+                        battleId: 'battle-br',
+                        userId: 'user-1',
+                        teamId: null,
+                        code: null,
+                        language: null,
+                        testsPassed: 0,
+                        totalTests: 0,
+                        pointsEarned: 0,
+                        submittedAt: null,
+                        mmrChange: null,
+                        user: { mmr: 1000, clanId: null },
+                    },
+                ],
+                problem: null,
+                problemPool: null,
+            } as any;
+
+            prisma.battle.findUnique.mockResolvedValue(royaleBattle);
+            prisma.user.findUnique.mockResolvedValue(mockUser2);
+            prisma.battleParticipant.create.mockResolvedValue({
+                id: 'p2',
+                battleId: 'battle-br',
+                userId: 'user-2',
+            } as any);
+
+            await service.joinBattle('user-2', 'battle-br');
+
+            expect(battleRoyaleService.enforceRoyaleJoinCap).toHaveBeenCalledWith(
+                royaleBattle,
+            );
+        });
+
+        it('submitSolution for BR delegates to submitRoyaleRound and skips normal path', async () => {
+            const royaleBattle = {
+                id: 'battle-br',
+                mode: BattleMode.BATTLE_ROYALE,
+                status: BattleStatus.IN_PROGRESS,
+                problemId: null,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: 'user-1',
+                        battleId: 'battle-br',
+                        submittedAt: null,
+                        isEliminated: false,
+                    },
+                ],
+                problem: null,
+                problemPool: null,
+                rounds: [],
+            } as any;
+
+            prisma.battle.findUnique.mockResolvedValue(royaleBattle);
+            battleRoyaleService.submitRoyaleRound.mockResolvedValue({
+                testsPassed: 2,
+                totalTests: 2,
+                allPassed: true,
+                results: [],
+            });
+
+            const result = await service.submitSolution(
+                'battle-br',
+                'user-1',
+                'code',
+                'js',
+                'problem-1',
+            );
+
+            expect(battleRoyaleService.submitRoyaleRound).toHaveBeenCalledWith(
+                'battle-br',
+                'user-1',
+                'code',
+                'js',
+                'problem-1',
+            );
+            // Normal submitSolution should not have executed code directly
+            expect(codeExecutionService.executeCode).not.toHaveBeenCalled();
+            expect(result).toEqual(
+                expect.objectContaining({ testsPassed: 2, allPassed: true }),
+            );
+        });
+
+        it('readyUp for BR calls startRoyale when lobby full and all ready', async () => {
+            const battle = {
+                id: 'battle-br',
+                mode: BattleMode.BATTLE_ROYALE,
+                status: BattleStatus.WAITING,
+                maxPlayers: 2,
+                participants: [
+                    {
+                        id: 'p1',
+                        battleId: 'battle-br',
+                        userId: 'user-1',
+                        isReady: true,
+                        user: mockUser1,
+                    },
+                    {
+                        id: 'p2',
+                        battleId: 'battle-br',
+                        userId: 'user-2',
+                        isReady: false,
+                        user: mockUser2,
+                    },
+                ],
+            } as any;
+
+            prisma.$transaction.mockImplementation(async (cb: any) => cb(prisma));
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(battle) // tx lookup
+                .mockResolvedValueOnce({
+                    ...battle,
+                    status: BattleStatus.IN_PROGRESS,
+                    participants: battle.participants.map((p: any) => ({
+                        ...p,
+                        isReady: true,
+                        user: { ...p.user, clan: null },
+                    })),
+                    problem: null,
+                    skillUses: [],
+                });
+            prisma.battleParticipant.update.mockResolvedValue({
+                ...battle.participants[1],
+                isReady: true,
+            });
+
+            const result = await service.readyUp('battle-br', 'user-2');
+
+            expect(battleRoyaleService.startRoyale).toHaveBeenCalledWith(
+                'battle-br',
+            );
+            expect(result.started).toBe(true);
+            // BR must NOT increment games via BattlesService (BR does it inside
+            // startRoyale to keep the self-contained flow).
+            expect(
+                subscriptionsService.incrementGamesPlayed,
+            ).not.toHaveBeenCalled();
+            // Non-BR "start battle" tx update should NOT be taken.
+            expect(prisma.battle.update).not.toHaveBeenCalled();
+        });
+
+        it('createBattle propagates validation errors from BattleRoyaleService (does not silently fall through to the 1v1 path)', async () => {
+            const boom = new Error('Sum of eliminateCount mismatch');
+            battleRoyaleService.createRoyaleBattle.mockRejectedValue(boom);
+
+            const dto: CreateBattleDto = {
+                mode: BattleMode.BATTLE_ROYALE,
+                battleRoyaleFormat: 'SAME_PROBLEM' as any,
+                maxPlayers: 4,
+                rounds: [{ timeLimitSeconds: 300, eliminateCount: 1 }],
+            } as any;
+
+            await expect(service.createBattle('user-1', dto)).rejects.toBe(boom);
+            // Must NOT fall through to the non-BR 1v1 path.
+            expect(prisma.battle.create).not.toHaveBeenCalled();
+        });
+
+        it('readyUp for BR rejects when lobby is not full', async () => {
+            const battle = {
+                id: 'battle-br',
+                mode: BattleMode.BATTLE_ROYALE,
+                status: BattleStatus.WAITING,
+                maxPlayers: 4,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: 'user-1',
+                        isReady: false,
+                        user: mockUser1,
+                    },
+                    {
+                        id: 'p2',
+                        userId: 'user-2',
+                        isReady: false,
+                        user: mockUser2,
+                    },
+                ],
+            } as any;
+
+            prisma.$transaction.mockImplementation(async (cb: any) => cb(prisma));
+            prisma.battle.findUnique.mockResolvedValue(battle);
+
+            await expect(service.readyUp('battle-br', 'user-1')).rejects.toThrow(
+                /lobby is not full/,
+            );
+            expect(battleRoyaleService.startRoyale).not.toHaveBeenCalled();
         });
     });
 });

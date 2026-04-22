@@ -476,6 +476,104 @@ describe('BattlesGateway', () => {
             });
         });
 
+        describe('Battle Royale emits', () => {
+            it('should emit battle.round_start with full round payload', () => {
+                const startedAt = new Date();
+                gateway.emitRoyaleRoundStart('battle-br', {
+                    battleId: 'battle-br',
+                    roundNumber: 1,
+                    totalRounds: 3,
+                    problemId: 'problem-1',
+                    timeLimitSeconds: 300,
+                    eliminateCount: 2,
+                    remainingUserIds: ['u1', 'u2', 'u3', 'u4'],
+                    startedAt,
+                });
+
+                expect(mockServer.to).toHaveBeenCalledWith('battle:battle-br');
+                expect(mockServer.emit).toHaveBeenCalledWith(
+                    'battle.round_start',
+                    expect.objectContaining({
+                        battleId: 'battle-br',
+                        roundNumber: 1,
+                        totalRounds: 3,
+                        problemId: 'problem-1',
+                        timeLimitSeconds: 300,
+                        eliminateCount: 2,
+                        remainingUserIds: ['u1', 'u2', 'u3', 'u4'],
+                        startedAt,
+                    }),
+                );
+            });
+
+            it('should emit battle.round_end with reason and standings', () => {
+                gateway.emitRoyaleRoundEnd('battle-br', {
+                    battleId: 'battle-br',
+                    roundNumber: 2,
+                    endedReason: 'TIMER' as any,
+                    eliminatedUserIds: ['u9', 'u10'],
+                    standings: [{ userId: 'u1' }],
+                });
+
+                expect(mockServer.to).toHaveBeenCalledWith('battle:battle-br');
+                expect(mockServer.emit).toHaveBeenCalledWith(
+                    'battle.round_end',
+                    expect.objectContaining({
+                        battleId: 'battle-br',
+                        roundNumber: 2,
+                        endedReason: 'TIMER',
+                        eliminatedUserIds: ['u9', 'u10'],
+                    }),
+                );
+            });
+
+            it('should emit one battle.elimination per eliminated user', () => {
+                gateway.emitRoyaleElimination('battle-br', {
+                    battleId: 'battle-br',
+                    userId: 'u9',
+                    roundNumber: 2,
+                    placement: 6,
+                });
+                gateway.emitRoyaleElimination('battle-br', {
+                    battleId: 'battle-br',
+                    userId: 'u10',
+                    roundNumber: 2,
+                    placement: 5,
+                });
+
+                const eliminationEmits = mockServer.emit.mock.calls.filter(
+                    (c) => c[0] === 'battle.elimination',
+                );
+                expect(eliminationEmits).toHaveLength(2);
+                expect(eliminationEmits[0][1]).toMatchObject({
+                    userId: 'u9',
+                    placement: 6,
+                });
+                expect(eliminationEmits[1][1]).toMatchObject({
+                    userId: 'u10',
+                    placement: 5,
+                });
+            });
+
+            it('should emit battle.royale_standings with ordered standings', () => {
+                gateway.emitRoyaleStandings('battle-br', {
+                    battleId: 'battle-br',
+                    roundNumber: 3,
+                    standings: [
+                        { userId: 'u1', cumulativePoints: 20 },
+                        { userId: 'u2', cumulativePoints: 12 },
+                    ],
+                });
+                expect(mockServer.emit).toHaveBeenCalledWith(
+                    'battle.royale_standings',
+                    expect.objectContaining({
+                        battleId: 'battle-br',
+                        roundNumber: 3,
+                    }),
+                );
+            });
+        });
+
         describe('battle.status_update', () => {
             it('should emit battle.status_update when status changes', () => {
                 const battleId = 'battle-1';

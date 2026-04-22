@@ -10,8 +10,12 @@ import {
     Max,
     IsBoolean,
     IsIn,
+    ValidateNested,
+    ArrayMinSize,
 } from 'class-validator';
-import { BattleMode, SkillType } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { BattleMode, BattleRoyaleFormat, SkillType } from '@prisma/client';
+import { RoundConfigDto } from './round-config.dto';
 
 export class CreateBattleDto {
     @ApiPropertyOptional({
@@ -107,4 +111,42 @@ export class CreateBattleDto {
     @IsString()
     @IsOptional()
     preferredDifficulty?: 'EASY' | 'MEDIUM' | 'HARD';
+
+    // ============================================
+    // Battle Royale specific fields (required when mode === BATTLE_ROYALE)
+    // ============================================
+
+    @ApiPropertyOptional({
+        description:
+            'Battle Royale format. Required when mode === BATTLE_ROYALE.',
+        enum: BattleRoyaleFormat,
+    })
+    @IsEnum(BattleRoyaleFormat)
+    @IsOptional()
+    battleRoyaleFormat?: BattleRoyaleFormat;
+
+    @ApiPropertyOptional({
+        description:
+            'Total lobby size for Battle Royale (3..50). Required when mode === BATTLE_ROYALE.',
+        example: 8,
+        minimum: 3,
+        maximum: 50,
+    })
+    @IsInt()
+    @Min(3)
+    @Max(50)
+    @IsOptional()
+    maxPlayers?: number;
+
+    @ApiPropertyOptional({
+        description:
+            'Per-round configuration for Battle Royale. Each entry specifies the round time limit (seconds) and number of eliminations. Sum of eliminations must equal maxPlayers - 1. Required when mode === BATTLE_ROYALE.',
+        type: [RoundConfigDto],
+    })
+    @IsArray()
+    @ArrayMinSize(1)
+    @ValidateNested({ each: true })
+    @Type(() => RoundConfigDto)
+    @IsOptional()
+    rounds?: RoundConfigDto[];
 }

@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Controller,
     Get,
     Post,
@@ -20,7 +21,16 @@ import {
     ApiParam,
 } from '@nestjs/swagger';
 import { BattlesService } from './battles.service';
-import { CreateBattleDto, SubmitSolutionDto, BattleResponseDto, BattleHistoryResponseDto } from './dto';
+import { BattleRoyaleService } from './battle-royale.service';
+import {
+    CreateBattleDto,
+    SubmitSolutionDto,
+    BattleResponseDto,
+    BattleHistoryResponseDto,
+    BattleRoundResponseDto,
+    BattleRoyaleStandingsResponseDto,
+    RoyalePresetDto,
+} from './dto';
 
 // Extend Express Request to include user
 interface AuthRequest extends Request {
@@ -36,7 +46,25 @@ interface AuthRequest extends Request {
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth('access-token')
 export class BattlesController {
-    constructor(private readonly battlesService: BattlesService) { }
+    constructor(
+        private readonly battlesService: BattlesService,
+        private readonly battleRoyaleService: BattleRoyaleService,
+    ) { }
+
+    // ========================================
+    // Battle Royale routes (MUST come before :id routes to avoid conflicts)
+    // ========================================
+
+    @Get('royale/presets')
+    @ApiOperation({ summary: 'List server-provided Battle Royale preset configs' })
+    @ApiResponse({
+        status: 200,
+        description: 'Returns a list of preset BR configurations the client can use as-is or mutate before POSTing.',
+        type: [RoyalePresetDto],
+    })
+    getRoyalePresets(): RoyalePresetDto[] {
+        return this.battleRoyaleService.getPresets();
+    }
 
     @Post()
     @ApiOperation({ summary: 'Create a new battle' })
@@ -219,6 +247,68 @@ export class BattlesController {
     @ApiResponse({ status: 403, description: 'Not a participant' })
     async unready(@Req() req: AuthRequest, @Param('id') id: string) {
         return this.battlesService.unready(id, req.user.sub);
+    }
+
+    @Get(':id/rounds')
+    @ApiOperation({ summary: 'List all Battle Royale rounds for a battle (config + runtime state)' })
+    @ApiParam({ name: 'id', description: 'Battle ID' })
+    @ApiResponse({
+        status: 200,
+        description: 'Returns all rounds in ascending order.',
+        type: [BattleRoundResponseDto],
+    })
+    @ApiResponse({ status: 404, description: 'Battle not found' })
+    async listRounds(@Param('id') id: string) {
+        return this.battleRoyaleService.listRounds(id);
+    }
+
+    @Get(':id/rounds/:n')
+    @ApiOperation({ summary: 'Get details for a single Battle Royale round' })
+    @ApiParam({ name: 'id', description: 'Battle ID' })
+    @ApiParam({ name: 'n', description: 'Round number (1-indexed)' })
+    @ApiResponse({
+        status: 200,
+        description: 'Returns round details including submissions. Only battle participants may access this endpoint.',
+        type: BattleRoundResponseDto,
+    })
+    @ApiResponse({ status: 403, description: 'Requesting user is not a participant of the battle' })
+    @ApiResponse({ status: 404, description: 'Battle or round not found' })
+    async getRoundDetails(
+        @Param('id') id: string,
+        @Param('n') n: string,
+        @Req() req: AuthRequest,
+    ) {
+        const roundNumber = parseInt(n, 10);
+        if (!Number.isInteger(roundNumber) || roundNumber < 1) {
+            throw new BadRequestException(
+                'Round number must be a positive integer',
+            );
+        }
+        return this.battleRoyaleService.getRoundDetails(
+            id,
+            roundNumber,
+            req.user.sub,
+        );
+    }
+
+    @Get(':id/standings')
+    @ApiOperation({ summary: 'Get current Battle Royale standings' })
+    @ApiParam({ name: 'id', description: 'Battle ID' })
+    @ApiResponse({
+        status: 200,
+        description: 'Returns ordered standings with placements and cumulative points.',
+        type: BattleRoyaleStandingsResponseDto,
+    })
+    @ApiResponse({ status: 404, description: 'Battle not found' })
+    async getStandings(@Param('id') id: string) {
+        const standings = await this.battleRoyaleService.getStandings(id);
+        // Pull currentRound for convenience on the client.
+        const battle = await this.battlesService.getBattleDetails(id);
+        return {
+            battleId: id,
+            currentRound: (battle as any).currentRound ?? 0,
+            standings,
+        };
     }
 
     @Post(':id/invite-user')

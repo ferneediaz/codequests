@@ -23,40 +23,14 @@ import {
 } from './harness-codegen';
 
 /**
- * A dry-run request in the legacy "write your own harness" format.
- * Still supported so existing tooling keeps working; authors using the
- * new v2 format should prefer `DryRunV2RequestBody`.
+ * Dry-run request: same conceptual fields as a v2 YAML (minus id/title/etc.).
+ * The server runs harness codegen, then executes against the given tests.
  */
-interface DryRunV1RequestBody {
-    language: string;
-    prefix: string;
-    body: string;
-    suffix: string;
-    testCases: Array<{ input: string; expectedOutput: string }>;
-}
-
-/**
- * A dry-run request in the new v2 format. The author hands us the same
- * fields they would put in a YAML file (minus the id/title/etc. metadata),
- * we run it through the codegen exactly like the importer would, and
- * execute against the provided tests.
- */
-interface DryRunV2RequestBody {
+interface DryRunRequestBody {
     language: string;
     signature: unknown;
     body: string;
     tests: Array<{ args: unknown[]; expected: unknown }>;
-}
-
-type DryRunRequestBody = DryRunV1RequestBody | DryRunV2RequestBody;
-
-function isV2DryRun(body: DryRunRequestBody): body is DryRunV2RequestBody {
-    return (
-        body !== null &&
-        typeof body === 'object' &&
-        'signature' in body &&
-        'tests' in body
-    );
 }
 
 /**
@@ -88,12 +62,8 @@ export class AuthoringController {
             title: problem.title,
             difficulty: problem.difficulty,
             tags: problem.tags,
-            testCount: 'tests' in problem ? problem.tests.length : problem.testCases.length,
-            languages:
-                'signature' in problem
-                    ? Object.keys(problem.starter)
-                    : Object.keys(problem.languages),
-            format: 'signature' in problem ? 'v2' : 'v1',
+            testCount: problem.tests.length,
+            languages: Object.keys(problem.starter),
         }));
     }
 
@@ -104,7 +74,10 @@ export class AuthoringController {
         if (!found) {
             throw new NotFoundException(`Problem '${slug}' not found in YAML files`);
         }
-        return found.problem;
+        return {
+            ...found.problem,
+            harness: generateStarterCodeMap(found.problem),
+        };
     }
 
     @Post('dry-run')
@@ -122,48 +95,6 @@ export class AuthoringController {
             );
         }
 
-        if (isV2DryRun(body)) {
-            return this.dryRunV2(body, lang as SupportedAuthoringLanguage);
-        }
-        return this.dryRunV1(body, lang);
-    }
-
-    /**
-     * v1 path: author supplies the full `{prefix, body, suffix}` and raw
-     * `{input, expectedOutput}` test cases. Hand them straight to the
-     * executor.
-     */
-    private async dryRunV1(body: DryRunV1RequestBody, lang: string) {
-        if (!Array.isArray(body.testCases) || body.testCases.length === 0) {
-            throw new HttpException(
-                'At least one test case is required',
-                HttpStatus.BAD_REQUEST,
-            );
-        }
-
-        return this.codeExecution.executeWithHarness({
-            language: lang,
-            starter: {
-                prefix: body.prefix ?? '',
-                body: body.body ?? '',
-                suffix: body.suffix ?? '',
-            },
-            testCases: body.testCases.map((tc) => ({
-                input: String(tc?.input ?? ''),
-                expectedOutput: String(tc?.expectedOutput ?? ''),
-            })),
-        });
-    }
-
-    /**
-     * v2 path: validate the `signature` with the same Zod shape the
-     * importer uses, then run codegen + structured test encoding so
-     * preview mirrors production behavior exactly.
-     */
-    private async dryRunV2(
-        body: DryRunV2RequestBody,
-        lang: SupportedAuthoringLanguage,
-    ) {
         if (!Array.isArray(body.tests) || body.tests.length === 0) {
             throw new HttpException(
                 'At least one test is required',
@@ -172,12 +103,12 @@ export class AuthoringController {
         }
 
         // Re-use the full v2 schema to validate the signature + tests shape.
-        // We synthesize dummy metadata so the schema accepts the partial doc.
+        // Synthesize dummy metadata so the schema accepts the partial doc.
         const doc = {
             id: 'dry-run',
             title: 'Dry Run',
             difficulty: 'EASY' as const,
-            tags: [],
+            tags: [] as string[],
             description: 'dry-run',
             signature: body.signature,
             starter: { [lang]: body.body ?? '' },
@@ -193,13 +124,13 @@ export class AuthoringController {
                 .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
                 .join('; ');
             throw new HttpException(
-                `Invalid v2 dry-run payload: ${issues}`,
+                `Invalid dry-run payload: ${issues}`,
                 HttpStatus.BAD_REQUEST,
             );
         }
 
         const starterMap = generateStarterCodeMap(parsed.data);
-        const starter = starterMap[lang];
+        const starter = starterMap[lang as SupportedAuthoringLanguage];
         if (!starter) {
             throw new HttpException(
                 `Codegen did not produce a harness for language '${lang}'.`,

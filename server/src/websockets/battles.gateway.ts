@@ -15,7 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BattlesService } from '../battles/battles.service';
 import { JwtVerificationService } from '../auth/jwt-verification.service';
 import { FriendsService } from '../friends/friends.service';
-import { BattleStatus, SkillType } from '@prisma/client';
+import { BattleRoundEndReason, BattleStatus, SkillType } from '@prisma/client';
 
 interface AuthenticatedSocket extends Socket {
     data: {
@@ -507,6 +507,75 @@ export class BattlesGateway
                 mmrChange: p.mmrChange,
             })),
         });
+    }
+
+    // ========================================
+    // Battle Royale emits
+    // ========================================
+
+    /**
+     * Emit when a BR round starts (IN_PROGRESS). Fired once per round.
+     */
+    emitRoyaleRoundStart(
+        battleId: string,
+        data: {
+            battleId: string;
+            roundNumber: number;
+            totalRounds: number;
+            problemId: string | null;
+            timeLimitSeconds: number;
+            eliminateCount: number;
+            remainingUserIds: string[];
+            startedAt: Date;
+        },
+    ) {
+        this.server.to(`battle:${battleId}`).emit('battle.round_start', data);
+    }
+
+    /**
+     * Emit when a BR round ends (COMPLETED).
+     */
+    emitRoyaleRoundEnd(
+        battleId: string,
+        data: {
+            battleId: string;
+            roundNumber: number;
+            endedReason: BattleRoundEndReason;
+            eliminatedUserIds: string[];
+            standings: any[];
+        },
+    ) {
+        this.server.to(`battle:${battleId}`).emit('battle.round_end', data);
+    }
+
+    /**
+     * Emit one event per eliminated user at round end.
+     */
+    emitRoyaleElimination(
+        battleId: string,
+        data: {
+            battleId: string;
+            userId: string;
+            roundNumber: number;
+            placement: number;
+        },
+    ) {
+        this.server.to(`battle:${battleId}`).emit('battle.elimination', data);
+    }
+
+    /**
+     * Emit standings updates during an in-progress round (after each
+     * submission).
+     */
+    emitRoyaleStandings(
+        battleId: string,
+        data: {
+            battleId: string;
+            roundNumber: number;
+            standings: any[];
+        },
+    ) {
+        this.server.to(`battle:${battleId}`).emit('battle.royale_standings', data);
     }
 
     /**

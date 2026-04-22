@@ -34,6 +34,14 @@ export class MatchmakingService {
     async joinQueue(userId: string, dto: JoinQueueDto) {
         const mode = dto.mode || BattleMode.ONE_V_ONE;
 
+        // Battle Royale is lobby-only: it cannot be formed via matchmaking
+        // because the host supplies per-round configuration up front.
+        if (mode === BattleMode.BATTLE_ROYALE) {
+            throw new BadRequestException(
+                'Battle Royale is lobby-only and cannot be joined via matchmaking',
+            );
+        }
+
         // Check user exists
         const user = await this.prisma.user.findUnique({
             where: { id: userId },

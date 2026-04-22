@@ -204,7 +204,7 @@ model Battle {
   id   String     @id @default(uuid())
   mode BattleMode @default(ONE_V_ONE)
 
-  // For single-problem battles (1v1, battle royale)
+  // For single-problem battles (1v1)
   problemId String?
   problem   Problem? @relation(fields: [problemId], references: [id])
 
@@ -227,6 +227,12 @@ model Battle {
   seasonId String?
   season   Season? @relation(fields: [seasonId], references: [id])
 
+  // Battle Royale fields
+  battleRoyaleFormat BattleRoyaleFormat?
+  maxPlayers         Int?                // BR only: total lobby size (3..50)
+  currentRound       Int                 @default(0) // 0 = not started; else matches BattleRound.roundNumber in progress
+  rounds             BattleRound[]
+
   participants BattleParticipant[]
   skillUses    BattleSkillUse[]
 
@@ -237,6 +243,73 @@ model Battle {
   startedAt DateTime?
   endedAt   DateTime?
   createdAt DateTime  @default(now())
+}
+
+// ============================================
+// BATTLE ROYALE
+// ============================================
+
+enum BattleRoyaleFormat {
+  SAME_PROBLEM  // Everyone solves the same problem each round; slowest eliminated
+  SCORE_ATTACK  // Solve as many pool problems as possible per round; lowest cumulative points eliminated
+}
+
+enum BattleRoundStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum BattleRoundEndReason {
+  EARLY_ALL_PASSED // SAME_PROBLEM: enough players fully passed to trigger immediate end
+  TIMER            // Per-round timer expired
+  NO_PLAYERS       // No non-eliminated players remained
+  HOST_ENDED       // Future: host-forced end
+}
+
+model BattleRound {
+  id       String @id @default(uuid())
+  battleId String
+  battle   Battle @relation(fields: [battleId], references: [id], onDelete: Cascade)
+
+  roundNumber Int
+
+  // Host-supplied configuration
+  timeLimitSeconds Int
+  eliminateCount   Int
+
+  // Runtime state
+  status      BattleRoundStatus     @default(PENDING)
+  problemId   String? // SAME_PROBLEM: chosen when round starts; SCORE_ATTACK: null (uses pool)
+  startedAt   DateTime?
+  endedAt     DateTime?
+  endedReason BattleRoundEndReason?
+
+  submissions BattleRoundSubmission[]
+
+  @@unique([battleId, roundNumber])
+}
+
+model BattleRoundSubmission {
+  id      String      @id @default(uuid())
+  roundId String
+  round   BattleRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  userId    String
+  problemId String
+
+  code        String
+  language    String
+  testsPassed Int     @default(0)
+  totalTests  Int     @default(0)
+  allPassed   Boolean @default(false)
+  pointsEarned Int    @default(0)
+
+  submittedAt DateTime @default(now())
+
+  // One row per user per problem per round (resubmissions update this row
+  // when (pointsEarned, testsPassed) strictly improves).
+  @@unique([roundId, userId, problemId])
 }
 
 model BattleSkillUse {
@@ -275,6 +348,11 @@ model BattleParticipant {
 
   // Ready state for invite battles
   isReady Boolean @default(false)
+
+  // Battle Royale state
+  isEliminated      Boolean @default(false)
+  placement         Int?    // 1 = winner; N = first eliminated (only set after battle ends)
+  eliminatedInRound Int?
 
   // MMR change after battle
   mmrChange Int?

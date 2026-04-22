@@ -1,11 +1,7 @@
 #!/usr/bin/env ts-node
+import '../../load-server-env';
 import { PrismaClient } from '@prisma/client';
-import {
-    loadAllProblems,
-    problemFormatLabel,
-    toImportTestCases,
-    toStarterCodeMap,
-} from './problem-loader';
+import { loadAllProblems, toImportTestCases, toStarterCodeMap } from './problem-loader';
 import { serializeStarterCode } from '../../code-execution/starter-code';
 
 /**
@@ -17,9 +13,8 @@ import { serializeStarterCode } from '../../code-execution/starter-code';
  *     semantics simple: the YAML file is the source of truth, importing it
  *     always produces the same DB state regardless of prior runs.
  *
- * Both v1 (hand-written harness) and v2 (signature + structured tests)
- * YAML formats feed through the same helpers in `problem-loader.ts`, so
- * this CLI does not care which format the author used.
+ * Problems are the v2 “signature + structured tests + per-language
+ * function body” format; see `problem-yaml.schema.ts`.
  *
  * Exits non-zero on the first validation failure so CI can block deploys
  * on a malformed problem file.
@@ -69,7 +64,7 @@ async function main() {
             });
 
             console.log(
-                `  ✓ ${filename} -> ${problem.id} (${problem.difficulty}, ${testCases.length} tests, ${problemFormatLabel(problem)})`,
+                `  ✓ ${filename} -> ${problem.id} (${problem.difficulty}, ${testCases.length} tests)`,
             );
         }
 

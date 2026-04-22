@@ -175,7 +175,7 @@ describe('MatchmakingService', () => {
 
             const createdEntry = {
                 ...baseQueueEntry,
-                mode: BattleMode.BATTLE_ROYALE,
+                mode: BattleMode.ONE_V_ONE,
                 preferredDifficulty: Difficulty.HARD,
             };
             prisma.matchmakingEntry.create.mockResolvedValue(createdEntry);
@@ -185,17 +185,32 @@ describe('MatchmakingService', () => {
             prisma.matchmakingEntry.findMany.mockResolvedValue([]);
 
             const result = await service.joinQueue(mockUser1.id, {
-                mode: BattleMode.BATTLE_ROYALE,
+                mode: BattleMode.ONE_V_ONE,
                 preferredDifficulty: Difficulty.HARD,
             });
 
             expect(result.status).toBe('queued');
             expect(prisma.matchmakingEntry.create).toHaveBeenCalledWith({
                 data: expect.objectContaining({
-                    mode: BattleMode.BATTLE_ROYALE,
+                    mode: BattleMode.ONE_V_ONE,
                     preferredDifficulty: Difficulty.HARD,
                 }),
             });
+        });
+
+        it('rejects BATTLE_ROYALE mode (lobby-only; matchmaking cannot form BR)', async () => {
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            prisma.matchmakingEntry.findUnique.mockResolvedValue(null);
+            prisma.battleParticipant.findFirst.mockResolvedValue(null);
+
+            await expect(
+                service.joinQueue(mockUser1.id, {
+                    mode: BattleMode.BATTLE_ROYALE,
+                } as any),
+            ).rejects.toThrow(BadRequestException);
+
+            // Must short-circuit before creating a queue entry.
+            expect(prisma.matchmakingEntry.create).not.toHaveBeenCalled();
         });
 
         it('should throw BadRequestException if user not found', async () => {
