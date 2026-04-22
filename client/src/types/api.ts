@@ -3,6 +3,32 @@ export type BattleStatus = 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export type MatchmakingStatus = 'QUEUED' | 'MATCHED' | 'EXPIRED';
 export type SkillType = 'FREEZE' | 'SCRAMBLE' | 'BLIND' | 'TIME_STEAL' | 'FOG_OF_WAR';
+export type BattleRoyaleFormat = 'SAME_PROBLEM' | 'SCORE_ATTACK';
+
+/**
+ * Configuration for a single Battle Royale round.
+ * Mirrors server `RoundConfigDto`:
+ *  - timeLimitSeconds: integer 10..7200
+ *  - eliminateCount: integer >= 0 (sum across rounds must equal maxPlayers - 1,
+ *    and the last round must equal exactly 1)
+ */
+export interface RoundConfig {
+    timeLimitSeconds: number;
+    eliminateCount: number;
+}
+
+/**
+ * Server-provided Battle Royale preset (from `GET /battles/royale/presets`).
+ * Clients may use as-is or mutate before POSTing.
+ */
+export interface RoyalePreset {
+    id: string;
+    name: string;
+    description: string;
+    battleRoyaleFormat: BattleRoyaleFormat;
+    maxPlayers: number;
+    rounds: RoundConfig[];
+}
 
 export interface MatchConfig {
     mode: BattleMode;
@@ -19,6 +45,15 @@ export interface CreateBattleRequest {
     enabledSkills?: SkillType[];
     withInviteCode?: boolean;
     preferredTopic?: string;
+    preferredDifficulty?: Difficulty;
+    /** Battle Royale only. */
+    battleRoyaleFormat?: BattleRoyaleFormat;
+    /** Battle Royale only. Integer in [3, 50]. */
+    maxPlayers?: number;
+    /** Battle Royale only. Must contain at least 2 rounds. */
+    rounds?: RoundConfig[];
+    /** Battle Royale SCORE_ATTACK only: optional explicit pool of problem IDs. */
+    problemIds?: string[];
 }
 
 export interface RankTier {
