@@ -5,12 +5,16 @@ import { toast } from 'sonner';
 import api from '@/services/api';
 import type { BattleResponse } from '@/types/api';
 import type { InviteReceivedPayload } from '@/types/socket';
+import { usePaywall } from './usePaywall';
+import { useSubscription } from './useSubscription';
 
 // Global listener for `battle.invite_received`. Renders an actionable toast
 // with Accept (joins via invite code, then routes to the lobby) and Decline
 // (dismiss). Mounted once in RootLayout.
 export function useInviteNotifications() {
     const navigate = useNavigate();
+    const { requireCanPlay } = usePaywall();
+    const { refresh: refreshSubscription } = useSubscription();
 
     useEffect(() => {
         const socket = getSocket();
@@ -31,10 +35,18 @@ export function useInviteNotifications() {
                     action: {
                         label: 'Accept',
                         onClick: async () => {
+                            // Gate before hitting the network so users get
+                            // an actionable upgrade prompt instead of a
+                            // generic server error.
+                            if (!requireCanPlay()) {
+                                toast.dismiss(toastId);
+                                return;
+                            }
                             try {
                                 const { data: battle } = await api.post<BattleResponse>(
                                     `/battles/invite/${data.inviteCode}/join`,
                                 );
+                                void refreshSubscription();
                                 toast.dismiss(toastId);
                                 navigate(`/battle/${battle.id}`);
                             } catch (err: unknown) {
@@ -62,5 +74,5 @@ export function useInviteNotifications() {
         return () => {
             socket.off('battle.invite_received', handleInvite);
         };
-    }, [navigate]);
+    }, [navigate, requireCanPlay, refreshSubscription]);
 }

@@ -22,6 +22,8 @@ import { toast } from 'sonner';
 import api from '@/services/api';
 import type { BattleResponse } from '@/types/api';
 import { savePendingInvite } from '@/lib/pendingInvite';
+import { usePaywall } from '@/hooks/usePaywall';
+import { useSubscription } from '@/hooks/useSubscription';
 
 type LoadState =
     | { status: 'loading' }
@@ -62,6 +64,8 @@ export default function InviteJoin() {
     const { isAuthenticated, isLoading: authLoading, user } = useAppSelector(
         (state) => state.auth,
     );
+    const { requireCanPlay } = usePaywall();
+    const { refresh: refreshSubscription } = useSubscription();
 
     const normalizedCode = useMemo(() => code?.trim().toUpperCase() ?? '', [code]);
 
@@ -118,11 +122,18 @@ export default function InviteJoin() {
 
     const handleJoin = async () => {
         if (state.status !== 'ready') return;
+        // Existing participants can always re-enter — they've already paid
+        // the daily-game cost when the battle was created/joined.
+        const isExistingParticipant = !!user && state.battle.participants.some(
+            (p) => p.userId === user.id,
+        );
+        if (!isExistingParticipant && !requireCanPlay()) return;
         setIsJoining(true);
         try {
             const { data } = await api.post<BattleResponse>(
                 `/battles/invite/${normalizedCode}/join`,
             );
+            void refreshSubscription();
             navigate(`/battle/${data.id}`);
         } catch (err: unknown) {
             const message =

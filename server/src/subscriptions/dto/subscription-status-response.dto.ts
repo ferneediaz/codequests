@@ -32,4 +32,16 @@ export class SubscriptionStatusResponseDto {
 
   @ApiPropertyOptional({ type: SubscriptionDetailsDto })
   subscription?: SubscriptionDetailsDto;
+
+  /**
+   * Where the Pro entitlement comes from. Useful for the client to render
+   * a small "Dev PRO" badge instead of "PRO" when access is granted by the
+   * developer allowlist (DEV_PRO_USER_IDS / DEV_PRO_EMAILS).
+   */
+  @ApiPropertyOptional({
+    enum: ['stripe', 'trial', 'dev'],
+    description:
+      'Source of pro entitlement. Omitted for free users.',
+  })
+  source?: 'stripe' | 'trial' | 'dev';
 }

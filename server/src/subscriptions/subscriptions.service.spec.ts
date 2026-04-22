@@ -74,6 +74,10 @@ describe('SubscriptionsService', () => {
                     STRIPE_PRICE_ID_BIMONTHLY: 'price_bimonthly',
                     STRIPE_PRICE_ID_YEARLY: 'price_yearly',
                     CLIENT_URL: 'http://localhost:5173',
+                    // Dev pro allowlist defaults to empty so existing tests
+                    // exercise the real free/pro/trial paths unchanged.
+                    DEV_PRO_USER_IDS: '',
+                    DEV_PRO_EMAILS: '',
                 };
                 return config[key];
             }),
@@ -743,6 +747,79 @@ describe('SubscriptionsService', () => {
 
         it('should have TRIAL_DURATION_DAYS of 7', () => {
             expect(TRIAL_DURATION_DAYS).toBe(7);
+        });
+    });
+
+    // =========================================
+    // Dev Pro allowlist
+    // =========================================
+
+    describe('dev pro allowlist', () => {
+        function withDevPro(overrides: {
+            DEV_PRO_USER_IDS?: string;
+            DEV_PRO_EMAILS?: string;
+        }) {
+            const config: Record<string, string> = {
+                STRIPE_PRICE_ID_BIMONTHLY: 'price_bimonthly',
+                STRIPE_PRICE_ID_YEARLY: 'price_yearly',
+                CLIENT_URL: 'http://localhost:5173',
+                DEV_PRO_USER_IDS: '',
+                DEV_PRO_EMAILS: '',
+                ...overrides,
+            };
+            configService.get.mockImplementation((key: string) => config[key]);
+        }
+
+        it('canPlay returns true via DEV_PRO_USER_IDS even at the limit', async () => {
+            withDevPro({ DEV_PRO_USER_IDS: 'user-free,other-id' });
+            const userAtLimit = { ...mockFreeUser, gamesPlayedToday: 1 };
+            prisma.user.findUnique.mockResolvedValue(userAtLimit);
+
+            expect(await service.canPlay('user-free')).toBe(true);
+            // No games-counter mutation should happen on the dev path.
+            expect(prisma.user.update).not.toHaveBeenCalled();
+        });
+
+        it('canPlay returns true via DEV_PRO_EMAILS (case-insensitive)', async () => {
+            withDevPro({ DEV_PRO_EMAILS: 'FREE@test.com' });
+            const userAtLimit = { ...mockFreeUser, gamesPlayedToday: 1 };
+            prisma.user.findUnique.mockResolvedValue(userAtLimit);
+
+            expect(await service.canPlay('user-free')).toBe(true);
+        });
+
+        it('canPlay falls back to free behavior when allowlist does not match', async () => {
+            withDevPro({ DEV_PRO_USER_IDS: 'someone-else' });
+            const userAtLimit = { ...mockFreeUser, gamesPlayedToday: 1 };
+            prisma.user.findUnique
+                .mockResolvedValueOnce(userAtLimit)
+                .mockResolvedValueOnce({ gamesPlayedToday: 1 });
+
+            expect(await service.canPlay('user-free')).toBe(false);
+        });
+
+        it('getSubscriptionStatus reports tier=pro and source=dev for allowlisted user', async () => {
+            withDevPro({ DEV_PRO_USER_IDS: 'user-free' });
+            // No subscription row in DB; dev allowlist still grants Pro.
+            prisma.user.findUnique.mockResolvedValue(mockFreeUser);
+
+            const status = await service.getSubscriptionStatus('user-free');
+
+            expect(status.tier).toBe('pro');
+            expect(status.source).toBe('dev');
+            expect(status.gamesRemaining).toBe(-1);
+            expect(status.dailyLimit).toBe(-1);
+            expect(status.subscription).toBeUndefined();
+        });
+
+        it('getSubscriptionStatus reports source=stripe for real Pro users', async () => {
+            withDevPro({}); // no allowlist
+            prisma.user.findUnique.mockResolvedValue(mockProUser);
+
+            const status = await service.getSubscriptionStatus('user-pro');
+
+            expect(status.tier).toBe('pro');
+            expect(status.source).toBe('stripe');
         });
     });
 });

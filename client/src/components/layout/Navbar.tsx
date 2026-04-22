@@ -9,7 +9,15 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Swords, BookOpen, LayoutDashboard } from 'lucide-react';
+import {
+    LogOut,
+    User,
+    Swords,
+    BookOpen,
+    LayoutDashboard,
+    Crown,
+} from 'lucide-react';
+import { SubscriptionBadge } from './SubscriptionBadge';
 
 export function Navbar() {
     const { user, isAuthenticated, logout } = useAuth();
@@ -46,9 +54,10 @@ export function Navbar() {
                     )}
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                     {isAuthenticated && user ? (
                         <>
+                            <SubscriptionBadge />
                             <RankBadge mmr={user.mmr} showMmr />
 
                             <DropdownMenu>
@@ -69,6 +78,13 @@ export function Navbar() {
                                 <DropdownMenuContent align="end">
                                     <DropdownMenuItem className="text-muted-foreground text-xs" disabled>
                                         {user.wins}W / {user.losses}L
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem asChild>
+                                        <Link to="/pricing" className="flex items-center no-underline">
+                                            <Crown className="mr-2 h-4 w-4" />
+                                            Pricing
+                                        </Link>
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={logout} className="text-destructive">

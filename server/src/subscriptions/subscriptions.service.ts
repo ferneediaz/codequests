@@ -49,6 +49,28 @@ export class SubscriptionsService {
   ) {}
 
   /**
+   * Developer Pro allowlist. When `DEV_PRO_USER_IDS` or `DEV_PRO_EMAILS`
+   * (comma-separated) match the current user, the user is treated as Pro
+   * for `canPlay` and `getSubscriptionStatus` without touching Stripe or
+   * mutating the DB. Real users and Stripe-driven flows are untouched.
+   */
+  private isDevPro(user: { id: string; email: string | null }): boolean {
+    const ids = (this.configService.get<string>('DEV_PRO_USER_IDS') ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (ids.includes(user.id)) return true;
+
+    const email = user.email?.toLowerCase();
+    if (!email) return false;
+    const emails = (this.configService.get<string>('DEV_PRO_EMAILS') ?? '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    return emails.includes(email);
+  }
+
+  /**
    * Check if a user has Pro-level access (paid or trial).
    */
   isTrialActive(trialEndsAt: Date | null): boolean {
@@ -101,6 +123,10 @@ export class SubscriptionsService {
 
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
+    }
+
+    if (this.isDevPro(user)) {
+      return true;
     }
 
     if (user.subscriptionTier === 'PRO' || this.isTrialActive(user.trialEndsAt)) {
@@ -172,9 +198,10 @@ export class SubscriptionsService {
     // Lazy reset
     await this.checkAndResetDailyGames(user.id, user.lastGameResetAt);
 
+    const isDev = this.isDevPro(user);
     const isPro = user.subscriptionTier === 'PRO';
     const onTrial = this.isTrialActive(user.trialEndsAt);
-    const hasProAccess = isPro || onTrial;
+    const hasProAccess = isDev || isPro || onTrial;
     let gamesPlayedToday = user.gamesPlayedToday;
 
     if (!hasProAccess) {
@@ -196,7 +223,17 @@ export class SubscriptionsService {
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
     );
 
-    const tier = isPro ? 'pro' : onTrial ? 'trial' : 'free';
+    // Dev allowlist takes precedence in tier reporting so the client can
+    // render an unambiguous "Dev PRO" indicator without confusing it with
+    // a real paid subscription.
+    const tier = isDev || isPro ? 'pro' : onTrial ? 'trial' : 'free';
+    const source: 'stripe' | 'trial' | 'dev' | undefined = isDev
+      ? 'dev'
+      : isPro
+        ? 'stripe'
+        : onTrial
+          ? 'trial'
+          : undefined;
 
     return {
       tier,
@@ -205,14 +242,16 @@ export class SubscriptionsService {
       dailyLimit: hasProAccess ? -1 : FREE_DAILY_LIMIT,
       resetsAt: resetsAt.toISOString(),
       trialEndsAt: onTrial ? user.trialEndsAt!.toISOString() : undefined,
-      subscription: user.subscription
-        ? {
-            status: user.subscription.status,
-            currentPeriodEnd:
-              user.subscription.currentPeriodEnd.toISOString(),
-            cancelAtPeriodEnd: user.subscription.cancelAtPeriodEnd,
-          }
-        : undefined,
+      subscription:
+        !isDev && user.subscription
+          ? {
+              status: user.subscription.status,
+              currentPeriodEnd:
+                user.subscription.currentPeriodEnd.toISOString(),
+              cancelAtPeriodEnd: user.subscription.cancelAtPeriodEnd,
+            }
+          : undefined,
+      source,
     };
   }
 

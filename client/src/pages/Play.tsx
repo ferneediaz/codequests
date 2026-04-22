@@ -35,6 +35,8 @@ import type {
 import api from '@/services/api';
 import { toast } from 'sonner';
 import { getRankTier } from '@/utils/rank';
+import { usePaywall } from '@/hooks/usePaywall';
+import { useSubscription } from '@/hooks/useSubscription';
 
 const MODES: {
     value: BattleMode;
@@ -127,6 +129,8 @@ export default function Play() {
     const user = useAppSelector((state) => state.auth.user);
     const mmr = user?.mmr ?? 1000;
     const tier = useMemo(() => getRankTier(mmr), [mmr]);
+    const { requireCanPlay } = usePaywall();
+    const { refresh: refreshSubscription } = useSubscription();
 
     // Config state
     const [mode, setMode] = useState<BattleMode>('ONE_V_ONE');
@@ -162,10 +166,12 @@ export default function Play() {
     });
 
     const handleFindMatch = () => {
+        if (!requireCanPlay()) return;
         navigate('/matchmaking', { state: { config: getConfig() } });
     };
 
     const handleCreatePrivate = async () => {
+        if (!requireCanPlay()) return;
         setIsCreatingPrivate(true);
         try {
             const { data } = await api.post('/battles/invite', {
@@ -177,6 +183,7 @@ export default function Play() {
                 preferredDifficulty: difficulty === 'ANY' ? undefined : difficulty,
             });
             setInviteCode(data.inviteCode);
+            void refreshSubscription();
         } catch (error: unknown) {
             const message =
                 (error as { response?: { data?: { message?: string } } })?.response?.data
@@ -197,9 +204,11 @@ export default function Play() {
 
     const handleJoinByCode = async () => {
         if (!joinCode.trim()) return;
+        if (!requireCanPlay()) return;
         setIsJoining(true);
         try {
             const { data } = await api.post(`/battles/invite/${joinCode.trim()}/join`);
+            void refreshSubscription();
             navigate(`/battle/${data.id}`);
         } catch (error) {
             console.error('Failed to join game:', error);

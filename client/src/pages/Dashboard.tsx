@@ -42,6 +42,7 @@ import {
     computeAverageTestsPassed,
     buildHeatmap,
 } from '@/utils/stats';
+import { usePaywall } from '@/hooks/usePaywall';
 
 const MODE_META: Record<BattleMode, { label: string; icon: typeof Swords }> = {
     ONE_V_ONE: { label: '1v1', icon: Swords },
@@ -58,6 +59,20 @@ export default function Dashboard() {
     const navigate = useNavigate();
     const user = useAppSelector((state) => state.auth.user);
     const [showAllMatches, setShowAllMatches] = useState(false);
+    const { requireCanPlay } = usePaywall();
+
+    const handleQuickMatch = () => {
+        if (!requireCanPlay()) return;
+        navigate('/matchmaking', {
+            state: {
+                config: {
+                    mode: 'ONE_V_ONE',
+                    timeLimitMinutes: 10,
+                    enabledSkills: [],
+                },
+            },
+        });
+    };
 
     const { data: stats, isLoading: statsLoading } = useQuery<UserStats>({
         queryKey: ['userStats', user?.id],
@@ -159,17 +174,7 @@ export default function Dashboard() {
                                     size="lg"
                                     variant="outline"
                                     className="h-14 px-6"
-                                    onClick={() =>
-                                        navigate('/matchmaking', {
-                                            state: {
-                                                config: {
-                                                    mode: 'ONE_V_ONE',
-                                                    timeLimitMinutes: 10,
-                                                    enabledSkills: [],
-                                                },
-                                            },
-                                        })
-                                    }
+                                    onClick={handleQuickMatch}
                                 >
                                     <Zap className="mr-2 h-4 w-4 text-primary" />
                                     Quick Match
@@ -392,17 +397,7 @@ export default function Dashboard() {
                         title="Quick Match"
                         description="Jump into 1v1 ranked instantly"
                         icon={<Zap className="h-5 w-5" />}
-                        onClick={() =>
-                            navigate('/matchmaking', {
-                                state: {
-                                    config: {
-                                        mode: 'ONE_V_ONE',
-                                        timeLimitMinutes: 10,
-                                        enabledSkills: [],
-                                    },
-                                },
-                            })
-                        }
+                        onClick={handleQuickMatch}
                     />
                     <QuickAction
                         delay={150}

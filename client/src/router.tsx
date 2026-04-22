@@ -14,6 +14,7 @@ import PracticeSolve from '@/pages/PracticeSolve';
 import AuthorList from '@/pages/AuthorList';
 import AuthorPreview from '@/pages/AuthorPreview';
 import InviteJoin from '@/pages/InviteJoin';
+import Pricing from '@/pages/Pricing';
 
 export const router = createBrowserRouter([
     {
@@ -68,6 +69,10 @@ export const router = createBrowserRouter([
                     {
                         path: '/practice/:problemId',
                         element: <PracticeSolve />,
+                    },
+                    {
+                        path: '/pricing',
+                        element: <Pricing />,
                     },
                     // Dev-only problem authoring tools. The server returns
                     // 404 unless ENABLE_AUTHOR_TOOLS=true, so these pages

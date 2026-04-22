@@ -61,7 +61,18 @@
 
 ## 🚧 In Progress
 
-_Nothing currently in progress_
+**Next up (queued after Subscription System shipped):**
+
+1. **Friends UI (Phase 3.1)** — backend endpoints and real-time presence are
+   complete; this delivers the biggest social-retention lift for the least
+   client effort. Start with `friendsSlice` + friends list sidebar.
+2. **Chat completion (Phase 3.2)** — backend (DMs, lobby/battle history) is
+   complete and `BattleChat` is already wired in-battle. Finish history
+   pagination, lobby chat, and direct-message threads.
+
+Clan pages/challenges (3.3/3.4) and Push notifications (3.5) come after,
+in that order. Avoid Battle Royale UI and Achievements until their server
+TODOs close out.
 
 ---
 
@@ -254,30 +265,44 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 **Goal:** Subscription gating, skills system, satisfying win celebrations, invites.
 **Depends on backend:** Subscription module, Skills module, Invite module.
 
-### 2.1 Subscription System
-- [ ] Create `subscriptionSlice` (plan: free/pro, gamesRemaining, gamesPlayedToday, resetsAt)
-- [ ] Create `useSubscription` hook (canPlay, isPro, gamesRemaining)
-- [ ] Create `usePaywall` hook (checkAccess, showPaywall)
-- [ ] Pricing page (`/pricing`):
-  - [ ] Single plan card: $5 / 2 months
-  - [ ] Feature comparison (free vs pro)
-  - [ ] "Subscribe" button → calls `POST /api/subscriptions/checkout` → redirects to Stripe hosted checkout
-  - [ ] Handle return from Stripe (success/cancel URL params)
-- [ ] Paywall modal component:
-  - [ ] Shown when free user tries to play 2nd game of the day
-  - [ ] "You've used your free game today. Upgrade to Pro for unlimited battles!"
-  - [ ] CTA button to pricing page
-  - [ ] Close/dismiss button
-- [ ] Games remaining badge in navbar/dashboard:
-  - [ ] Free users: "1 free game today" or "0 games remaining"
-  - [ ] Pro users: "Pro ∞" badge
-- [ ] Gate check on:
-  - [ ] `/play` (game creation)
-  - [ ] `/play/quick` (quick play)
-  - [ ] Matchmaking queue join
-  - [ ] Joining a battle
-- [ ] Fetch subscription status on login from `GET /api/subscriptions/status`
-- [ ] **Success Criteria:** Free user blocked after 1 game → paywall shown → can subscribe → unlimited games ✅
+### 2.1 Subscription System ✅
+- [x] Create `subscriptionSlice` (tier free/pro/trial, gamesRemaining, gamesPlayedToday, resetsAt, source)
+- [x] Create `useSubscription` hook (isPro, isDev, canPlay, refresh)
+- [x] Create `usePaywall` hook (requireCanPlay, guard)
+- [x] Pricing page (`/pricing`):
+  - [x] Plan cards: $5 / 2 months + yearly option
+  - [x] Feature comparison (free vs pro)
+  - [x] "Upgrade" buttons → `POST /api/subscriptions/checkout` → Stripe hosted checkout redirect
+  - [x] Handle return from Stripe (`?checkout=success|cancel`) with toast + status refresh
+  - [x] "Manage Billing" button for active Pro users → `POST /api/subscriptions/portal`
+- [x] Paywall prompt via sonner toast (actionable "Upgrade" CTA → `/pricing`)
+  - Uses toast instead of a modal to match the existing design language; same
+    copy hooks + CTA as a modal without introducing a new Dialog primitive.
+- [x] Games remaining badge in navbar:
+  - [x] Free users: "N free game(s) today" → amber "0 today · Upgrade" when out
+  - [x] Pro users: "PRO ∞" pill
+  - [x] Trial users: "TRIAL ∞" pill
+  - [x] Dev-allowlist users: "DEV PRO ∞" pill (surfaces server `source === 'dev'`)
+- [x] Gate check on:
+  - [x] `/play` → Find Match, Create Private, Join by Code
+  - [x] Dashboard Quick Match (hero + quick-action card)
+  - [x] Matchmaking queue join (`useMatchmaking.joinQueue` defensive gate)
+  - [x] Joining a battle via `/invite/:code` and in-app invite toast
+- [x] Fetch subscription status on login from `GET /api/subscriptions/status`
+  - Mounted in `RootLayout` via `useSubscription`; refreshed after each
+    successful gameplay-initiating action.
+- [x] Dev bypass: server reads `DEV_PRO_USER_IDS` / `DEV_PRO_EMAILS` and
+  short-circuits `canPlay` + reports `source: 'dev'` in `getSubscriptionStatus`
+  so developer accounts are unaffected by the free daily limit without
+  touching Stripe. Covered by unit tests in `subscriptions.service.spec.ts`.
+- [x] **Success Criteria:** Free user blocked after 1 game → upgrade toast shown → can subscribe → unlimited games ✅
+
+#### Follow-ups (non-blocking)
+- [ ] Replace the sonner "out of free games" toast with a dedicated modal
+  once a shared Dialog primitive lands in `components/ui/`.
+- [ ] Surface the subscription status on the Profile page when that page
+  lands.
+- [ ] Quick Play preset (`/play/quick`) should share the same gate flow.
 
 ### 2.2 Skills System UI ✅
 - [x] Skill bar component (`SkillBar.tsx`) displayed during battle:
