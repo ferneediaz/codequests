@@ -33,7 +33,7 @@ import type {
     MatchHistoryEntry,
     BattleMode,
 } from '@/types/api';
-import { getRankTier, getNextRankTier, getRankProgress } from '@/utils/rank';
+import { getRankTier, getNextRankTier, getRankProgress, getRankTiers } from '@/utils/rank';
 import {
     computeStreak,
     computeWinRate,
@@ -113,6 +113,8 @@ export default function Dashboard() {
     const tier = getRankTier(mmr);
     const nextTier = getNextRankTier(mmr);
     const progress = getRankProgress(mmr);
+    const rankTiers = getRankTiers();
+    const currentRankIndex = rankTiers.findIndex((rank) => rank.name === tier.name);
 
     const derived = useMemo(() => {
         const h = history ?? [];
@@ -198,22 +200,117 @@ export default function Dashboard() {
 
                         {/* Rank progress */}
                         <div className="relative mt-8">
-                            <div className="mb-2 flex items-end justify-between text-xs">
-                                <span className="text-muted-foreground">
-                                    Progress to{' '}
-                                    <span className="font-semibold text-foreground">
-                                        {nextTier ? `${nextTier.icon} ${nextTier.name}` : 'Top Tier'}
+                            <div className="rounded-2xl border border-border/60 bg-background/35 p-4 backdrop-blur-sm">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <span
+                                            className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold"
+                                            style={{
+                                                borderColor: `${tier.color}40`,
+                                                background: `${tier.color}18`,
+                                                color: tier.color,
+                                            }}
+                                        >
+                                            {tier.icon} {tier.name}
+                                        </span>
+                                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span className="text-muted-foreground">
+                                            {nextTier ? (
+                                                <>
+                                                    Next:{' '}
+                                                    <span className="font-semibold text-foreground">
+                                                        {nextTier.icon} {nextTier.name}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <span className="font-semibold text-foreground">
+                                                    Top tier reached
+                                                </span>
+                                            )}
+                                        </span>
+                                    </div>
+
+                                    <span className="text-xs font-mono text-muted-foreground">
+                                        {nextTier ? `${nextTier.minMmr - mmr} MMR to rank up` : 'MAX'}
                                     </span>
-                                </span>
-                                <span className="font-mono text-muted-foreground">
-                                    {nextTier ? `${mmr} / ${nextTier.minMmr}` : 'MAX'}
-                                </span>
-                            </div>
-                            <div className="h-2.5 w-full overflow-hidden rounded-full border border-border/60 bg-background/60">
-                                <div
-                                    className="h-full rounded-full bg-gradient-to-r from-primary via-blue-400 to-violet-400 transition-all duration-700"
-                                    style={{ width: `${progress}%` }}
-                                />
+                                </div>
+
+                                <div className="mt-3">
+                                    <div className="mb-2 flex items-end justify-between text-xs">
+                                        <span className="text-muted-foreground">Rank-up progress</span>
+                                        <span className="font-mono text-muted-foreground">
+                                            {nextTier ? `${mmr} / ${nextTier.minMmr}` : 'MAX'}
+                                        </span>
+                                    </div>
+                                    <div className="h-2.5 w-full overflow-hidden rounded-full border border-border/60 bg-background/60">
+                                        <div
+                                            className="h-full rounded-full bg-gradient-to-r from-primary via-blue-400 to-violet-400 transition-all duration-700"
+                                            style={{ width: `${progress}%` }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="mt-4">
+                                    <div className="relative h-8">
+                                        <div className="absolute left-0 right-0 top-3 h-[2px] bg-border/70" />
+                                        <div
+                                            className="absolute left-0 top-3 h-[2px] bg-gradient-to-r from-primary via-blue-400 to-violet-400"
+                                            style={{
+                                                width:
+                                                    currentRankIndex <= 0
+                                                        ? '0%'
+                                                        : `${(currentRankIndex / (rankTiers.length - 1)) * 100}%`,
+                                            }}
+                                        />
+                                        {rankTiers.map((rank, index) => {
+                                            const isCurrent = rank.name === tier.name;
+                                            const isNext = !!nextTier && rank.name === nextTier.name;
+                                            const isPassed = index <= currentRankIndex;
+                                            const mmrLabel =
+                                                rank.maxMmr == null
+                                                    ? `${rank.minMmr}+`
+                                                    : `${rank.minMmr}-${rank.maxMmr}`;
+                                            const mmrToRank = Math.max(0, rank.minMmr - mmr);
+                                            const hoverInfo = `${rank.icon} ${rank.name}\nMMR: ${mmrLabel}\n${isCurrent
+                                                ? 'Current rank'
+                                                : isPassed
+                                                    ? 'Unlocked'
+                                                    : `${mmrToRank} MMR to unlock`
+                                                }`;
+                                            return (
+                                                <div
+                                                    key={rank.name}
+                                                    className="absolute top-0 -translate-x-1/2"
+                                                    style={{
+                                                        left: `${(index / (rankTiers.length - 1)) * 100}%`,
+                                                    }}
+                                                >
+                                                    <div
+                                                        className="mx-auto h-6 w-6 cursor-pointer rounded-full border text-[12px] shadow-sm"
+                                                        style={{
+                                                            borderColor:
+                                                                isCurrent || isNext || isPassed
+                                                                    ? `${rank.color}80`
+                                                                    : `${rank.color}35`,
+                                                            background:
+                                                                isCurrent || isNext || isPassed
+                                                                    ? `${rank.color}22`
+                                                                    : `${rank.color}10`,
+                                                            boxShadow: isCurrent
+                                                                ? `0 0 0 2px ${rank.color}35`
+                                                                : undefined,
+                                                        }}
+                                                        title={hoverInfo}
+                                                    >
+                                                        <span className="flex h-full items-center justify-center">
+                                                            {rank.icon}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

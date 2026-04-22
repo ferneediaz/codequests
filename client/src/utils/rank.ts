@@ -10,6 +10,10 @@ const RANK_TIERS: RankTier[] = [
     { name: 'Cracked', icon: '💀', color: '#ef4444', minMmr: 1900, maxMmr: null },
 ];
 
+export function getRankTiers(): RankTier[] {
+    return RANK_TIERS;
+}
+
 export function getRankTier(mmr: number): RankTier {
     for (let i = RANK_TIERS.length - 1; i >= 0; i--) {
         if (mmr >= RANK_TIERS[i].minMmr) {
