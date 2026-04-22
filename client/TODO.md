@@ -40,6 +40,10 @@
 | `/battle/:id/results/share` | Public shareable result page | No | No |
 | `/invite/:code` | Invite link handler | Yes | No |
 | `/matchmaking` | Matchmaking queue UI | Yes | Check |
+| `/practice` | Practice Ground problem list | Yes | No |
+| `/practice/:problemId` | Practice solve view | Yes | No |
+| `/author` | Dev-only YAML problem list/preview launcher | No | No |
+| `/author/problems/:slug` | Dev-only problem preview + dry-run sandbox | No | No |
 | `/profile/:username` | Player profile | No | No |
 | `/profile/settings` | Profile settings | Yes | No |
 | `/leaderboard` | Rankings | No | No |
@@ -58,6 +62,60 @@
 ## 🚧 In Progress
 
 _Nothing currently in progress_
+
+---
+
+## ✅ Practice Ground — COMPLETED
+
+Non-competitive problem-solving mode. Free for everyone; stat tracking is a PRO perk.
+
+### Completed:
+
+- [x] `Practice.tsx` problem list page
+  - Difficulty filter (All / Easy / Medium / Hard)
+  - Topic tag multi-select filter
+  - "Unsolved only" toggle
+  - Solved checkmark (or 🔒 upgrade hint for FREE users)
+  - Per-problem attempt counter
+  - Hero stats tile (solved/total, total attempts, solve rate)
+- [x] `PracticeSolve.tsx` solve view reusing battle components:
+  - `ProblemPanel`, `CodeEditor`, `ConsolePanel` — no Timer, no OpponentProgress, no SkillBar, no BattleChat
+  - Horizontal + vertical resizable splits
+  - Run button (`POST /problems/:id/execute` — stdout sandbox)
+  - Submit button (`POST /api/practice/attempts` — records for PRO)
+  - Language switcher constrained to Python + JavaScript
+  - FREE-tier upsell banner above the editor
+  - Toast feedback on run/submit
+- [x] TanStack Query hooks for `GET /practice/problems` and `GET /practice/stats`
+- [x] `client/src/services/practice.ts` API helper + `client/src/types/practice.ts` types
+- [x] Navbar link to `/practice` (between Dashboard and Play)
+- [x] Practice Ground quick-action card on Dashboard
+
+### Follow-ups:
+
+- [ ] Profile tab: render `stats.practice` (topics-I-crush visualization, difficulty bars)
+- [ ] Per-problem attempt history drawer in PracticeSolve
+
+---
+
+## ✅ Dev Authoring Preview + Harness Editing — COMPLETED
+
+Dev-focused tooling to preview YAML-authored problems and safely edit only the function body.
+
+### Completed:
+
+- [x] Added dev routes: `/author` and `/author/problems/:slug`
+- [x] Added `AuthorList.tsx` and `AuthorPreview.tsx` pages for YAML problem browsing + dry-run execution
+- [x] Added shared starter parser (`client/src/lib/starterCode.ts`) to support both:
+  - Legacy `{ lang: fullProgram }`
+  - New `{ lang: { prefix, body, suffix } }`
+- [x] Updated `CodeEditor` to expose/edit only `body` while preserving hidden IO harness server-side
+- [x] Updated battle/practice flow to use parsed body starters consistently
+
+### Follow-ups:
+
+- [ ] Add discoverability link to author tools in dev builds only (instead of direct route entry)
+- [ ] Add client tests for legacy/new starter-code parsing edge cases
 
 ---
 

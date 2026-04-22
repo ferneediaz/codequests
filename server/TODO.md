@@ -42,6 +42,84 @@ _Nothing currently in progress_
 
 ---
 
+## ✅ Practice Ground - COMPLETED
+
+Free, non-competitive problem-solving mode. Same problem pool as battles, no timer,
+no MMR. Attempts are persisted only for PRO/trial users — the FREE experience is
+unlimited runs/submits with no history, which doubles as an upsell hook.
+
+### Completed:
+
+**Database schema**
+- [x] `PracticeAttempt` model with `(userId, problemId, language, code, passed, testsPassed, totalTests, attemptedAt)`
+- [x] Indexes on `(userId, attemptedAt)` and `(userId, problemId)`
+- [x] Inverse relations on `User.practiceAttempts` and `Problem.practiceAttempts`
+
+**Practice module (`server/src/practice/`)**
+- [x] `PracticeService.submitAttempt` — runs the code, persists only if user is PRO or on active trial
+- [x] `PracticeService.getMyAttempts` — paginated attempt history per user
+- [x] `PracticeService.getSolvedProblemIds` — O(1) lookup for solved state
+- [x] `PracticeService.getMyStats` — totalAttempts, totalSolved, solveRate, per-topic breakdown, per-difficulty counts
+- [x] `PracticeService.listProblems` — problem list enriched with `{ solved, attempts }` per user
+- [x] Tier gating reuses `SubscriptionsService.isTrialActive` — no new subscription logic
+- [x] Swagger-annotated `PracticeController`:
+  - `POST /api/practice/attempts` → `{ passed, total, results[], allPassed, saved }`
+  - `GET /api/practice/attempts?problemId&page&limit`
+  - `GET /api/practice/stats`
+  - `GET /api/practice/problems?difficulty&tags&unsolvedOnly`
+- [x] All endpoints behind `AuthGuard('jwt')`
+- [x] 17 unit tests in `practice.service.spec.ts` (save vs no-save, stats aggregation, solved set, filters) — all passing ✅
+
+**Profile integration**
+- [x] `GET /users/:id/stats` now returns a `practice` field (empty for FREE users, aggregated for PRO)
+
+**Seed harness fix (pre-existing bug)**
+- [x] Rewrote JS + Python starter code for all 7 seed problems to include stdin parsing + output harness. Previously, starter code was just function signatures — combined with the Piston stdin/stdout runner, Run/Submit never actually worked. Now it does, for both battles and practice.
+- [x] Fixed ambiguous Two Sum hidden test case (`[1,5,3,7,9] → [1,3]` had two valid pairs). Replaced with `[1,5,3,2,9] target=11 → [3,4]`.
+- [x] Seed is now idempotent for problem fields + test cases (fields update on re-run; test cases delete+recreate).
+
+### Not in this slice (follow-ups):
+
+- [ ] Admin "easy add question" UI at `/admin/problems/new` — calls existing `POST /api/problems`.
+- [ ] Reference-solution validator script (run each seed's canonical solution against all tests in CI).
+
+---
+
+## ✅ YAML Problem Authoring + Import Pipeline - COMPLETED
+
+Local-first authoring workflow for defining problems in YAML, previewing them, and importing into Postgres.
+
+### Completed:
+
+**Schema + dependencies**
+- [x] Added `js-yaml` + `zod` (and `@types/js-yaml`) for parsing/validation
+- [x] Added `server/problems/*.yaml` source-of-truth problem files (7 seeded problems)
+
+**Authoring domain (`server/src/problems/authoring/`)**
+- [x] Zod schema for YAML contract (`problem-yaml.schema.ts`)
+- [x] Loader utilities with aggregated validation errors + duplicate id detection
+- [x] Dev-only controller/module (`/author/*`) gated behind `ENABLE_AUTHOR_TOOLS=true`
+- [x] Dry-run endpoint (`POST /author/dry-run`) executes `{prefix, body, suffix}` harness without DB writes
+- [x] Import script (`import-problems.ts`) upserts problems and replace-syncs test cases
+
+**Execution pipeline hardening**
+- [x] Introduced starter-code helpers (`parseStarterCode`, `stitchSource`, `serializeStarterCode`)
+- [x] `CodeExecutionService` now stitches user body into stored harness before execution
+- [x] Added explicit "empty output" guidance when code runs but prints nothing
+- [x] Added `executeWithHarness` for authoring dry-runs
+
+**Integration**
+- [x] Registered `PracticeModule` in `AppModule` and surfaced practice stats via `UsersService`
+- [x] Updated tests/mocks for starter harness and new practice stats dependency
+- [x] Updated docs (`server/readme.md`) for the new authoring/import flow
+
+### Follow-ups:
+
+- [ ] Add CI job to run YAML validation + importer dry-run on PRs
+- [ ] Add reference-solution verification per YAML problem before import
+
+---
+
 ## ✅ Battle System - COMPLETED
 
 The **core competitive feature** is now implemented!

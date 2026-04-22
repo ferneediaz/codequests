@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService, MockPrismaService } from '../__mocks__/prisma.service';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 import { getRankTier } from '../common/utils/rank-tiers';
+import { PracticeService } from '../practice/practice.service';
 
 describe('UsersService', () => {
     let service: UsersService;
@@ -11,6 +12,16 @@ describe('UsersService', () => {
 
     beforeEach(async () => {
         const mockPrisma = createMockPrismaService();
+        const mockPractice = {
+            getMyStats: jest.fn().mockResolvedValue({
+                totalAttempts: 0,
+                totalSolved: 0,
+                solveRate: 0,
+                topics: [],
+                byDifficulty: { EASY: 0, MEDIUM: 0, HARD: 0 },
+                isTracked: false,
+            }),
+        };
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -18,6 +29,10 @@ describe('UsersService', () => {
                 {
                     provide: PrismaService,
                     useValue: mockPrisma,
+                },
+                {
+                    provide: PracticeService,
+                    useValue: mockPractice,
                 },
             ],
         }).compile();
@@ -284,7 +299,7 @@ describe('UsersService', () => {
 
             const result = await service.getStats('user-123');
 
-            expect(result).toEqual({
+            expect(result).toMatchObject({
                 mmr: 1500,
                 wins: 15,
                 losses: 5,
@@ -292,6 +307,8 @@ describe('UsersService', () => {
                 winRate: 75,
                 tier: getRankTier(1500),
             });
+            expect(result.practice).toBeDefined();
+            expect(result.practice.isTracked).toBe(false);
         });
 
         it('should handle zero games', async () => {

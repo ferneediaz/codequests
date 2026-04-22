@@ -5,6 +5,16 @@ import { PistonClient } from './piston.client';
 import { createMockPrismaService, MockPrismaService } from '../__mocks__/prisma.service';
 import { BadRequestException } from '@nestjs/common';
 
+/**
+ * Minimal starter harness used by the mocked problems. The service now
+ * refuses to run without one, so every `problem.findUnique` mock in this
+ * file includes this field.
+ */
+const MOCK_STARTER_CODE = JSON.stringify({
+  javascript: { prefix: '', body: '', suffix: '' },
+  python: { prefix: '', body: '', suffix: '' },
+});
+
 describe('CodeExecutionService', () => {
   let service: CodeExecutionService;
   let prisma: MockPrismaService;
@@ -43,6 +53,7 @@ describe('CodeExecutionService', () => {
       const problem = {
         id: 'problem-1',
         title: 'Two Sum',
+        starterCode: MOCK_STARTER_CODE,
         testCases: [
           {
             id: 'test-1',
@@ -97,6 +108,7 @@ describe('CodeExecutionService', () => {
     it('should handle compilation errors', async () => {
       const problem = {
         id: 'problem-1',
+        starterCode: MOCK_STARTER_CODE,
         testCases: [
           {
             id: 'test-1',
@@ -134,6 +146,7 @@ describe('CodeExecutionService', () => {
     it('should hide details of hidden test cases on failure', async () => {
       const problem = {
         id: 'problem-1',
+        starterCode: MOCK_STARTER_CODE,
         testCases: [
           {
             id: 'test-1',
@@ -168,6 +181,7 @@ describe('CodeExecutionService', () => {
     it('should handle mixed pass/fail results', async () => {
       const problem = {
         id: 'problem-1',
+        starterCode: MOCK_STARTER_CODE,
         testCases: [
           { id: 'test-1', input: '[2,7]\n9', expectedOutput: '[0,1]', isHidden: false },
           { id: 'test-2', input: '[3,3]\n6', expectedOutput: '[0,1]', isHidden: false },
@@ -208,6 +222,7 @@ describe('CodeExecutionService', () => {
     it('should handle runtime errors', async () => {
       const problem = {
         id: 'problem-1',
+        starterCode: MOCK_STARTER_CODE,
         testCases: [
           { id: 'test-1', input: '', expectedOutput: 'hello', isHidden: false },
         ],
@@ -236,6 +251,7 @@ describe('CodeExecutionService', () => {
     it('should handle execution exceptions gracefully', async () => {
       const problem = {
         id: 'problem-1',
+        starterCode: MOCK_STARTER_CODE,
         testCases: [
           { id: 'test-1', input: '', expectedOutput: 'hello', isHidden: false },
           { id: 'test-2', input: '', expectedOutput: 'world', isHidden: false },
@@ -257,6 +273,7 @@ describe('CodeExecutionService', () => {
     it('should throw BadRequestException for unsupported language', async () => {
       const problem = {
         id: 'problem-1',
+        starterCode: MOCK_STARTER_CODE,
         testCases: [{ id: 'test-1', input: '', expectedOutput: '', isHidden: false }],
       };
 
@@ -278,6 +295,7 @@ describe('CodeExecutionService', () => {
     it('should throw BadRequestException when no test cases exist', async () => {
       const problem = {
         id: 'problem-1',
+        starterCode: MOCK_STARTER_CODE,
         testCases: [],
       };
 

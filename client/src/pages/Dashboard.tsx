@@ -25,6 +25,7 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     Minus,
+    BookOpen,
 } from 'lucide-react';
 import api from '@/services/api';
 import type {
@@ -48,6 +49,10 @@ const MODE_META: Record<BattleMode, { label: string; icon: typeof Swords }> = {
     GROUP: { label: 'Group', icon: Users },
     CLAN_VS_CLAN: { label: 'Clan', icon: Users },
 };
+
+function getModeMeta(mode: string): { label: string; icon: typeof Swords } {
+    return MODE_META[mode as BattleMode] ?? { label: mode || 'Unknown', icon: Swords };
+}
 
 export default function Dashboard() {
     const navigate = useNavigate();
@@ -374,7 +379,7 @@ export default function Dashboard() {
                 </AnimateIn>
 
                 {/* ---------------- QUICK ACTIONS ---------------- */}
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <QuickAction
                         delay={0}
                         title="New Battle"
@@ -383,7 +388,7 @@ export default function Dashboard() {
                         onClick={() => navigate('/play')}
                     />
                     <QuickAction
-                        delay={100}
+                        delay={75}
                         title="Quick Match"
                         description="Jump into 1v1 ranked instantly"
                         icon={<Zap className="h-5 w-5" />}
@@ -400,7 +405,14 @@ export default function Dashboard() {
                         }
                     />
                     <QuickAction
-                        delay={200}
+                        delay={150}
+                        title="Practice Ground"
+                        description="Solve problems, no timer, no pressure"
+                        icon={<BookOpen className="h-5 w-5" />}
+                        onClick={() => navigate('/practice')}
+                    />
+                    <QuickAction
+                        delay={225}
                         title="Invite Friends"
                         description="Create a private game with a code"
                         icon={<Users className="h-5 w-5" />}
@@ -525,8 +537,8 @@ function Heatmap({ grid, max }: { grid: number[][]; max: number }) {
 }
 
 function ModeBreakdown({ dist }: { dist: Record<BattleMode, number> }) {
-    const entries = (Object.keys(dist) as BattleMode[])
-        .map((mode) => ({ mode, count: dist[mode] }))
+    const entries = Object.keys(dist)
+        .map((mode) => ({ mode, count: dist[mode as BattleMode] }))
         .filter((e) => e.count > 0)
         .sort((a, b) => b.count - a.count);
     const total = entries.reduce((a, b) => a + b.count, 0);
@@ -543,7 +555,7 @@ function ModeBreakdown({ dist }: { dist: Record<BattleMode, number> }) {
         <div className="space-y-2.5">
             {entries.map(({ mode, count }) => {
                 const pct = Math.round((count / total) * 100);
-                const meta = MODE_META[mode];
+                const meta = getModeMeta(mode);
                 const Icon = meta.icon;
                 return (
                     <div key={mode}>
@@ -582,7 +594,7 @@ function MatchRow({
     const won = match.winnerId === userId;
     const isDraw = match.status === 'COMPLETED' && !match.winnerId;
     const mmrChange = me?.mmrChange;
-    const meta = MODE_META[match.mode];
+    const meta = getModeMeta(match.mode);
     const ModeIcon = meta.icon;
     const when = match.endedAt ?? match.startedAt ?? match.createdAt;
     const whenLabel = when ? formatRelative(when) : '';

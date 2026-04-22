@@ -1,0 +1,62 @@
+id: problem-001-two-sum
+title: Two Sum
+difficulty: EASY
+tags:
+  - arrays
+  - hash-table
+description: |
+  Given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`.
+
+  You may assume that each input would have exactly one solution, and you may not use the same element twice.
+
+  **Input format:** Line 1 is a JSON array of integers. Line 2 is the target integer.
+  **Output format:** A JSON array of two indices (no spaces), e.g. `[0,1]`.
+
+  **Example 1:**
+  ```
+  Input:
+  [2,7,11,15]
+  9
+  Output: [0,1]
+  ```
+
+  **Example 2:**
+  ```
+  Input:
+  [3,2,4]
+  6
+  Output: [1,2]
+  ```
+languages:
+  javascript:
+    prefix: |
+      const input = require('fs').readFileSync(0, 'utf8');
+      const [numsLine, targetLine] = input.split('\n');
+      const nums = JSON.parse(numsLine);
+      const target = parseInt(targetLine, 10);
+    body: |
+      function twoSum(nums, target) {
+        // Your code here
+        return [];
+      }
+    suffix: |
+      console.log(JSON.stringify(twoSum(nums, target)));
+  python:
+    prefix: |
+      import sys, json
+
+      lines = sys.stdin.read().split('\n')
+      nums = json.loads(lines[0])
+      target = int(lines[1])
+    body: |
+      def two_sum(nums, target):
+          # Your code here
+          return []
+    suffix: |
+      print(json.dumps(two_sum(nums, target), separators=(',', ':')))
+testCases:
+  - { input: "[2,7,11,15]\n9", expectedOutput: "[0,1]", hidden: false }
+  - { input: "[3,2,4]\n6",     expectedOutput: "[1,2]", hidden: false }
+  - { input: "[3,3]\n6",       expectedOutput: "[0,1]", hidden: false }
+  - { input: "[1,5,3,2,9]\n11", expectedOutput: "[3,4]", hidden: true }
+  - { input: "[10,20,30]\n50", expectedOutput: "[1,2]", hidden: true }

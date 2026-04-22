@@ -13,6 +13,8 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { SeasonsModule } from './seasons/seasons.module';
 import { FriendsModule } from './friends/friends.module';
 import { ChatModule } from './chat/chat.module';
+import { PracticeModule } from './practice/practice.module';
+import { AuthoringModule } from './problems/authoring/authoring.module';
 
 @Module({
     imports: [
@@ -38,6 +40,10 @@ import { ChatModule } from './chat/chat.module';
         SeasonsModule,
         FriendsModule,
         ChatModule,
+        PracticeModule,
+
+        // Dev-only routes gated by ENABLE_AUTHOR_TOOLS=true at runtime.
+        AuthoringModule,
 
         // TODO: Add these modules as we build them
         // RankingsModule,

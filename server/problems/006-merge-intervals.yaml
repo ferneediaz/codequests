@@ -1,0 +1,50 @@
+id: problem-006-merge-intervals
+title: Merge Intervals
+difficulty: HARD
+tags:
+  - arrays
+  - sorting
+description: |
+  Given an array of intervals where `intervals[i] = [starti, endi]`, merge all overlapping intervals, and return an array of the non-overlapping intervals that cover all the intervals in the input.
+
+  **Input format:** A JSON array of `[start, end]` pairs.
+  **Output format:** A compact JSON array of merged intervals (no spaces), sorted by start.
+
+  **Example 1:**
+  ```
+  Input: [[1,3],[2,6],[8,10],[15,18]]
+  Output: [[1,6],[8,10],[15,18]]
+  ```
+
+  **Example 2:**
+  ```
+  Input: [[1,4],[4,5]]
+  Output: [[1,5]]
+  ```
+languages:
+  javascript:
+    prefix: |
+      const input = require('fs').readFileSync(0, 'utf8');
+      const intervals = JSON.parse(input.trim());
+    body: |
+      function merge(intervals) {
+        // Your code here
+        return [];
+      }
+    suffix: |
+      console.log(JSON.stringify(merge(intervals)));
+  python:
+    prefix: |
+      import sys, json
+
+      intervals = json.loads(sys.stdin.read().strip())
+    body: |
+      def merge(intervals):
+          # Your code here
+          return []
+    suffix: |
+      print(json.dumps(merge(intervals), separators=(',', ':')))
+testCases:
+  - { input: "[[1,3],[2,6],[8,10],[15,18]]", expectedOutput: "[[1,6],[8,10],[15,18]]", hidden: false }
+  - { input: "[[1,4],[4,5]]",                expectedOutput: "[[1,5]]",                hidden: false }
+  - { input: "[[1,4],[0,4]]",                expectedOutput: "[[0,4]]",                hidden: true }

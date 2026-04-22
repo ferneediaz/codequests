@@ -2,10 +2,14 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { getRankTier } from '../common/utils/rank-tiers';
+import { PracticeService } from '../practice/practice.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private practice: PracticeService,
+  ) {}
 
   /**
    * Get all users (for leaderboard, etc.)
@@ -179,11 +183,14 @@ export class UsersService {
     // Calculate rank tier based on MMR
     const tier = getRankTier(user.mmr);
 
+    const practice = await this.practice.getMyStats(id);
+
     return {
       ...user,
       totalGames,
       winRate: Math.round(winRate * 10) / 10,
       tier,
+      practice,
     };
   }
 }

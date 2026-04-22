@@ -133,6 +133,79 @@ npm run test:integration
 
 ---
 
+## ✍️ Authoring Problems
+
+Problems live in YAML files under [`server/problems/`](./problems). Each file is the source of truth for one problem — the importer upserts it into the DB by stable `id`.
+
+### Workflow
+
+1. **Write the YAML.** Copy an existing file (e.g. [`problems/001-two-sum.yaml`](./problems/001-two-sum.yaml)) and edit. The schema lives in [`src/problems/authoring/problem-yaml.schema.ts`](./src/problems/authoring/problem-yaml.schema.ts).
+
+    ```yaml
+    id: problem-123-my-problem           # stable, lowercase, dashes only
+    title: My Problem
+    difficulty: EASY                     # EASY | MEDIUM | HARD
+    tags: [arrays]
+    description: |
+      Markdown-formatted problem statement...
+    languages:
+      javascript:
+        prefix: |                        # reads stdin, prepares variables
+          const input = require('fs').readFileSync(0, 'utf8');
+          const n = parseInt(input, 10);
+        body: |                          # what the solver sees + edits
+          function solve(n) {
+            return 0;
+          }
+        suffix: |                        # calls the function, prints result
+          console.log(solve(n));
+      python:
+        prefix: |
+          import sys
+          n = int(sys.stdin.read())
+        body: |
+          def solve(n):
+              return 0
+        suffix: |
+          print(solve(n))
+    testCases:
+      - { input: "1", expectedOutput: "0", hidden: false }
+      - { input: "5", expectedOutput: "4", hidden: true }
+    ```
+
+    Only `body` is shown in the editor; `prefix + body + suffix` is stitched server-side and run through Piston.
+
+2. **Try it locally in the author preview UI.** Start server and client with the author flag:
+
+    ```bash
+    # server
+    ENABLE_AUTHOR_TOOLS=true npm run start:dev
+
+    # client
+    npm run dev
+    ```
+
+    Open <http://localhost:5173/author> for the list, or jump straight to `/author/problems/<id>`. The page shows three Monaco panes (prefix read-only, body editable, suffix read-only), an editable test-case table, and a "Run all tests" button that hits `POST /api/author/dry-run`. No DB writes happen during a dry-run. Without `ENABLE_AUTHOR_TOOLS=true` the endpoints 404.
+
+3. **Import into the DB.** Once the dry-run looks good:
+
+    ```bash
+    npm run problems:import
+    ```
+
+    This parses every `server/problems/*.yaml`, Zod-validates it, and upserts the `Problem` + replaces its `TestCase` rows. Also runs automatically during `npm run prisma:seed`.
+
+4. **Open a PR.** Commit the new YAML file. CI / deploy scripts should run `npm run problems:import` after migrations so prod stays in sync with the checked-in YAML files.
+
+### Rules / gotchas
+
+- IDs must be unique across all files. Duplicate IDs fail the importer loudly.
+- Test cases are delete-and-created on every import — do not store anything else under the `TestCase` relation that you care about preserving.
+- `hidden: true` test cases are not shown to solvers on failure.
+- Supported languages today: `javascript`, `python`. Add new ones by extending `SUPPORTED_LANGUAGES` in `problem-yaml.schema.ts`.
+
+---
+
 ## 📦 Available Scripts
 
 | Command | Description |
@@ -152,6 +225,7 @@ npm run test:integration
 | `npm run prisma:migrate` | Run Prisma migrations |
 | `npm run prisma:studio` | Open Prisma Studio GUI |
 | `npm run prisma:seed` | Seed database with sample data |
+| `npm run problems:import` | Upsert every YAML problem under `server/problems/` |
 
 ---
 
@@ -274,7 +348,7 @@ The server uses Piston for code execution:
 | C | GCC 11+ | ✅ |
 | Rust | 1.70+ | ✅ |
 
----
+---and ran tests
 
 ## 📊 Sample Data
 

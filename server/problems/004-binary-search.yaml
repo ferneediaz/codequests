@@ -1,0 +1,61 @@
+id: problem-004-binary-search
+title: Binary Search
+difficulty: MEDIUM
+tags:
+  - arrays
+  - binary-search
+description: |
+  Given an array of integers `nums` which is sorted in ascending order, and an integer `target`, write a function to search `target` in `nums`. If `target` exists, return its index. Otherwise, return `-1`.
+
+  You must write an algorithm with O(log n) runtime complexity.
+
+  **Input format:** Line 1 is a JSON array of integers. Line 2 is the target integer.
+  **Output format:** A single integer index (or `-1`).
+
+  **Example 1:**
+  ```
+  Input:
+  [-1,0,3,5,9,12]
+  9
+  Output: 4
+  ```
+
+  **Example 2:**
+  ```
+  Input:
+  [-1,0,3,5,9,12]
+  2
+  Output: -1
+  ```
+languages:
+  javascript:
+    prefix: |
+      const input = require('fs').readFileSync(0, 'utf8');
+      const [numsLine, targetLine] = input.split('\n');
+      const nums = JSON.parse(numsLine);
+      const target = parseInt(targetLine, 10);
+    body: |
+      function search(nums, target) {
+        // Your code here
+        return -1;
+      }
+    suffix: |
+      console.log(search(nums, target));
+  python:
+    prefix: |
+      import sys, json
+
+      lines = sys.stdin.read().split('\n')
+      nums = json.loads(lines[0])
+      target = int(lines[1])
+    body: |
+      def search(nums, target):
+          # Your code here
+          return -1
+    suffix: |
+      print(search(nums, target))
+testCases:
+  - { input: "[-1,0,3,5,9,12]\n9",           expectedOutput: "4",  hidden: false }
+  - { input: "[-1,0,3,5,9,12]\n2",           expectedOutput: "-1", hidden: false }
+  - { input: "[5]\n5",                        expectedOutput: "0",  hidden: true }
+  - { input: "[1,2,3,4,5,6,7,8,9,10]\n7",     expectedOutput: "6",  hidden: true }

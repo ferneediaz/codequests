@@ -13,6 +13,7 @@ import { BattleLobby } from '@/components/battle/BattleLobby';
 import { BattleChat } from '@/components/battle/BattleChat';
 import { Button } from '@/components/ui/button';
 import { Loader2, Play, Send } from 'lucide-react';
+import { parseStarterCode } from '@/lib/starterCode';
 
 function useResizable(initialFraction: number, direction: 'horizontal' | 'vertical') {
     const [fraction, setFraction] = useState(initialFraction);
@@ -89,20 +90,14 @@ export default function Battle() {
     const hSplit = useResizable(0.4, 'horizontal');
     const vSplit = useResizable(0.65, 'vertical');
 
-    // Initialize code from starter code when problem loads
-    const starterCodeMap = useMemo(() => {
-        if (!problem?.starterCode) return {};
-        try {
-            return JSON.parse(problem.starterCode) as Record<string, string>;
-        } catch {
-            return {};
-        }
-    }, [problem?.starterCode]);
+    const starterCodeMap = useMemo(
+        () => parseStarterCode(problem?.starterCode),
+        [problem?.starterCode],
+    );
 
-    // Set initial code once problem loads
     useEffect(() => {
         if (problem && !codeInitialized && starterCodeMap[language]) {
-            setCode(starterCodeMap[language]);
+            setCode(starterCodeMap[language].body);
             setCodeInitialized(true);
         }
     }, [problem, codeInitialized, starterCodeMap, language]);

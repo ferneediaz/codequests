@@ -9,6 +9,10 @@ import Play from '@/pages/Play';
 import Matchmaking from '@/pages/Matchmaking';
 import Battle from '@/pages/Battle';
 import Results from '@/pages/Results';
+import Practice from '@/pages/Practice';
+import PracticeSolve from '@/pages/PracticeSolve';
+import AuthorList from '@/pages/AuthorList';
+import AuthorPreview from '@/pages/AuthorPreview';
 
 export const router = createBrowserRouter([
     {
@@ -48,6 +52,25 @@ export const router = createBrowserRouter([
                     {
                         path: '/battle/:id/results',
                         element: <Results />,
+                    },
+                    {
+                        path: '/practice',
+                        element: <Practice />,
+                    },
+                    {
+                        path: '/practice/:problemId',
+                        element: <PracticeSolve />,
+                    },
+                    // Dev-only problem authoring tools. The server returns
+                    // 404 unless ENABLE_AUTHOR_TOOLS=true, so these pages
+                    // display a "disabled" message in production builds.
+                    {
+                        path: '/author',
+                        element: <AuthorList />,
+                    },
+                    {
+                        path: '/author/problems/:slug',
+                        element: <AuthorPreview />,
                     },
                 ],
             },

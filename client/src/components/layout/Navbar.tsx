@@ -9,7 +9,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Swords } from 'lucide-react';
+import { LogOut, User, Swords, BookOpen, LayoutDashboard } from 'lucide-react';
 
 export function Navbar() {
     const { user, isAuthenticated, logout } = useAuth();
@@ -17,10 +17,34 @@ export function Navbar() {
     return (
         <nav className="border-b border-border bg-card">
             <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-                <Link to="/dashboard" className="flex items-center gap-2 text-lg font-bold text-foreground no-underline">
-                    <Swords className="h-5 w-5 text-primary" />
-                    <span>CodeQuest</span>
-                </Link>
+                <div className="flex items-center gap-6">
+                    <Link to="/dashboard" className="flex items-center gap-2 text-lg font-bold text-foreground no-underline">
+                        <Swords className="h-5 w-5 text-primary" />
+                        <span>CodeQuest</span>
+                    </Link>
+                    {isAuthenticated && (
+                        <div className="hidden items-center gap-1 sm:flex">
+                            <Link to="/dashboard">
+                                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                                    <LayoutDashboard className="mr-1.5 h-4 w-4" />
+                                    Dashboard
+                                </Button>
+                            </Link>
+                            <Link to="/practice">
+                                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                                    <BookOpen className="mr-1.5 h-4 w-4" />
+                                    Practice
+                                </Button>
+                            </Link>
+                            <Link to="/play">
+                                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                                    <Swords className="mr-1.5 h-4 w-4" />
+                                    Play
+                                </Button>
+                            </Link>
+                        </div>
+                    )}
+                </div>
 
                 <div className="flex items-center gap-4">
                     {isAuthenticated && user ? (

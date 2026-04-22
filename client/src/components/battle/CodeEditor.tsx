@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
+import { parseStarterCode } from '@/lib/starterCode';
 
 const LANGUAGE_MAP: Record<string, string> = {
     javascript: 'javascript',
@@ -58,19 +59,18 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
     ) {
         const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
-        const starterCodeMap = useMemo(() => {
-            try {
-                return JSON.parse(starterCode) as Record<string, string>;
-            } catch {
-                return {};
-            }
-        }, [starterCode]);
+        // Parse into per-language `{prefix, body, suffix}` entries. Only
+        // `body` is shown in the editor; the harness lives server-side.
+        const starterCodeMap = useMemo(
+            () => parseStarterCode(starterCode),
+            [starterCode],
+        );
 
         const handleLanguageChange = useCallback(
             (e: React.ChangeEvent<HTMLSelectElement>) => {
                 const newLang = e.target.value;
                 onLanguageChange(newLang);
-                const starter = starterCodeMap[newLang] ?? '';
+                const starter = starterCodeMap[newLang]?.body ?? '';
                 onCodeChange(starter);
             },
             [onLanguageChange, onCodeChange, starterCodeMap],
@@ -126,6 +126,9 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
                                 </option>
                             ))}
                         </select>
+                        <span className="ml-auto text-[11px] text-muted-foreground">
+                            Only the function body is editable. IO is handled for you.
+                        </span>
                     </div>
                 )}
 

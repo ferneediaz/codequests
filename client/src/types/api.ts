@@ -98,6 +98,13 @@ export interface ProblemResponse {
     title: string;
     description: string;
     difficulty: Difficulty;
+    /**
+     * JSON string keyed by language. New shape is
+     * `{ javascript: { prefix, body, suffix }, ... }`. The editor only
+     * shows `body`; the server stitches prefix + body + suffix before
+     * executing. Legacy rows may still contain a flat `{ lang: fullProgram }`
+     * string — the shared parser handles both.
+     */
     starterCode: string;
     testCases?: {
         id: string;
@@ -108,6 +115,14 @@ export interface ProblemResponse {
     createdAt: string;
     updatedAt: string;
 }
+
+export interface LanguageStarter {
+    prefix: string;
+    body: string;
+    suffix: string;
+}
+
+export type StarterCodeMap = Record<string, LanguageStarter>;
 
 export interface QueueStatusResponse {
     inQueue: boolean;
