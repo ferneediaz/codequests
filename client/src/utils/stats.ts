@@ -75,47 +75,112 @@ export function computeAverageTestsPassed(
     return Math.round(avg * 100);
 }
 
+export type HeatmapBuildOptions = {
+    year?: number;
+};
+
+export type HeatmapData = {
+    grid: number[][];
+    dates: (Date | null)[][];
+    monthLabels: (string | null)[];
+    max: number;
+    totalGames: number;
+    periodLabel: string;
+};
+
+function toDateKey(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
 /**
- * Build a 12-week activity grid (most recent week on the right).
- * Returns a 2D array [week][dayOfWeek] of counts, where dayOfWeek 0 = Sun.
+ * Build a GitHub-style activity heatmap (weeks x days).
+ * Day index follows JS Date.getDay(): 0 = Sun, 6 = Sat.
  */
 export function buildHeatmap(
     history: MatchHistoryEntry[],
-    weeks = 12,
-): { grid: number[][]; max: number; totalGames: number } {
-    const days = weeks * 7;
+    options?: HeatmapBuildOptions,
+): HeatmapData {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Anchor so that the rightmost column contains today.
-    // dayIndex: 0 = oldest day, days - 1 = today.
-    const counts = new Array<number>(days).fill(0);
+    const selectedYear = options?.year;
+    const periodStart = selectedYear
+        ? new Date(selectedYear, 0, 1)
+        : new Date(today.getFullYear(), today.getMonth(), today.getDate() - 364);
+    const periodEnd = selectedYear ? new Date(selectedYear, 11, 31) : new Date(today);
+    periodStart.setHours(0, 0, 0, 0);
+    periodEnd.setHours(0, 0, 0, 0);
 
+    // Align to Sunday so each column is a full week, while keeping
+    // the right edge anchored to the selected period end date.
+    const alignedStart = new Date(periodStart);
+    alignedStart.setDate(alignedStart.getDate() - alignedStart.getDay());
+
+    const dayCount =
+        Math.floor((periodEnd.getTime() - alignedStart.getTime()) / (1000 * 60 * 60 * 24)) +
+        1;
+    const weeks = Math.ceil(dayCount / 7);
+
+    const countsByDate = new Map<string, number>();
     for (const m of history) {
         const dateStr = m.startedAt ?? m.createdAt;
         if (!dateStr) continue;
         const d = new Date(dateStr);
         d.setHours(0, 0, 0, 0);
-        const diffDays = Math.round(
-            (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24),
-        );
-        if (diffDays < 0 || diffDays >= days) continue;
-        const idx = days - 1 - diffDays;
-        counts[idx]++;
+        if (d < periodStart || d > periodEnd) continue;
+        const key = toDateKey(d);
+        countsByDate.set(key, (countsByDate.get(key) ?? 0) + 1);
     }
 
-    // Group into weeks of 7, starting from the anchor column.
-    // Column 0 = oldest week, last column = current week.
     const grid: number[][] = [];
-    for (let w = 0; w < weeks; w++) {
+    const dates: (Date | null)[][] = [];
+    const monthLabels: (string | null)[] = new Array(weeks).fill(null);
+    let max = 0;
+    let totalGames = 0;
+
+    for (let week = 0; week < weeks; week++) {
         const col: number[] = [];
-        for (let dow = 0; dow < 7; dow++) {
-            col.push(counts[w * 7 + dow] ?? 0);
+        const dateCol: (Date | null)[] = [];
+        for (let day = 0; day < 7; day++) {
+            const cellDate = new Date(alignedStart);
+            cellDate.setDate(alignedStart.getDate() + week * 7 + day);
+            const inRange = cellDate >= periodStart && cellDate <= periodEnd;
+            if (!inRange) {
+                col.push(0);
+                dateCol.push(null);
+                continue;
+            }
+            const count = countsByDate.get(toDateKey(cellDate)) ?? 0;
+            col.push(count);
+            dateCol.push(cellDate);
+            if (count > max) max = count;
+            totalGames += count;
         }
         grid.push(col);
+        dates.push(dateCol);
     }
 
-    const max = counts.reduce((m, v) => (v > m ? v : m), 0);
-    const totalGames = counts.reduce((a, b) => a + b, 0);
-    return { grid, max, totalGames };
+    // Show month label at the first visible week where that month appears.
+    // This works for both calendar-year mode and rolling 12-month mode.
+    let prevMonth: number | null = null;
+    let prevYear: number | null = null;
+    for (let week = 0; week < dates.length; week++) {
+        const firstVisibleDate = dates[week].find((d): d is Date => d !== null) ?? null;
+        if (!firstVisibleDate) continue;
+        const month = firstVisibleDate.getMonth();
+        const year = firstVisibleDate.getFullYear();
+        if (month !== prevMonth || year !== prevYear) {
+            monthLabels[week] = firstVisibleDate.toLocaleString('default', {
+                month: 'short',
+            });
+            prevMonth = month;
+            prevYear = year;
+        }
+    }
+
+    const periodLabel = selectedYear ? `${selectedYear}` : 'last 12 months';
+    return { grid, dates, monthLabels, max, totalGames, periodLabel };
 }

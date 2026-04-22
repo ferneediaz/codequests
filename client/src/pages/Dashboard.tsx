@@ -59,6 +59,7 @@ export default function Dashboard() {
     const navigate = useNavigate();
     const user = useAppSelector((state) => state.auth.user);
     const [showAllMatches, setShowAllMatches] = useState(false);
+    const [heatmapYear, setHeatmapYear] = useState<string>('rolling');
     const { requireCanPlay } = usePaywall();
 
     const handleQuickMatch = () => {
@@ -94,6 +95,17 @@ export default function Dashboard() {
         enabled: !!user?.id,
     });
 
+    const availableHeatmapYears = useMemo(() => {
+        const years = new Set<number>([new Date().getFullYear()]);
+        for (const match of history ?? []) {
+            const dateStr = match.startedAt ?? match.createdAt;
+            if (!dateStr) continue;
+            const year = new Date(dateStr).getFullYear();
+            if (!Number.isNaN(year)) years.add(year);
+        }
+        return [...years].sort((a, b) => b - a);
+    }, [history]);
+
     const mmr = stats?.mmr ?? user?.mmr ?? 1000;
     const wins = stats?.wins ?? user?.wins ?? 0;
     const losses = stats?.losses ?? user?.losses ?? 0;
@@ -111,9 +123,11 @@ export default function Dashboard() {
             favLang: computeFavoriteLanguage(h, uid),
             modeDist: computeModeDistribution(h),
             avgTests: computeAverageTestsPassed(h, uid),
-            heatmap: buildHeatmap(h, 12),
+            heatmap: buildHeatmap(h, {
+                year: heatmapYear === 'rolling' ? undefined : Number(heatmapYear),
+            }),
         };
-    }, [history, user?.id, wins, losses]);
+    }, [heatmapYear, history, user?.id, wins, losses]);
 
     const visibleMatches = showAllMatches ? history ?? [] : (history ?? []).slice(0, 5);
 
@@ -283,15 +297,32 @@ export default function Dashboard() {
                                         <Activity className="h-4 w-4 text-primary" />
                                         <h2 className="text-base font-semibold">Activity</h2>
                                     </div>
-                                    <span className="text-xs text-muted-foreground">
-                                        {derived.heatmap.totalGames} games · last 12 weeks
-                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs text-muted-foreground">
+                                            {derived.heatmap.totalGames} games · {derived.heatmap.periodLabel}
+                                        </span>
+                                        <select
+                                            value={heatmapYear}
+                                            onChange={(e) => setHeatmapYear(e.target.value)}
+                                            className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                                            aria-label="Select activity year"
+                                        >
+                                            <option value="rolling">Last 12 months</option>
+                                            {availableHeatmapYears.map((year) => (
+                                                <option key={year} value={String(year)}>
+                                                    {year}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 {historyLoading ? (
                                     <Skeleton className="h-[120px] w-full" />
                                 ) : (
                                     <Heatmap
                                         grid={derived.heatmap.grid}
+                                        dates={derived.heatmap.dates}
+                                        monthLabels={derived.heatmap.monthLabels}
                                         max={derived.heatmap.max}
                                     />
                                 )}
@@ -480,7 +511,17 @@ function StatTile({
     );
 }
 
-function Heatmap({ grid, max }: { grid: number[][]; max: number }) {
+function Heatmap({
+    grid,
+    dates,
+    monthLabels,
+    max,
+}: {
+    grid: number[][];
+    dates: (Date | null)[][];
+    monthLabels: (string | null)[];
+    max: number;
+}) {
     const intensity = (count: number) => {
         if (count === 0 || max === 0) return 'bg-muted/40';
         const ratio = count / max;
@@ -494,38 +535,62 @@ function Heatmap({ grid, max }: { grid: number[][]; max: number }) {
 
     return (
         <div className="flex gap-3">
-            <div className="flex flex-col justify-between py-0.5 text-[10px] text-muted-foreground">
-                {dayLabels.map((d) => (
-                    <span key={d}>{d}</span>
-                ))}
+            <div className="pt-5">
+                <div className="flex h-full flex-col justify-between py-0.5 text-[10px] text-muted-foreground">
+                    {dayLabels.map((d) => (
+                        <span key={d}>{d}</span>
+                    ))}
+                </div>
             </div>
-            <div className="flex flex-1 gap-1 overflow-x-auto">
-                {grid.map((week, wi) => (
-                    <div key={wi} className="flex flex-col gap-1">
-                        {week.map((count, di) => (
+            <div className="flex-1 overflow-x-auto pb-1 [scrollbar-color:theme(colors.border)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80 [&::-webkit-scrollbar-thumb:hover]:bg-primary/60 [&::-webkit-scrollbar-track]:bg-transparent">
+                <div className="min-w-[700px] md:min-w-0">
+                    <div
+                        className="mb-2 grid gap-1 text-[10px] text-muted-foreground"
+                        style={{ gridTemplateColumns: `repeat(${grid.length}, minmax(0, 1fr))` }}
+                    >
+                        {monthLabels.map((label, i) => (
                             <div
-                                key={di}
-                                className={`h-3.5 w-3.5 rounded-sm transition-colors ${intensity(count)}`}
-                                title={
-                                    count === 0
-                                        ? 'No games'
-                                        : `${count} game${count === 1 ? '' : 's'}`
-                                }
-                            />
+                                key={i}
+                                className="w-0 overflow-visible whitespace-nowrap text-left"
+                            >
+                                {label ? label.slice(0, 3) : ''}
+                            </div>
                         ))}
                     </div>
-                ))}
-            </div>
-            <div className="flex flex-col justify-end gap-1 text-[10px] text-muted-foreground">
-                <span>Less</span>
-                <div className="flex gap-0.5">
-                    <div className="h-2.5 w-2.5 rounded-sm bg-muted/40" />
-                    <div className="h-2.5 w-2.5 rounded-sm bg-primary/25" />
-                    <div className="h-2.5 w-2.5 rounded-sm bg-primary/50" />
-                    <div className="h-2.5 w-2.5 rounded-sm bg-primary/75" />
-                    <div className="h-2.5 w-2.5 rounded-sm bg-primary" />
+                    <div className="flex gap-2">
+                        <div
+                            className="grid flex-1 grid-rows-7 gap-1"
+                            style={{ gridTemplateColumns: `repeat(${grid.length}, minmax(0, 1fr))` }}
+                        >
+                            {grid.map((week, wi) =>
+                                week.map((count, di) => {
+                                    const date = dates[wi]?.[di] ?? null;
+                                    const title = date
+                                        ? `${count} game${count === 1 ? '' : 's'} on ${date.toLocaleDateString()}`
+                                        : '';
+                                    return (
+                                        <div
+                                            key={`${wi}-${di}`}
+                                            className={`aspect-square w-full rounded-[3px] transition-colors ${date ? intensity(count) : 'bg-transparent'}`}
+                                            title={title}
+                                        />
+                                    );
+                                }),
+                            )}
+                        </div>
+                        <div className="flex shrink-0 flex-col justify-end gap-1 text-[10px] text-muted-foreground">
+                            <span>Less</span>
+                            <div className="flex gap-0.5">
+                                <div className="h-2.5 w-2.5 rounded-sm bg-muted/40" />
+                                <div className="h-2.5 w-2.5 rounded-sm bg-primary/25" />
+                                <div className="h-2.5 w-2.5 rounded-sm bg-primary/50" />
+                                <div className="h-2.5 w-2.5 rounded-sm bg-primary/75" />
+                                <div className="h-2.5 w-2.5 rounded-sm bg-primary" />
+                            </div>
+                            <span>More</span>
+                        </div>
+                    </div>
                 </div>
-                <span>More</span>
             </div>
         </div>
     );
