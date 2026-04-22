@@ -31,6 +31,12 @@ import {
     AlertCircle,
     Layers,
     Trophy,
+    Info,
+    ChevronDown,
+    ChevronUp,
+    ShieldCheck,
+    CircleDot,
+    UserX,
 } from 'lucide-react';
 import type {
     BattleMode,
@@ -71,7 +77,7 @@ const MODES: {
         },
         {
             value: 'GROUP',
-            label: 'Group Battle',
+            label: 'Clan Wars',
             icon: Users,
             description: 'Squad up and battle another team.',
             tag: 'Teams',
@@ -329,6 +335,7 @@ export default function Play() {
     const [presets, setPresets] = useState<RoyalePreset[]>([]);
     const [presetsLoading, setPresetsLoading] = useState(false);
     const [presetsError, setPresetsError] = useState<string | null>(null);
+    const [royaleRulesExpanded, setRoyaleRulesExpanded] = useState(false);
 
     // Action state
     const [isCreatingPrivate, setIsCreatingPrivate] = useState(false);
@@ -827,6 +834,299 @@ export default function Play() {
                                                     );
                                                 })}
                                             </div>
+                                        </div>
+
+                                        {/* How it works — rules explainer */}
+                                        <div className="rounded-xl border border-primary/20 bg-primary/[0.03]">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setRoyaleRulesExpanded((v) => !v)
+                                                }
+                                                aria-expanded={royaleRulesExpanded}
+                                                className="flex w-full items-center justify-between gap-2 rounded-xl p-3 text-left transition-colors hover:bg-primary/[0.05]"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <Info className="h-4 w-4 text-primary" />
+                                                    <span className="text-sm font-semibold">
+                                                        How it works
+                                                    </span>
+                                                    <span className="hidden text-[11px] text-muted-foreground sm:inline">
+                                                        ·{' '}
+                                                        {royaleFormat === 'SAME_PROBLEM'
+                                                            ? 'Same Problem rules'
+                                                            : 'Score Attack rules'}
+                                                    </span>
+                                                </div>
+                                                {royaleRulesExpanded ? (
+                                                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                                ) : (
+                                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                                )}
+                                            </button>
+
+                                            {/* Always-visible micro-summary */}
+                                            <div className="px-3 pb-3">
+                                                {royaleFormat === 'SAME_PROBLEM' ? (
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                                                            <ShieldCheck className="h-3 w-3" />
+                                                            Fully solved
+                                                        </span>
+                                                        <span className="text-[11px] text-muted-foreground">
+                                                            →
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                                            <CircleDot className="h-3 w-3" />
+                                                            Attempted
+                                                        </span>
+                                                        <span className="text-[11px] text-muted-foreground">
+                                                            →
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400">
+                                                            <UserX className="h-3 w-3" />
+                                                            No submission
+                                                        </span>
+                                                        <span className="ml-1 text-[11px] text-muted-foreground">
+                                                            (safest → out first)
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[12px] text-muted-foreground">
+                                                        Lowest cumulative points is eliminated each
+                                                        round. Round ends when the timer hits{' '}
+                                                        <span className="font-medium text-foreground">
+                                                            0
+                                                        </span>
+                                                        .
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* Expanded details */}
+                                            {royaleRulesExpanded && (
+                                                <div className="space-y-4 border-t border-primary/15 px-3 py-3 text-[12px] text-muted-foreground">
+                                                    {royaleFormat === 'SAME_PROBLEM' ? (
+                                                        <>
+                                                            <div>
+                                                                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                                                                    Round Flow
+                                                                </p>
+                                                                <ol className="space-y-1 pl-1">
+                                                                    <li className="flex gap-2">
+                                                                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                                                                            1
+                                                                        </span>
+                                                                        <span>
+                                                                            Every surviving player
+                                                                            gets the{' '}
+                                                                            <span className="font-medium text-foreground">
+                                                                                same problem
+                                                                            </span>
+                                                                            .
+                                                                        </span>
+                                                                    </li>
+                                                                    <li className="flex gap-2">
+                                                                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                                                                            2
+                                                                        </span>
+                                                                        <span>
+                                                                            Round ends when enough
+                                                                            players fully solve{' '}
+                                                                            <span className="text-muted-foreground/80">
+                                                                                (remaining −
+                                                                                eliminations)
+                                                                            </span>{' '}
+                                                                            <span className="font-medium text-foreground">
+                                                                                or
+                                                                            </span>{' '}
+                                                                            the timer hits 0.
+                                                                        </span>
+                                                                    </li>
+                                                                    <li className="flex gap-2">
+                                                                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                                                                            3
+                                                                        </span>
+                                                                        <span>
+                                                                            The configured number of
+                                                                            players is eliminated
+                                                                            from the bottom.
+                                                                        </span>
+                                                                    </li>
+                                                                </ol>
+                                                            </div>
+
+                                                            <div>
+                                                                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                                                                    Safety Ladder
+                                                                </p>
+                                                                <div className="space-y-1.5">
+                                                                    <div className="flex items-start gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/[0.04] p-2">
+                                                                        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                                                                        <div>
+                                                                            <p className="font-medium text-foreground">
+                                                                                Fully solved{' '}
+                                                                                <span className="text-muted-foreground">
+                                                                                    — safest
+                                                                                </span>
+                                                                            </p>
+                                                                            <p className="text-[11px]">
+                                                                                Ties broken by{' '}
+                                                                                <span className="font-medium text-foreground">
+                                                                                    earliest
+                                                                                    full-pass time
+                                                                                </span>
+                                                                                .
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/[0.04] p-2">
+                                                                        <CircleDot className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                                                                        <div>
+                                                                            <p className="font-medium text-foreground">
+                                                                                Attempted, not fully
+                                                                                passing
+                                                                            </p>
+                                                                            <p className="text-[11px]">
+                                                                                More{' '}
+                                                                                <span className="font-medium text-foreground">
+                                                                                    tests passed
+                                                                                </span>{' '}
+                                                                                wins ties; then{' '}
+                                                                                <span className="font-medium text-foreground">
+                                                                                    earlier
+                                                                                    submission
+                                                                                </span>
+                                                                                .
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/[0.04] p-2">
+                                                                        <UserX className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
+                                                                        <div>
+                                                                            <p className="font-medium text-foreground">
+                                                                                No submission —
+                                                                                eliminated first
+                                                                            </p>
+                                                                            <p className="text-[11px]">
+                                                                                Deterministic
+                                                                                tiebreak by username.
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div>
+                                                                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                                                                    Round Flow
+                                                                </p>
+                                                                <ol className="space-y-1 pl-1">
+                                                                    <li className="flex gap-2">
+                                                                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                                                                            1
+                                                                        </span>
+                                                                        <span>
+                                                                            Pick problems from the
+                                                                            round{"'"}s pool and
+                                                                            solve{' '}
+                                                                            <span className="font-medium text-foreground">
+                                                                                as many as you can
+                                                                            </span>
+                                                                            .
+                                                                        </span>
+                                                                    </li>
+                                                                    <li className="flex gap-2">
+                                                                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                                                                            2
+                                                                        </span>
+                                                                        <span>
+                                                                            Harder problems are
+                                                                            worth more points.
+                                                                            Points{' '}
+                                                                            <span className="font-medium text-foreground">
+                                                                                carry across rounds
+                                                                            </span>
+                                                                            .
+                                                                        </span>
+                                                                    </li>
+                                                                    <li className="flex gap-2">
+                                                                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                                                                            3
+                                                                        </span>
+                                                                        <span>
+                                                                            Round ends{' '}
+                                                                            <span className="font-medium text-foreground">
+                                                                                only
+                                                                            </span>{' '}
+                                                                            when the timer hits 0 —
+                                                                            no early finish.
+                                                                        </span>
+                                                                    </li>
+                                                                </ol>
+                                                            </div>
+
+                                                            <div>
+                                                                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                                                                    Who Gets Eliminated
+                                                                </p>
+                                                                <ul className="space-y-1 pl-1">
+                                                                    <li className="flex items-start gap-2">
+                                                                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                                                                        <span>
+                                                                            Lowest{' '}
+                                                                            <span className="font-medium text-foreground">
+                                                                                cumulative points
+                                                                            </span>{' '}
+                                                                            is eliminated.
+                                                                        </span>
+                                                                    </li>
+                                                                    <li className="flex items-start gap-2">
+                                                                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
+                                                                        <span>
+                                                                            Tiebreak 1: fewer points{' '}
+                                                                            <span className="font-medium text-foreground">
+                                                                                this round
+                                                                            </span>
+                                                                            .
+                                                                        </span>
+                                                                    </li>
+                                                                    <li className="flex items-start gap-2">
+                                                                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
+                                                                        <span>
+                                                                            Tiebreak 2:{' '}
+                                                                            <span className="font-medium text-foreground">
+                                                                                later
+                                                                            </span>{' '}
+                                                                            last submission loses.
+                                                                        </span>
+                                                                    </li>
+                                                                    <li className="flex items-start gap-2">
+                                                                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
+                                                                        <span>
+                                                                            Tiebreak 3: deterministic
+                                                                            username tiebreak.
+                                                                        </span>
+                                                                    </li>
+                                                                </ul>
+                                                            </div>
+                                                        </>
+                                                    )}
+
+                                                    <div className="flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/[0.05] px-2 py-1.5 text-[11px] text-foreground">
+                                                        <Trophy className="h-3 w-3 shrink-0 text-primary" />
+                                                        <span>
+                                                            The final round is always a{' '}
+                                                            <span className="font-semibold">
+                                                                1v1 showdown
+                                                            </span>
+                                                            .
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Lobby size */}

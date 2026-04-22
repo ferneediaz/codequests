@@ -1033,10 +1033,22 @@ export class BattleRoyaleService {
     }
 
     /**
-     * Rank non-eliminated participants from BEST to WORST for the current round.
+     * Rank non-eliminated participants from BEST (safest) to WORST (first to
+     * be eliminated) for the current round.
      *
-     * SAME_PROBLEM: order by allPassed desc → testsPassed desc → earliest
-     *   submittedAt asc → userId asc. Non-submitters rank below all submitters.
+     * SAME_PROBLEM — "v1 Balanced" bucket rules:
+     *   Bucket A: full solve this round (allPassed === true)   [safest]
+     *   Bucket B: attempted but not a full solve               [middle]
+     *   Bucket C: no submission at all this round              [worst]
+     *
+     *   Buckets are compared A < B < C (A safest). Within each bucket we use
+     *   a deterministic tie-break:
+     *     A: earliest submittedAt asc → userId asc
+     *        (first to fully solve is the safest — this makes "first to
+     *        answer advances" natural for simple quick-round formats)
+     *     B: testsPassed desc → earliest submittedAt asc → userId asc
+     *        (more tests passing is safer; earlier submission breaks ties)
+     *     C: userId asc (pure deterministic; there's no signal to rank on)
      *
      * SCORE_ATTACK: order by cumulativePoints desc → thisRoundPoints desc →
      *   lastSubmittedAt asc → userId asc.
@@ -1054,7 +1066,10 @@ export class BattleRoyaleService {
         cumulative: Map<string, { points: number; lastSubmittedAt: Date | null }>,
     ): Array<{ userId: string }> {
         if (format === BattleRoyaleFormat.SAME_PROBLEM) {
-            // Aggregate per user: the (best) submission in this round.
+            // One submission per (round, user, problem) is the invariant
+            // enforced by the submit handler (upsert on unique key). If that
+            // invariant ever changes we still pick the best row per user:
+            // prefer allPassed, then higher testsPassed, then earlier time.
             const bestByUser = new Map<
                 string,
                 {
@@ -1081,21 +1096,40 @@ export class BattleRoyaleService {
                     });
                 }
             }
-            const enriched = participants.map((p) => ({
-                userId: p.userId,
-                sub: bestByUser.get(p.userId) || null,
-            }));
+
+            // Classify each remaining participant into a bucket.
+            type Bucket = 'A' | 'B' | 'C';
+            const enriched = participants.map((p) => {
+                const sub = bestByUser.get(p.userId) || null;
+                let bucket: Bucket;
+                if (!sub) bucket = 'C';
+                else if (sub.allPassed) bucket = 'A';
+                else bucket = 'B';
+                return { userId: p.userId, sub, bucket };
+            });
+
             enriched.sort((a, b) => {
-                const as = a.sub,
-                    bs = b.sub;
-                if (!!as !== !!bs) return as ? -1 : 1; // submitters first
-                if (as && bs) {
-                    if (as.allPassed !== bs.allPassed) return as.allPassed ? -1 : 1;
-                    if (as.testsPassed !== bs.testsPassed)
-                        return bs.testsPassed - as.testsPassed;
-                    const t = as.submittedAt.getTime() - bs.submittedAt.getTime();
-                    if (t !== 0) return t;
+                // Lower bucket letter ranks better (A < B < C).
+                if (a.bucket !== b.bucket) {
+                    return a.bucket < b.bucket ? -1 : 1;
                 }
+                if (a.bucket === 'A' && a.sub && b.sub) {
+                    // Earliest full-pass wins. First to fully solve is safest.
+                    const t =
+                        a.sub.submittedAt.getTime() - b.sub.submittedAt.getTime();
+                    if (t !== 0) return t;
+                    return a.userId.localeCompare(b.userId);
+                }
+                if (a.bucket === 'B' && a.sub && b.sub) {
+                    if (a.sub.testsPassed !== b.sub.testsPassed) {
+                        return b.sub.testsPassed - a.sub.testsPassed;
+                    }
+                    const t =
+                        a.sub.submittedAt.getTime() - b.sub.submittedAt.getTime();
+                    if (t !== 0) return t;
+                    return a.userId.localeCompare(b.userId);
+                }
+                // Bucket C (or defensive fallback): no submission signal.
                 return a.userId.localeCompare(b.userId);
             });
             return enriched.map((e) => ({ userId: e.userId }));

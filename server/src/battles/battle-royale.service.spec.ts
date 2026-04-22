@@ -1731,6 +1731,353 @@ describe('BattleRoyaleService', () => {
             const call = prisma.battleParticipant.updateMany.mock.calls[0][0];
             expect(call.where.userId).toBe('u4');
         });
+
+        // ----------------------------------------------------------------
+        // SAME_PROBLEM "v1 Balanced" bucket rules
+        //   Bucket A: full solve (allPassed=true)
+        //   Bucket B: attempted but not fully solved
+        //   Bucket C: no submission
+        // Order: A (safest) < B < C (first eliminated).
+        // ----------------------------------------------------------------
+        describe('SAME_PROBLEM bucket ranking (v1 Balanced)', () => {
+            it('eliminates Bucket C (no submission) before Bucket B (attempted but failed)', async () => {
+                // u1,u2 full solve (A); u3 attempted but not passing (B);
+                // u4 did not submit (C). Eliminate 1 → u4 (bucket C) goes.
+                prisma.battleRoundSubmission.findMany.mockResolvedValue([
+                    {
+                        userId: 'u1',
+                        allPassed: true,
+                        testsPassed: 3,
+                        submittedAt: new Date('2024-01-01T10:00:00Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u2',
+                        allPassed: true,
+                        testsPassed: 3,
+                        submittedAt: new Date('2024-01-01T10:00:05Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u3',
+                        allPassed: false,
+                        testsPassed: 2,
+                        submittedAt: new Date('2024-01-01T10:00:10Z'),
+                        pointsEarned: 0,
+                    },
+                ] as any);
+                jest.spyOn(service, 'startRound').mockResolvedValue(
+                    undefined as any,
+                );
+
+                await service.endRoundAndAdvance(
+                    'battle-br',
+                    'r-1',
+                    BattleRoundEndReason.TIMER,
+                );
+
+                const updateCalls =
+                    prisma.battleParticipant.updateMany.mock.calls;
+                expect(updateCalls).toHaveLength(1);
+                expect(updateCalls[0][0]).toMatchObject({
+                    where: expect.objectContaining({ userId: 'u4' }),
+                    data: expect.objectContaining({ placement: 4 }),
+                });
+            });
+
+            it('eliminates Bucket B (attempted) before Bucket A (full solve) when the cut dips into B', async () => {
+                // 4 players, eliminate 2.
+                // u1,u2 full solve (A); u3,u4 attempted but failed (B).
+                // Eliminate 2 → u3 and u4 (both from B), u4 worst placement.
+                const b = buildBattle({
+                    rounds: [
+                        round({
+                            id: 'r-1',
+                            roundNumber: 1,
+                            status: BattleRoundStatus.IN_PROGRESS,
+                            eliminateCount: 2,
+                            problemId: 'problem-1',
+                        }),
+                        round({
+                            id: 'r-2',
+                            roundNumber: 2,
+                            status: BattleRoundStatus.PENDING,
+                            eliminateCount: 1,
+                        }),
+                    ],
+                });
+                prisma.battle.findUnique.mockResolvedValue(b as any);
+                prisma.battleRoundSubmission.findMany.mockResolvedValue([
+                    {
+                        userId: 'u1',
+                        allPassed: true,
+                        testsPassed: 3,
+                        submittedAt: new Date('2024-01-01T10:00:00Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u2',
+                        allPassed: true,
+                        testsPassed: 3,
+                        submittedAt: new Date('2024-01-01T10:00:05Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u3',
+                        allPassed: false,
+                        testsPassed: 2,
+                        submittedAt: new Date('2024-01-01T10:00:10Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u4',
+                        allPassed: false,
+                        testsPassed: 1,
+                        submittedAt: new Date('2024-01-01T10:00:15Z'),
+                        pointsEarned: 0,
+                    },
+                ] as any);
+                jest.spyOn(service, 'startRound').mockResolvedValue(
+                    undefined as any,
+                );
+
+                await service.endRoundAndAdvance(
+                    'battle-br',
+                    'r-1',
+                    BattleRoundEndReason.TIMER,
+                );
+
+                const updateCalls =
+                    prisma.battleParticipant.updateMany.mock.calls;
+                expect(updateCalls).toHaveLength(2);
+                const eliminated = updateCalls
+                    .map((c) => c[0])
+                    .sort((a, b) => a.data.placement - b.data.placement);
+                // u3 has higher testsPassed than u4 → u3 safer, placement 3.
+                expect(eliminated[0]).toMatchObject({
+                    where: expect.objectContaining({ userId: 'u3' }),
+                    data: expect.objectContaining({ placement: 3 }),
+                });
+                expect(eliminated[1]).toMatchObject({
+                    where: expect.objectContaining({ userId: 'u4' }),
+                    data: expect.objectContaining({ placement: 4 }),
+                });
+            });
+
+            it('within Bucket A, the LATEST full-pass is eliminated when the cut reaches into A', async () => {
+                // All 4 full-solved (bucket A); eliminate 1.
+                // u1 at t=0, u2 at t=5, u3 at t=10, u4 at t=15 → u4 (latest) eliminated.
+                prisma.battleRoundSubmission.findMany.mockResolvedValue([
+                    {
+                        userId: 'u1',
+                        allPassed: true,
+                        testsPassed: 3,
+                        submittedAt: new Date('2024-01-01T10:00:00Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u2',
+                        allPassed: true,
+                        testsPassed: 3,
+                        submittedAt: new Date('2024-01-01T10:00:05Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u3',
+                        allPassed: true,
+                        testsPassed: 3,
+                        submittedAt: new Date('2024-01-01T10:00:10Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u4',
+                        allPassed: true,
+                        testsPassed: 3,
+                        submittedAt: new Date('2024-01-01T10:00:15Z'),
+                        pointsEarned: 0,
+                    },
+                ] as any);
+                jest.spyOn(service, 'startRound').mockResolvedValue(
+                    undefined as any,
+                );
+
+                await service.endRoundAndAdvance(
+                    'battle-br',
+                    'r-1',
+                    BattleRoundEndReason.EARLY_ALL_PASSED,
+                );
+
+                const call =
+                    prisma.battleParticipant.updateMany.mock.calls[0][0];
+                expect(call.where.userId).toBe('u4');
+                expect(call.data.placement).toBe(4);
+            });
+
+            it('within Bucket B, lower testsPassed is eliminated first', async () => {
+                // 4 players, eliminate 1. All attempted but none fully solved.
+                // u1: 3 tests, u2: 2 tests, u3: 2 tests earlier, u4: 1 test → u4 goes.
+                prisma.battleRoundSubmission.findMany.mockResolvedValue([
+                    {
+                        userId: 'u1',
+                        allPassed: false,
+                        testsPassed: 3,
+                        submittedAt: new Date('2024-01-01T10:00:00Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u2',
+                        allPassed: false,
+                        testsPassed: 2,
+                        submittedAt: new Date('2024-01-01T10:00:10Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u3',
+                        allPassed: false,
+                        testsPassed: 2,
+                        submittedAt: new Date('2024-01-01T10:00:05Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u4',
+                        allPassed: false,
+                        testsPassed: 1,
+                        submittedAt: new Date('2024-01-01T10:00:20Z'),
+                        pointsEarned: 0,
+                    },
+                ] as any);
+                jest.spyOn(service, 'startRound').mockResolvedValue(
+                    undefined as any,
+                );
+
+                await service.endRoundAndAdvance(
+                    'battle-br',
+                    'r-1',
+                    BattleRoundEndReason.TIMER,
+                );
+
+                const call =
+                    prisma.battleParticipant.updateMany.mock.calls[0][0];
+                expect(call.where.userId).toBe('u4');
+            });
+
+            it('within Bucket B with equal testsPassed, the LATER submitter is eliminated', async () => {
+                // 4 players, eliminate 1. All attempted with same testsPassed;
+                // tie-break by earlier submittedAt wins.
+                prisma.battleRoundSubmission.findMany.mockResolvedValue([
+                    {
+                        userId: 'u1',
+                        allPassed: false,
+                        testsPassed: 2,
+                        submittedAt: new Date('2024-01-01T10:00:00Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u2',
+                        allPassed: false,
+                        testsPassed: 2,
+                        submittedAt: new Date('2024-01-01T10:00:05Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u3',
+                        allPassed: false,
+                        testsPassed: 2,
+                        submittedAt: new Date('2024-01-01T10:00:10Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u4',
+                        allPassed: false,
+                        testsPassed: 2,
+                        submittedAt: new Date('2024-01-01T10:00:15Z'),
+                        pointsEarned: 0,
+                    },
+                ] as any);
+                jest.spyOn(service, 'startRound').mockResolvedValue(
+                    undefined as any,
+                );
+
+                await service.endRoundAndAdvance(
+                    'battle-br',
+                    'r-1',
+                    BattleRoundEndReason.TIMER,
+                );
+
+                const call =
+                    prisma.battleParticipant.updateMany.mock.calls[0][0];
+                expect(call.where.userId).toBe('u4');
+            });
+
+            it('within Bucket C (all non-submitters), eliminates the alphabetically-last userId first', async () => {
+                // Nobody submitted; all 4 are bucket C. Eliminate 1.
+                prisma.battleRoundSubmission.findMany.mockResolvedValue([]);
+                jest.spyOn(service, 'startRound').mockResolvedValue(
+                    undefined as any,
+                );
+
+                await service.endRoundAndAdvance(
+                    'battle-br',
+                    'r-1',
+                    BattleRoundEndReason.TIMER,
+                );
+
+                const call =
+                    prisma.battleParticipant.updateMany.mock.calls[0][0];
+                expect(call.where.userId).toBe('u4');
+            });
+
+            it('strict bucket ordering: a LATE full-solve (A) beats an EARLY partial (B) even with fewer tests shown', async () => {
+                // u1: partial submission very early, many tests passed.
+                // u4: full solve, but late.
+                // Bucket A (u4) must still be safer than bucket B (u1).
+                // Eliminate 1 → must pick from B or C, not u4.
+                prisma.battleRoundSubmission.findMany.mockResolvedValue([
+                    {
+                        userId: 'u1',
+                        allPassed: false,
+                        testsPassed: 2,
+                        submittedAt: new Date('2024-01-01T10:00:00Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u2',
+                        allPassed: false,
+                        testsPassed: 1,
+                        submittedAt: new Date('2024-01-01T10:00:05Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u3',
+                        allPassed: true,
+                        testsPassed: 3,
+                        submittedAt: new Date('2024-01-01T10:00:02Z'),
+                        pointsEarned: 0,
+                    },
+                    {
+                        userId: 'u4',
+                        allPassed: true,
+                        testsPassed: 3,
+                        submittedAt: new Date('2024-01-01T10:00:30Z'),
+                        pointsEarned: 0,
+                    },
+                ] as any);
+                jest.spyOn(service, 'startRound').mockResolvedValue(
+                    undefined as any,
+                );
+
+                await service.endRoundAndAdvance(
+                    'battle-br',
+                    'r-1',
+                    BattleRoundEndReason.TIMER,
+                );
+
+                const call =
+                    prisma.battleParticipant.updateMany.mock.calls[0][0];
+                // Bucket B: u1 (2 tests) safer than u2 (1 test) → u2 eliminated.
+                expect(call.where.userId).toBe('u2');
+            });
+        });
     });
 
     // ========================================
