@@ -5,6 +5,7 @@ import { setUser, setToken } from '@/store/slices/authSlice';
 import { supabase } from '@/services/supabase';
 import { connectSocket } from '@/services/socket';
 import api from '@/services/api';
+import { consumePendingInvite } from '@/lib/pendingInvite';
 
 export default function AuthCallback() {
     const navigate = useNavigate();
@@ -30,7 +31,11 @@ export default function AuthCallback() {
                 if (mounted) {
                     dispatch(setUser(user));
                     connectSocket(session.access_token);
-                    navigate('/dashboard', { replace: true });
+                    const pendingInvite = consumePendingInvite();
+                    const destination = pendingInvite
+                        ? `/invite/${pendingInvite}`
+                        : '/dashboard';
+                    navigate(destination, { replace: true });
                 }
             } catch (err) {
                 if (mounted) {

@@ -13,6 +13,7 @@ import Practice from '@/pages/Practice';
 import PracticeSolve from '@/pages/PracticeSolve';
 import AuthorList from '@/pages/AuthorList';
 import AuthorPreview from '@/pages/AuthorPreview';
+import InviteJoin from '@/pages/InviteJoin';
 
 export const router = createBrowserRouter([
     {
@@ -29,6 +30,13 @@ export const router = createBrowserRouter([
             {
                 path: '/auth/callback',
                 element: <AuthCallback />,
+            },
+            // Public invite landing page. Unauthenticated users see a
+            // "sign in to join" prompt; authenticated users get battle
+            // details + join action.
+            {
+                path: '/invite/:code',
+                element: <InviteJoin />,
             },
             {
                 element: <ProtectedRoute />,

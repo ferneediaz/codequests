@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Swords } from 'lucide-react';
+import { consumePendingInvite, peekPendingInvite } from '@/lib/pendingInvite';
 
 export default function Login() {
     const { isAuthenticated, isLoading, loginWithGithub, loginWithGoogle } = useAuth();
@@ -16,8 +17,12 @@ export default function Login() {
     }
 
     if (isAuthenticated) {
-        return <Navigate to="/dashboard" replace />;
+        const pendingInvite = consumePendingInvite();
+        const destination = pendingInvite ? `/invite/${pendingInvite}` : '/dashboard';
+        return <Navigate to={destination} replace />;
     }
+
+    const pendingInvite = peekPendingInvite();
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -27,7 +32,11 @@ export default function Login() {
                         <Swords className="h-6 w-6 text-primary" />
                     </div>
                     <CardTitle className="text-2xl">CodeQuest Battles</CardTitle>
-                    <CardDescription>Sign in to start battling</CardDescription>
+                    <CardDescription>
+                        {pendingInvite
+                            ? `Sign in to accept invite ${pendingInvite}`
+                            : 'Sign in to start battling'}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
                     <Button

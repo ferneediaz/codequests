@@ -38,7 +38,7 @@
 | `/battle/:id` | Active battle view | Yes | Check |
 | `/battle/:id/results` | Post-battle results screen | Yes | No |
 | `/battle/:id/results/share` | Public shareable result page | No | No |
-| `/invite/:code` | Invite link handler | Yes | No |
+| `/invite/:code` | Invite link handler | No | No |
 | `/matchmaking` | Matchmaking queue UI | Yes | Check |
 | `/practice` | Practice Ground problem list | Yes | No |
 | `/practice/:problemId` | Practice solve view | Yes | No |
@@ -351,26 +351,28 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 - [ ] Manage presets (list, rename, delete saved presets)
 - [ ] **Success Criteria:** One-click play from dashboard using saved settings ✅
 
-### 2.6 Direct Invites (Partial)
+### 2.6 Direct Invites ✅
 - [x] Invite code flow: creator gets code → opponent enters code → joins battle
 - [x] BattleLobby component with ready-up flow (both players ready → battle starts)
 - [x] Invite notification hook (`useInviteNotifications.ts`) — listens for battle invites via WebSocket
-- [ ] Invite link page (`/invite/:code`):
-  - [ ] Fetch battle info from `GET /api/battles/invite/:code`
-  - [ ] Show game settings (mode, skills, creator username)
-  - [ ] "Join Battle" button → calls `POST /api/battles/invite/:code/join`
-  - [ ] If not logged in → redirect to login first, then back to invite
-  - [ ] Handle invalid/expired invite codes
-- [ ] In-app invite:
-  - [ ] Username search autocomplete
-  - [ ] Send invite → WebSocket `battle.invite_received` to target
-  - [ ] Target sees notification/popup with "Accept" / "Decline"
-- [ ] Invite notification component (toast or modal):
-  - [ ] "PlayerX invited you to a 1v1 battle!"
-  - [ ] Show game settings summary
-  - [ ] Accept → join battle → redirect to `/battle/:id`
-  - [ ] Decline → dismiss
-- [ ] **Success Criteria:** Both link and in-app invites work, target can accept/decline ✅
+- [x] Invite link page (`/invite/:code`, `InviteJoin.tsx`):
+  - [x] Fetch battle info from `GET /api/battles/invite/:code`
+  - [x] Show game settings (mode, skills, creator username, expiry)
+  - [x] "Join Battle" button → calls `POST /api/battles/invite/:code/join`
+  - [x] If not logged in → stores pending invite in sessionStorage, sends user to login, returns to `/invite/:code` after OAuth callback
+  - [x] Handle invalid (404) / expired/started (400) invite codes with friendly messaging
+- [x] In-app invite:
+  - [x] Username input (send invite from `BattleLobby` → `POST /api/battles/:id/invite-user`)
+  - [x] Send invite → WebSocket `battle.invite_received` to target
+  - [x] Target sees toast notification with "Accept" / "Decline" actions
+- [x] Invite notification component (sonner toast):
+  - [x] "PlayerX invited you to a 1v1 battle!"
+  - [x] Accept → `POST /api/battles/invite/:code/join` → redirect to `/battle/:id`
+  - [x] Decline → dismiss toast
+- [ ] Nice-to-haves (deferred):
+  - [ ] Username search autocomplete in invite-by-username input
+  - [ ] Mutual friends / profile preview on invite link page
+- [x] **Success Criteria:** Both link and in-app invites work, target can accept/decline ✅
 
 ### 2.7 Sound System
 - [ ] Create `SoundManager` utility (preload audio files, play, stop, volume control)
@@ -860,7 +862,7 @@ client/
 - [ ] Skills system works in-battle (5 skills, visual effects)
 - [ ] Win celebrations feel satisfying (confetti, MMR animation, sound)
 - [ ] Game creation wizard works with presets
-- [ ] Direct invites work (link + in-app)
+- [x] Direct invites work (link + in-app)
 - [ ] Sound effects working with mute toggle
 
 ### Phase 3: Social ⏳
