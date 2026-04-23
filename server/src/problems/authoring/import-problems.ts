@@ -42,6 +42,8 @@ async function main() {
                     difficulty: problem.difficulty,
                     tags: problem.tags,
                     starterCode,
+                    hints: problem.hints,
+                    solution: problem.solution,
                 },
                 create: {
                     id: problem.id,
@@ -50,6 +52,8 @@ async function main() {
                     difficulty: problem.difficulty,
                     tags: problem.tags,
                     starterCode,
+                    hints: problem.hints,
+                    solution: problem.solution,
                 },
             });
 

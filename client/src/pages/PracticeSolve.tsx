@@ -13,6 +13,7 @@ import { practiceApi } from '@/services/practice';
 import { ProblemPanel } from '@/components/battle/ProblemPanel';
 import { CodeEditor, type CodeEditorHandle } from '@/components/battle/CodeEditor';
 import { ConsolePanel } from '@/components/battle/ConsolePanel';
+import { PracticeHelpPanel } from '@/components/practice/PracticeHelpPanel';
 import { parseStarterCode } from '@/lib/starterCode';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,12 +24,10 @@ import {
     Send,
     Sparkles,
 } from 'lucide-react';
-import type {
-    ProblemResponse,
-    SubmissionResult,
-} from '@/types/api';
+import type { SubmissionResult } from '@/types/api';
 import type {
     PracticeLanguage,
+    PracticeProblemDetail,
     PracticeSubmitResponse,
 } from '@/types/practice';
 
@@ -93,12 +92,9 @@ export default function PracticeSolve() {
     const hSplit = useResizable(0.4, 'horizontal');
     const vSplit = useResizable(0.65, 'vertical');
 
-    const { data: problem, isLoading: problemLoading } = useQuery<ProblemResponse>({
+    const { data: problem, isLoading: problemLoading } = useQuery<PracticeProblemDetail>({
         queryKey: ['practice', 'problem', problemId],
-        queryFn: async () => {
-            const { data } = await api.get<ProblemResponse>(`/problems/${problemId}`);
-            return data;
-        },
+        queryFn: () => practiceApi.getProblem(problemId!),
         enabled: !!problemId,
     });
 
@@ -268,6 +264,10 @@ export default function PracticeSolve() {
                     style={{ width: `${hSplit.fraction * 100}%` }}
                 >
                     <ProblemPanel problem={problem} />
+                    <PracticeHelpPanel
+                        hints={problem.hints ?? []}
+                        solution={problem.solution ?? ''}
+                    />
                 </div>
 
                 <div

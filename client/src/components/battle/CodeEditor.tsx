@@ -126,9 +126,6 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
                                 </option>
                             ))}
                         </select>
-                        <span className="ml-auto text-[11px] text-muted-foreground">
-                            Only the function body is editable. IO is handled for you.
-                        </span>
                     </div>
                 )}
 

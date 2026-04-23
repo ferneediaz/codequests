@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { MarkdownContent } from '@/components/MarkdownContent';
 import { ArrowLeft, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import api from '@/services/api';
 import type { LanguageStarter, SubmissionResult } from '@/types/api';
@@ -242,9 +243,7 @@ export default function AuthorPreview() {
             <div className="grid flex-1 grid-cols-[1fr_1.2fr_1fr] overflow-hidden">
                 <div className="overflow-y-auto border-r border-border bg-background p-4">
                     <h2 className="mb-2 text-sm font-semibold">Description</h2>
-                    <pre className="whitespace-pre-wrap text-xs text-muted-foreground">
-                        {problem.description}
-                    </pre>
+                    <MarkdownContent markdown={problem.description} />
                 </div>
 
                 <div className="flex flex-col overflow-hidden">

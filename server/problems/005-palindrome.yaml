@@ -41,3 +41,42 @@ tests:
   - { args: ["A man, a plan, a canal: Panama"], expected: true }
   - { args: ["race a car"],                     expected: false }
   - { args: [" "],                              expected: true, hidden: true }
+hints:
+  - You have to ignore non-alphanumeric characters and case. Two pointers let you do that without allocating a cleaned-up copy.
+  - Start a pointer at each end of the string. Skip any character that isn't a letter or digit.
+  - Compare the lowercase versions of the two characters at the pointers and move them inward until they cross.
+solution: |
+  Walk two pointers from opposite ends of the string. At each step, advance each pointer past any non-alphanumeric character, then compare the lowercase of the remaining characters. If any pair doesn't match, it isn't a palindrome.
+
+  ```javascript
+  function isPalindrome(s) {
+      const isAlnum = (c) => /[a-z0-9]/i.test(c);
+      let left = 0;
+      let right = s.length - 1;
+      while (left < right) {
+          while (left < right && !isAlnum(s[left])) left++;
+          while (left < right && !isAlnum(s[right])) right--;
+          if (s[left].toLowerCase() !== s[right].toLowerCase()) return false;
+          left++;
+          right--;
+      }
+      return true;
+  }
+  ```
+
+  ```python
+  def is_palindrome(s):
+      left, right = 0, len(s) - 1
+      while left < right:
+          while left < right and not s[left].isalnum():
+              left += 1
+          while left < right and not s[right].isalnum():
+              right -= 1
+          if s[left].lower() != s[right].lower():
+              return False
+          left += 1
+          right -= 1
+      return True
+  ```
+
+  Time is `O(n)` with `O(1)` extra space.

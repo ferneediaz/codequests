@@ -52,3 +52,39 @@ tests:
   - { args: ["(]"],        expected: false }
   - { args: ["{[()]}"],    expected: true,  hidden: true }
   - { args: ["([)]"],      expected: false, hidden: true }
+hints:
+  - The most recently opened bracket must be the next one closed. Which data structure gives you "most recent" in O(1)?
+  - Push every opening bracket onto a stack. When you see a closing bracket, it must match the top of the stack.
+  - Don't forget the edge cases. If the stack is empty when you encounter a closing bracket, or if anything is left on the stack at the end, the string is invalid.
+solution: |
+  A stack is a natural fit because bracket nesting is last-in / first-out. Walk the string once; push opening brackets, and for each closing bracket pop the top of the stack and verify it's the matching partner.
+
+  ```javascript
+  function isValid(s) {
+      const pairs = { ')': '(', ']': '[', '}': '{' };
+      const stack = [];
+      for (const ch of s) {
+          if (ch === '(' || ch === '[' || ch === '{') {
+              stack.push(ch);
+          } else {
+              if (stack.pop() !== pairs[ch]) return false;
+          }
+      }
+      return stack.length === 0;
+  }
+  ```
+
+  ```python
+  def is_valid(s):
+      pairs = {')': '(', ']': '[', '}': '{'}
+      stack = []
+      for ch in s:
+          if ch in '([{':
+              stack.append(ch)
+          else:
+              if not stack or stack.pop() != pairs[ch]:
+                  return False
+      return not stack
+  ```
+
+  Both time and space are `O(n)` in the worst case.

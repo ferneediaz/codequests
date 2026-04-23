@@ -117,6 +117,26 @@ export class PracticeService {
     }
 
     /**
+     * Fetch a problem for the practice page, including practice-only
+     * fields (`hints`, `solution`) that are intentionally stripped from
+     * the generic `/problems/:id` endpoint. Only visible test cases are
+     * returned — hidden tests stay hidden here the same way they do on
+     * the public endpoint.
+     */
+    async getProblemForPractice(problemId: string) {
+        const problem = await this.prisma.problem.findUnique({
+            where: { id: problemId },
+            include: {
+                testCases: { where: { isHidden: false } },
+            },
+        });
+        if (!problem) {
+            throw new NotFoundException(`Problem ${problemId} not found`);
+        }
+        return problem;
+    }
+
+    /**
      * Get the set of problem IDs the user has solved at least once.
      */
     async getSolvedProblemIds(userId: string): Promise<Set<string>> {

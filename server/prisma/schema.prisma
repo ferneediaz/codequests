@@ -179,6 +179,11 @@ model Problem {
   // Starter code as JSON: { "javascript": "...", "python": "..." }
   starterCode String @default("{}")
 
+  // Practice-only fields (stripped from public /problems responses so
+  // battles can't leak them). Populated from YAML via the importer.
+  hints    String[] @default([])
+  solution String   @default("") @db.Text
+
   testCases TestCase[]
   battles   Battle[]
   poolItems ProblemPoolItem[]

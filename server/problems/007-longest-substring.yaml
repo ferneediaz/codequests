@@ -48,3 +48,41 @@ tests:
   - { args: ["pwwkew"],   expected: 3 }
   - { args: ["dvdf"],     expected: 3, hidden: true }
   - { args: [""],         expected: 0, hidden: true }
+hints:
+  - You're looking for a contiguous range, so think about a sliding window over the string.
+  - Track the last index at which you saw each character in a hash map. That tells you whether the window needs to shrink.
+  - When you see a repeat, advance the window's left boundary to just past the previous occurrence. Track the maximum window length along the way.
+solution: |
+  Use a sliding window `[left, right]` together with a hash map of `char -> most recent index`. As you expand the window to the right, if the new character was seen at index `j >= left`, jump `left` to `j + 1` to restore uniqueness. Record the best window size seen.
+
+  ```javascript
+  function lengthOfLongestSubstring(s) {
+      const lastSeen = new Map();
+      let left = 0;
+      let best = 0;
+      for (let right = 0; right < s.length; right++) {
+          const ch = s[right];
+          if (lastSeen.has(ch) && lastSeen.get(ch) >= left) {
+              left = lastSeen.get(ch) + 1;
+          }
+          lastSeen.set(ch, right);
+          best = Math.max(best, right - left + 1);
+      }
+      return best;
+  }
+  ```
+
+  ```python
+  def length_of_longest_substring(s):
+      last_seen = {}
+      left = 0
+      best = 0
+      for right, ch in enumerate(s):
+          if ch in last_seen and last_seen[ch] >= left:
+              left = last_seen[ch] + 1
+          last_seen[ch] = right
+          best = max(best, right - left + 1)
+      return best
+  ```
+
+  Each character is visited at most twice, so the algorithm runs in `O(n)` time with `O(min(n, alphabet))` extra space.

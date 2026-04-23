@@ -44,3 +44,32 @@ tests:
   - { args: [["h", "e", "l", "l", "o"]],         expected: ["o", "l", "l", "e", "h"] }
   - { args: [["H", "a", "n", "n", "a", "h"]],    expected: ["h", "a", "n", "n", "a", "H"] }
   - { args: [["a"]],                              expected: ["a"], hidden: true }
+hints:
+  - You need O(1) extra memory, so building a new array or using slice tricks is off the table.
+  - Think about walking two indices toward each other from opposite ends of the array.
+  - Swap `s[left]` and `s[right]`, then move `left` forward and `right` backward until they meet in the middle.
+solution: |
+  Use the classic two-pointer swap. Start with `left = 0` and `right = s.length - 1`; swap the characters at those indices and step the pointers toward each other until they cross. The array is mutated in place, so no extra memory is allocated beyond a couple of integer indices.
+
+  ```javascript
+  function reverseString(s) {
+      let left = 0;
+      let right = s.length - 1;
+      while (left < right) {
+          [s[left], s[right]] = [s[right], s[left]];
+          left++;
+          right--;
+      }
+  }
+  ```
+
+  ```python
+  def reverse_string(s):
+      left, right = 0, len(s) - 1
+      while left < right:
+          s[left], s[right] = s[right], s[left]
+          left += 1
+          right -= 1
+  ```
+
+  Time complexity is `O(n)` and the auxiliary space is `O(1)`.

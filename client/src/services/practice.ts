@@ -2,6 +2,7 @@ import api from './api';
 import type { Difficulty } from '@/types/api';
 import type {
     PracticeAttemptsResponse,
+    PracticeProblemDetail,
     PracticeProblemSummary,
     PracticeStats,
     PracticeSubmitRequest,
@@ -27,6 +28,13 @@ export const practiceApi = {
                     unsolvedOnly: params.unsolvedOnly ? 'true' : undefined,
                 },
             },
+        );
+        return data;
+    },
+
+    async getProblem(problemId: string): Promise<PracticeProblemDetail> {
+        const { data } = await api.get<PracticeProblemDetail>(
+            `/practice/problems/${problemId}`,
         );
         return data;
     },

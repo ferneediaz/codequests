@@ -1,4 +1,5 @@
 import type { ProblemResponse } from '@/types/api';
+import { MarkdownContent } from '@/components/MarkdownContent';
 
 interface ProblemPanelProps {
     problem: ProblemResponse;
@@ -8,7 +9,7 @@ export function ProblemPanel({ problem }: ProblemPanelProps) {
     const visibleTests = problem.testCases?.filter((tc) => !tc.isHidden) ?? [];
 
     return (
-        <div className="flex h-full flex-col overflow-y-auto p-4">
+        <div className="flex flex-col p-4">
             <div className="mb-4">
                 <h2 className="text-xl font-bold text-foreground">{problem.title}</h2>
                 <span
@@ -23,8 +24,8 @@ export function ProblemPanel({ problem }: ProblemPanelProps) {
                 </span>
             </div>
 
-            <div className="prose prose-invert mb-6 max-w-none text-sm">
-                <p className="whitespace-pre-wrap text-foreground/90">{problem.description}</p>
+            <div className="mb-6 max-w-none">
+                <MarkdownContent markdown={problem.description} />
             </div>
 
             {visibleTests.length > 0 && (

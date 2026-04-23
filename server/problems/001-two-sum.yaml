@@ -44,3 +44,37 @@ tests:
   - { args: [[3, 3], 6],               expected: [0, 1] }
   - { args: [[1, 5, 3, 2, 9], 11],     expected: [3, 4], hidden: true }
   - { args: [[10, 20, 30], 50],        expected: [1, 2], hidden: true }
+hints:
+  - A brute-force `O(n^2)` double loop works, but can you do it in a single pass?
+  - For each number `x`, the value you really care about is its complement `target - x`. If you had already seen it, you would be done.
+  - Use a hash map from value to index. As you iterate, check whether `target - nums[i]` is already in the map before inserting `nums[i]`.
+solution: |
+  Scan the array once, keeping a hash map of `value -> index` of everything seen so far. For each element `nums[i]`, compute the complement `target - nums[i]` and check the map:
+
+  - If it exists, return `[map[complement], i]`.
+  - Otherwise, record `map[nums[i]] = i` and move on.
+
+  Every lookup and insert is `O(1)` on average, so the overall algorithm is `O(n)` time and `O(n)` extra space.
+
+  ```javascript
+  function twoSum(nums, target) {
+      const seen = new Map();
+      for (let i = 0; i < nums.length; i++) {
+          const complement = target - nums[i];
+          if (seen.has(complement)) return [seen.get(complement), i];
+          seen.set(nums[i], i);
+      }
+      return [];
+  }
+  ```
+
+  ```python
+  def two_sum(nums, target):
+      seen = {}
+      for i, x in enumerate(nums):
+          complement = target - x
+          if complement in seen:
+              return [seen[complement], i]
+          seen[x] = i
+      return []
+  ```

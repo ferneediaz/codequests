@@ -98,6 +98,11 @@ export const ProblemYamlV2Schema = BaseProblemSchema.extend({
     signature: SignatureSchema,
     starter: languageMapSchema(z.string()),
     tests: z.array(StructuredTestCaseSchema).min(1, 'At least one test required'),
+    hints: z
+        .array(z.string().min(1))
+        .min(1, 'Provide at least 1 hint')
+        .max(3, 'At most 3 hints are allowed'),
+    solution: z.string().min(1),
 }).superRefine((doc, ctx) => {
     const langs = Object.keys(doc.starter).filter(
         (lang) => doc.starter[lang as SupportedAuthoringLanguage] !== undefined,

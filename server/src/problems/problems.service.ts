@@ -4,6 +4,20 @@ import { CreateProblemDto } from './dto/create-problem.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 import { Difficulty } from '@prisma/client';
 
+/**
+ * Practice-only fields that must never leak onto the generic `/problems/*`
+ * endpoints — otherwise a player mid-battle could fetch the official
+ * solution from the network tab. `PracticeService` reads these separately
+ * via its own practice-scoped endpoint.
+ */
+function stripPracticeOnlyFields<T extends { hints?: unknown; solution?: unknown }>(
+    problem: T,
+): Omit<T, 'hints' | 'solution'> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { hints: _hints, solution: _solution, ...rest } = problem;
+    return rest;
+}
+
 @Injectable()
 export class ProblemsService {
     constructor(private prisma: PrismaService) { }
@@ -14,7 +28,7 @@ export class ProblemsService {
     async create(createProblemDto: CreateProblemDto) {
         const { testCases, starterCode, tags, ...problemData } = createProblemDto;
 
-        return this.prisma.problem.create({
+        const created = await this.prisma.problem.create({
             data: {
                 ...problemData,
                 starterCode: starterCode ? JSON.stringify(starterCode) : '{}',
@@ -27,6 +41,7 @@ export class ProblemsService {
                 testCases: true,
             },
         });
+        return stripPracticeOnlyFields(created);
     }
 
     /**
@@ -57,7 +72,7 @@ export class ProblemsService {
         ]);
 
         return {
-            data: problems,
+            data: problems.map((p) => stripPracticeOnlyFields(p)),
             meta: {
                 total,
                 page,
@@ -82,7 +97,7 @@ export class ProblemsService {
             throw new NotFoundException(`Problem with ID ${id} not found`);
         }
 
-        return problem;
+        return stripPracticeOnlyFields(problem);
     }
 
     /**
@@ -114,7 +129,7 @@ export class ProblemsService {
             },
         });
 
-        return problem;
+        return problem ? stripPracticeOnlyFields(problem) : problem;
     }
 
     /**
@@ -126,7 +141,7 @@ export class ProblemsService {
 
         const { starterCode, ...updateData } = updateProblemDto;
 
-        return this.prisma.problem.update({
+        const updated = await this.prisma.problem.update({
             where: { id },
             data: {
                 ...updateData,
@@ -136,6 +151,7 @@ export class ProblemsService {
                 testCases: true,
             },
         });
+        return stripPracticeOnlyFields(updated);
     }
 
     /**

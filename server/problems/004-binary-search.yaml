@@ -43,3 +43,39 @@ tests:
   - { args: [[-1, 0, 3, 5, 9, 12], 2],          expected: -1 }
   - { args: [[5], 5],                           expected: 0,  hidden: true }
   - { args: [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 7], expected: 6, hidden: true }
+hints:
+  - The array is sorted, so you can eliminate half of the remaining range at every step.
+  - Maintain two indices `left` and `right` and inspect `mid = (left + right) / 2`. Based on how `nums[mid]` compares to `target`, move one of the pointers.
+  - Use `mid = left + (right - left) / 2` (integer division) to avoid overflow in other languages, and loop while `left <= right`.
+solution: |
+  Standard iterative binary search. Keep a closed window `[left, right]` and on each iteration look at the middle element. If it equals `target`, return its index; if it's smaller, the answer must be to the right; otherwise, to the left.
+
+  ```javascript
+  function search(nums, target) {
+      let left = 0;
+      let right = nums.length - 1;
+      while (left <= right) {
+          const mid = left + Math.floor((right - left) / 2);
+          if (nums[mid] === target) return mid;
+          if (nums[mid] < target) left = mid + 1;
+          else right = mid - 1;
+      }
+      return -1;
+  }
+  ```
+
+  ```python
+  def search(nums, target):
+      left, right = 0, len(nums) - 1
+      while left <= right:
+          mid = left + (right - left) // 2
+          if nums[mid] == target:
+              return mid
+          if nums[mid] < target:
+              left = mid + 1
+          else:
+              right = mid - 1
+      return -1
+  ```
+
+  Time complexity is `O(log n)` and space is `O(1)`.

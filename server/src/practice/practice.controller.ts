@@ -2,6 +2,7 @@ import {
     Body,
     Controller,
     Get,
+    Param,
     Post,
     Query,
     Req,
@@ -21,6 +22,7 @@ import { PracticeService } from './practice.service';
 import { SubmitAttemptDto } from './dto/submit-attempt.dto';
 import { AttemptResultDto } from './dto/attempt-response.dto';
 import { PracticeStatsDto } from './dto/practice-stats.dto';
+import { PracticeProblemDetailDto } from './dto/practice-problem.dto';
 
 type AuthedRequest = Request & { user: { id: string } };
 
@@ -120,5 +122,21 @@ export class PracticeController {
             tags: parsedTags,
             unsolvedOnly: unsolvedOnly === 'true',
         });
+    }
+
+    @Get('problems/:problemId')
+    @ApiOperation({
+        summary: 'Get a problem for the practice solve view',
+        description:
+            'Practice-scoped problem fetch that includes the reference `solution` and progressive `hints`. These fields are intentionally absent from the generic `/problems/:id` endpoint so they cannot leak during live battles.',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Problem detail with hints + solution',
+        type: PracticeProblemDetailDto,
+    })
+    @ApiResponse({ status: 404, description: 'Problem not found' })
+    getProblem(@Param('problemId') problemId: string) {
+        return this.practice.getProblemForPractice(problemId);
     }
 }

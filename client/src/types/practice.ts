@@ -1,4 +1,4 @@
-import type { Difficulty, SubmissionResult } from './api';
+import type { Difficulty, ProblemResponse, SubmissionResult } from './api';
 
 export type PracticeLanguage = 'javascript' | 'python';
 
@@ -9,6 +9,18 @@ export interface PracticeProblemSummary {
     tags: string[];
     solved: boolean;
     attempts: number;
+}
+
+/**
+ * Practice-only problem payload returned by `GET /practice/problems/:id`.
+ * Mirrors `ProblemResponse` (shared with battle flows) and adds the
+ * `hints` + `solution` fields that are intentionally stripped from the
+ * generic `/problems/:id` endpoint.
+ */
+export interface PracticeProblemDetail extends ProblemResponse {
+    tags: string[];
+    hints: string[];
+    solution: string;
 }
 
 export interface PracticeSubmitRequest {
