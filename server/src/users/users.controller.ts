@@ -20,13 +20,18 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
+import { NewsService, NewsFilter } from './news.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
+import { NewsResponseDto } from './dto/news-response.dto';
 
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly newsService: NewsService,
+  ) {}
 
   /**
    * Get all users (paginated, sorted by MMR)
@@ -119,5 +124,65 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   getStats(@Param('id') id: string) {
     return this.usersService.getStats(id);
+  }
+
+  /**
+   * Get the news feed for a user.
+   *
+   * Clan challenge events are globally visible; friend battle results are
+   * only surfaced when at least one participant is in the viewer's
+   * accepted-friends set. The viewer (`id`) must match the authenticated
+   * user so friend scoping can't be spoofed.
+   */
+  @Get(':id/news')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get dashboard news feed for a user' })
+  @ApiParam({ name: 'id', description: 'User ID (must match authenticated user)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 15 })
+  @ApiQuery({
+    name: 'before',
+    required: false,
+    type: String,
+    description: 'ISO timestamp cursor (from a previous `nextCursor`)',
+  })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    enum: ['all', 'clan', 'friends', 'shame'],
+  })
+  @ApiResponse({ status: 200, description: 'News feed', type: NewsResponseDto })
+  @ApiResponse({ status: 403, description: 'Cannot read another user\'s news feed' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  getNews(
+    @Param('id') id: string,
+    @Req() req: Request & { user: { id: string } },
+    @Query('limit') limit?: string,
+    @Query('before') before?: string,
+    @Query('filter') filter?: string,
+  ) {
+    if (req.user.id !== id) {
+      throw new ForbiddenException(
+        'You can only read your own news feed',
+      );
+    }
+    return this.newsService.getNews(id, {
+      limit: limit ? parseInt(limit, 10) : undefined,
+      before,
+      filter: sanitizeFilter(filter),
+    });
+  }
+}
+
+function sanitizeFilter(value?: string): NewsFilter | undefined {
+  if (!value) return undefined;
+  switch (value) {
+    case 'all':
+    case 'clan':
+    case 'friends':
+    case 'shame':
+      return value;
+    default:
+      return undefined;
   }
 }

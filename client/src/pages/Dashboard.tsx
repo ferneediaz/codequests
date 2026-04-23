@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { useAppSelector } from '@/store/hooks';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,12 +26,23 @@ import {
     ArrowDownRight,
     Minus,
     BookOpen,
+    Newspaper,
+    Shield,
+    Hourglass,
+    Handshake,
+    Repeat,
+    XCircle,
+    UserCircle2,
 } from 'lucide-react';
 import api from '@/services/api';
 import type {
     UserStats,
     MatchHistoryEntry,
     BattleMode,
+    NewsItem,
+    NewsResponse,
+    NewsItemSeverity,
+    NewsItemType,
 } from '@/types/api';
 import { getRankTier, getNextRankTier, getRankProgress, getRankTiers } from '@/utils/rank';
 import {
@@ -94,6 +105,36 @@ export default function Dashboard() {
         },
         enabled: !!user?.id,
     });
+
+    const {
+        data: newsPages,
+        isLoading: newsLoading,
+        fetchNextPage: fetchMoreNews,
+        hasNextPage: hasMoreNews,
+        isFetchingNextPage: isFetchingMoreNews,
+    } = useInfiniteQuery<NewsResponse>({
+        queryKey: ['newsFeed', user?.id],
+        initialPageParam: undefined as string | undefined,
+        queryFn: async ({ pageParam }) => {
+            const { data } = await api.get(`/users/${user!.id}/news`, {
+                params: {
+                    limit: 15,
+                    filter: 'all',
+                    before: pageParam,
+                },
+            });
+            return data;
+        },
+        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+        enabled: !!user?.id,
+    });
+
+    const newsItems = useMemo(() => {
+        const apiItems = (newsPages?.pages ?? []).flatMap((p) => p.items);
+        return [...HARD_CODED_NEWS_PREVIEW, ...apiItems].sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+        );
+    }, [newsPages]);
 
     const availableHeatmapYears = useMemo(() => {
         const years = new Set<number>([new Date().getFullYear()]);
@@ -461,6 +502,53 @@ export default function Dashboard() {
                     </AnimateIn>
                 </div>
 
+                {/* ---------------- NEWS ---------------- */}
+                <AnimateIn>
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Newspaper className="h-4 w-4 text-primary" />
+                                    <h2 className="text-base font-semibold">News</h2>
+                                </div>
+                            </div>
+
+                            {newsLoading ? (
+                                <div className="space-y-2">
+                                    {[...Array(4)].map((_, i) => (
+                                        <Skeleton key={i} className="h-14 w-full" />
+                                    ))}
+                                </div>
+                            ) : !newsItems.length ? (
+                                <div className="py-10 text-center">
+                                    <Newspaper className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                                    <p className="text-muted-foreground">No news yet. Go start some drama.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {newsItems.map((item) => (
+                                        <NewsRow key={item.id} item={item} />
+                                    ))}
+                                    {hasMoreNews && (
+                                        <div className="pt-2 text-center">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => fetchMoreNews()}
+                                                disabled={isFetchingMoreNews}
+                                            >
+                                                {isFetchingMoreNews
+                                                    ? 'Loading...'
+                                                    : 'Show more'}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </AnimateIn>
+
                 {/* ---------------- RECENT MATCHES ---------------- */}
                 <AnimateIn>
                     <Card>
@@ -815,6 +903,172 @@ function MatchRow({
                         {mmrChange}
                     </span>
                 )}
+            </div>
+        </div>
+    );
+}
+
+const NEWS_TYPE_ICON: Record<NewsItemType, typeof Swords> = {
+    CLAN_CHALLENGE_SENT: Swords,
+    CLAN_CHALLENGE_ACCEPTED: Handshake,
+    CLAN_CHALLENGE_DECLINED: XCircle,
+    CLAN_CHALLENGE_COUNTERED: Repeat,
+    CLAN_CHALLENGE_EXPIRED: Hourglass,
+    FRIEND_BATTLE_RESULT: Trophy,
+};
+
+const SEVERITY_STYLES: Record<
+    NewsItemSeverity,
+    { icon: string; iconBg: string; border: string }
+> = {
+    neutral: {
+        icon: 'text-primary',
+        iconBg: 'bg-primary/10',
+        border: 'border-border/60',
+    },
+    positive: {
+        icon: 'text-green-500',
+        iconBg: 'bg-green-500/10',
+        border: 'border-green-500/30',
+    },
+    warning: {
+        icon: 'text-amber-400',
+        iconBg: 'bg-amber-400/10',
+        border: 'border-amber-400/30',
+    },
+    negative: {
+        icon: 'text-red-500',
+        iconBg: 'bg-red-500/10',
+        border: 'border-red-500/30',
+    },
+};
+
+const HARD_CODED_NEWS_PREVIEW: NewsItem[] = [
+    {
+        id: 'preview-clan-sent-harvard-mit',
+        type: 'CLAN_CHALLENGE_SENT',
+        severity: 'neutral',
+        category: 'clan',
+        isShame: false,
+        timestamp: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
+        text: 'Harvard Coders challenged MIT Hackers to a clan war.',
+        challengerClan: { id: 'clan-harvard-coders', name: 'Harvard Coders', tag: 'HVD' },
+        challengedClan: { id: 'clan-mit-hackers', name: 'MIT Hackers', tag: 'MIT' },
+    },
+    {
+        id: 'preview-clan-declined-mit-harvard',
+        type: 'CLAN_CHALLENGE_DECLINED',
+        severity: 'negative',
+        category: 'clan',
+        isShame: true,
+        timestamp: new Date(Date.now() - 24 * 60 * 1000).toISOString(),
+        text: 'MIT Hackers declined Harvard Coders challenge.',
+        challengerClan: { id: 'clan-harvard-coders', name: 'Harvard Coders', tag: 'HVD' },
+        challengedClan: { id: 'clan-mit-hackers', name: 'MIT Hackers', tag: 'MIT' },
+    },
+    {
+        id: 'preview-clan-expired-mit-harvard',
+        type: 'CLAN_CHALLENGE_EXPIRED',
+        severity: 'warning',
+        category: 'clan',
+        isShame: true,
+        timestamp: new Date(Date.now() - 42 * 60 * 1000).toISOString(),
+        text: 'MIT Hackers did not respond to Harvard Coders challenge in time.',
+        challengerClan: { id: 'clan-harvard-coders', name: 'Harvard Coders', tag: 'HVD' },
+        challengedClan: { id: 'clan-mit-hackers', name: 'MIT Hackers', tag: 'MIT' },
+    },
+    {
+        id: 'preview-clan-win-mit-harvard',
+        type: 'CLAN_CHALLENGE_ACCEPTED',
+        severity: 'positive',
+        category: 'clan',
+        isShame: false,
+        timestamp: new Date(Date.now() - 55 * 60 * 1000).toISOString(),
+        text: 'MIT Hackers won a clan war against Harvard Coders.',
+        challengerClan: { id: 'clan-harvard-coders', name: 'Harvard Coders', tag: 'HVD' },
+        challengedClan: { id: 'clan-mit-hackers', name: 'MIT Hackers', tag: 'MIT' },
+    },
+    {
+        id: 'preview-friends-win-lina-kai',
+        type: 'FRIEND_BATTLE_RESULT',
+        severity: 'positive',
+        category: 'friends',
+        isShame: false,
+        timestamp: new Date(Date.now() - 65 * 60 * 1000).toISOString(),
+        text: 'Lina beat Kai in a friend battle (2-1 tests solved).',
+        winner: { id: 'user-lina', username: 'Lina' },
+        loser: { id: 'user-kai', username: 'Kai' },
+        participants: [
+            { id: 'user-lina', username: 'Lina' },
+            { id: 'user-kai', username: 'Kai' },
+        ],
+        battleMode: 'ONE_V_ONE',
+        battleId: 'preview-battle-lina-kai',
+    },
+    {
+        id: 'preview-friends-win-noah-zara',
+        type: 'FRIEND_BATTLE_RESULT',
+        severity: 'positive',
+        category: 'friends',
+        isShame: false,
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        text: 'Noah defeated Zara in a friend rematch.',
+        winner: { id: 'user-noah', username: 'Noah' },
+        loser: { id: 'user-zara', username: 'Zara' },
+        participants: [
+            { id: 'user-noah', username: 'Noah' },
+            { id: 'user-zara', username: 'Zara' },
+        ],
+        battleMode: 'ONE_V_ONE',
+        battleId: 'preview-battle-noah-zara',
+    },
+];
+
+function NewsRow({ item }: { item: NewsItem }) {
+    const Icon = NEWS_TYPE_ICON[item.type] ?? Newspaper;
+    const style = SEVERITY_STYLES[item.severity];
+    const when = formatRelative(item.timestamp);
+
+    return (
+        <div
+            className={`group flex items-center gap-3 rounded-lg border ${style.border} bg-background/40 p-3 transition-colors hover:bg-card/60`}
+        >
+            <span
+                className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${style.iconBg} ${style.icon}`}
+            >
+                <Icon className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="font-medium truncate">{item.text}</span>
+                    {item.isShame && (
+                        <Badge
+                            variant="outline"
+                            className="h-5 border-red-500/40 bg-red-500/10 px-1.5 text-[10px] uppercase text-red-400"
+                        >
+                            Shame
+                        </Badge>
+                    )}
+                    {item.category === 'clan' && !item.isShame && (
+                        <Badge
+                            variant="outline"
+                            className="h-5 gap-1 px-1.5 text-[10px] uppercase"
+                        >
+                            <Shield className="h-3 w-3" />
+                            Clan
+                        </Badge>
+                    )}
+                    {item.category === 'friends' && (
+                        <Badge
+                            variant="outline"
+                            className="h-5 gap-1 px-1.5 text-[10px] uppercase"
+                        >
+                            <UserCircle2 className="h-3 w-3" />
+                            Friends
+                        </Badge>
+                    )}
+                </div>
+                <p className="text-xs text-muted-foreground">{when}</p>
             </div>
         </div>
     );
