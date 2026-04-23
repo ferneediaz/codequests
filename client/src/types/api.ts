@@ -4,6 +4,7 @@ export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export type MatchmakingStatus = 'QUEUED' | 'MATCHED' | 'EXPIRED';
 export type SkillType = 'FREEZE' | 'SCRAMBLE' | 'BLIND' | 'TIME_STEAL' | 'FOG_OF_WAR';
 export type BattleRoyaleFormat = 'SAME_PROBLEM' | 'SCORE_ATTACK';
+export type ClanWarsFormat = 'SAME_PROBLEM' | 'SCORE_ATTACK';
 
 /**
  * Configuration for a single Battle Royale round.
@@ -28,6 +29,19 @@ export interface RoyalePreset {
     battleRoyaleFormat: BattleRoyaleFormat;
     maxPlayers: number;
     rounds: RoundConfig[];
+}
+
+export interface ClanWarsPresetRound {
+    timeLimitSeconds: number;
+}
+
+export interface ClanWarsPreset {
+    id: string;
+    name: string;
+    description: string;
+    clanWarsFormat: ClanWarsFormat;
+    teamSize: number;
+    rounds: ClanWarsPresetRound[];
 }
 
 export interface MatchConfig {
@@ -56,6 +70,25 @@ export interface CreateBattleRequest {
     problemIds?: string[];
 }
 
+export interface ClanTeamMeta {
+    name?: string;
+    tag?: string;
+    clanId?: string;
+}
+
+export interface CreateClanWarsRequest {
+    clanWarsFormat: ClanWarsFormat;
+    teamSize: number;
+    rounds: ClanWarsPresetRound[];
+    enabledSkills?: SkillType[];
+    preferredTopic?: string;
+    preferredDifficulty?: Difficulty;
+    problemIds?: string[];
+    teamOne?: ClanTeamMeta;
+    teamTwo?: ClanTeamMeta;
+    withInviteCode?: boolean;
+}
+
 export interface RankTier {
     name: string;
     icon: string;
@@ -73,6 +106,7 @@ export interface User {
     mmr: number;
     wins: number;
     losses: number;
+    clanId?: string | null;
     tier?: RankTier;
     createdAt: string;
 }

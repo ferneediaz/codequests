@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ClanChallengeService } from './clan-challenges.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClanWarsService } from '../battles/clan-wars.service';
 import {
     createMockPrismaService,
     MockPrismaService,
@@ -11,11 +12,12 @@ import {
     ForbiddenException,
     ConflictException,
 } from '@nestjs/common';
-import { ClanChallengeStatus } from '@prisma/client';
+import { BattleMode, ClanChallengeStatus, ClanWarsFormat } from '@prisma/client';
 
 describe('ClanChallengeService', () => {
     let service: ClanChallengeService;
     let prisma: MockPrismaService;
+    let clanWars: { createClanWarsBattle: jest.Mock };
 
     const mockUser1 = {
         id: 'user-1',
@@ -75,11 +77,17 @@ describe('ClanChallengeService', () => {
 
     beforeEach(async () => {
         const mockPrisma = createMockPrismaService();
+        clanWars = {
+            createClanWarsBattle: jest
+                .fn()
+                .mockResolvedValue({ id: 'new-cw-battle' }),
+        };
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 ClanChallengeService,
                 { provide: PrismaService, useValue: mockPrisma },
+                { provide: ClanWarsService, useValue: clanWars },
             ],
         }).compile();
 
@@ -169,6 +177,111 @@ describe('ClanChallengeService', () => {
                 service.sendChallenge('user-1', { targetClanId: 'clan-2' }),
             ).rejects.toThrow(ConflictException);
         });
+
+        // ============================================================
+        // CLAN_WARS-specific validation on send
+        // ============================================================
+
+        it('CLAN_WARS: requires clanWarsFormat (missing → 400)', async () => {
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            prisma.clan.findUnique
+                .mockResolvedValueOnce(mockClan1)
+                .mockResolvedValueOnce(mockClan2);
+            prisma.clanChallenge.findFirst.mockResolvedValue(null);
+
+            await expect(
+                service.sendChallenge('user-1', {
+                    targetClanId: 'clan-2',
+                    mode: BattleMode.CLAN_WARS,
+                    rounds: [{ timeLimitSeconds: 300 }],
+                }),
+            ).rejects.toThrow(/clanWarsFormat is required/);
+        });
+
+        it('CLAN_WARS: requires non-empty rounds (missing → 400)', async () => {
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            prisma.clan.findUnique
+                .mockResolvedValueOnce(mockClan1)
+                .mockResolvedValueOnce(mockClan2);
+            prisma.clanChallenge.findFirst.mockResolvedValue(null);
+
+            await expect(
+                service.sendChallenge('user-1', {
+                    targetClanId: 'clan-2',
+                    mode: BattleMode.CLAN_WARS,
+                    clanWarsFormat: ClanWarsFormat.SAME_PROBLEM,
+                }),
+            ).rejects.toThrow(/rounds \(non-empty\) are required/);
+        });
+
+        it('CLAN_WARS: requires rounds to be non-empty (empty array → 400)', async () => {
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            prisma.clan.findUnique
+                .mockResolvedValueOnce(mockClan1)
+                .mockResolvedValueOnce(mockClan2);
+            prisma.clanChallenge.findFirst.mockResolvedValue(null);
+
+            await expect(
+                service.sendChallenge('user-1', {
+                    targetClanId: 'clan-2',
+                    mode: BattleMode.CLAN_WARS,
+                    clanWarsFormat: ClanWarsFormat.SAME_PROBLEM,
+                    rounds: [],
+                }),
+            ).rejects.toThrow(/rounds \(non-empty\) are required/);
+        });
+
+        it('CLAN_WARS: happy path persists mode, format and rounds', async () => {
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            prisma.clan.findUnique
+                .mockResolvedValueOnce(mockClan1)
+                .mockResolvedValueOnce(mockClan2);
+            prisma.clanChallenge.findFirst.mockResolvedValue(null);
+            prisma.clanChallenge.create.mockResolvedValue({
+                ...mockChallenge,
+                mode: BattleMode.CLAN_WARS,
+            });
+
+            await service.sendChallenge('user-1', {
+                targetClanId: 'clan-2',
+                mode: BattleMode.CLAN_WARS,
+                clanWarsFormat: ClanWarsFormat.SCORE_ATTACK,
+                rounds: [
+                    { timeLimitSeconds: 300 },
+                    { timeLimitSeconds: 300 },
+                ],
+                teamSize: 3,
+            });
+
+            const createArg = prisma.clanChallenge.create.mock.calls[0][0];
+            expect(createArg.data.mode).toBe(BattleMode.CLAN_WARS);
+            expect(createArg.data.clanWarsFormat).toBe(
+                ClanWarsFormat.SCORE_ATTACK,
+            );
+            expect(createArg.data.teamSize).toBe(3);
+            // rounds goes through JSON field, so the create layer receives
+            // the same object shape back.
+            expect(createArg.data.rounds).toEqual([
+                { timeLimitSeconds: 300 },
+                { timeLimitSeconds: 300 },
+            ]);
+        });
+
+        it('CLAN_VS_CLAN (default mode) does NOT require format or rounds', async () => {
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            prisma.clan.findUnique
+                .mockResolvedValueOnce(mockClan1)
+                .mockResolvedValueOnce(mockClan2);
+            prisma.clanChallenge.findFirst.mockResolvedValue(null);
+            prisma.clanChallenge.create.mockResolvedValue(mockChallenge);
+
+            await expect(
+                service.sendChallenge('user-1', {
+                    targetClanId: 'clan-2',
+                    teamSize: 2,
+                }),
+            ).resolves.toBeDefined();
+        });
     });
 
     // ====================================================================
@@ -256,6 +369,60 @@ describe('ClanChallengeService', () => {
             await expect(
                 service.acceptChallenge('user-2', 'challenge-1'),
             ).rejects.toThrow(BadRequestException);
+        });
+
+        it('materialises a Clan Wars battle when mode === CLAN_WARS', async () => {
+            const cwChallenge = {
+                ...mockChallenge,
+                mode: BattleMode.CLAN_WARS,
+                clanWarsFormat: ClanWarsFormat.SAME_PROBLEM,
+                rounds: [{ timeLimitSeconds: 300 }, { timeLimitSeconds: 300 }],
+                counterClanWarsFormat: null,
+                counterRounds: null,
+                counterEnabledSkills: [],
+                counterPreferredTopic: null,
+                counterTeamSize: null,
+            };
+            prisma.clanChallenge.findUnique.mockResolvedValue(cwChallenge);
+            prisma.clan.findUnique
+                .mockResolvedValueOnce(mockClan2) // validateClanOwner for challenged clan
+                .mockResolvedValueOnce(mockClan1) // challenger clan lookup in createClanWarsBattleFromChallenge
+                .mockResolvedValueOnce(mockClan2); // challenged clan lookup
+            prisma.clanChallenge.update.mockResolvedValue({
+                ...cwChallenge,
+                status: ClanChallengeStatus.ACCEPTED,
+                respondedAt: new Date(),
+            });
+
+            const result = await service.acceptChallenge(
+                'user-2',
+                'challenge-1',
+            );
+
+            expect(result.status).toBe(ClanChallengeStatus.ACCEPTED);
+            expect(result.battleId).toBe('new-cw-battle');
+            expect(clanWars.createClanWarsBattle).toHaveBeenCalledTimes(1);
+            const [creatorId, dto] =
+                clanWars.createClanWarsBattle.mock.calls[0];
+            // Challenger clan's owner is the creator/captain of team-1.
+            expect(creatorId).toBe(mockClan1.ownerId);
+            expect(dto.clanWarsFormat).toBe(ClanWarsFormat.SAME_PROBLEM);
+            // Both clan IDs are pre-filled from the challenge.
+            expect(dto.teamOne.clanId).toBe(mockClan1.id);
+            expect(dto.teamTwo.clanId).toBe(mockClan2.id);
+        });
+
+        it('does NOT create a Clan Wars battle for CLAN_VS_CLAN challenges', async () => {
+            prisma.clanChallenge.findUnique.mockResolvedValue(mockChallenge);
+            prisma.clan.findUnique.mockResolvedValue(mockClan2);
+            prisma.clanChallenge.update.mockResolvedValue({
+                ...mockChallenge,
+                status: ClanChallengeStatus.ACCEPTED,
+                respondedAt: new Date(),
+            });
+
+            await service.acceptChallenge('user-2', 'challenge-1');
+            expect(clanWars.createClanWarsBattle).not.toHaveBeenCalled();
         });
     });
 
@@ -420,6 +587,140 @@ describe('ClanChallengeService', () => {
                 (newExpiresAt.getTime() - Date.now()) / (1000 * 60 * 60);
             expect(hoursFromNow).toBeGreaterThan(23);
             expect(hoursFromNow).toBeLessThanOrEqual(24);
+        });
+
+        // ============================================================
+        // CLAN_WARS counter-proposal semantics
+        // ============================================================
+
+        it('CLAN_WARS counter snapshots original fields when DTO omits them (so counter row is self-contained)', async () => {
+            const cwChallenge = {
+                ...mockChallenge,
+                mode: BattleMode.CLAN_WARS,
+                clanWarsFormat: ClanWarsFormat.SAME_PROBLEM,
+                rounds: [{ timeLimitSeconds: 300 }],
+                enabledSkills: ['FREEZE'],
+                preferredTopic: 'dp',
+                teamSize: 2,
+                timeLimitMinutes: 30,
+            };
+            prisma.clanChallenge.findUnique.mockResolvedValue(cwChallenge);
+            prisma.clan.findUnique.mockResolvedValue(mockClan2);
+            prisma.clanChallenge.update.mockResolvedValue({
+                ...cwChallenge,
+                status: ClanChallengeStatus.COUNTERED,
+            });
+
+            // Counter only tweaks teamSize; format / rounds / skills /
+            // topic / timeLimit are omitted — they MUST be snapshotted from
+            // the original so the counter row is a complete proposal.
+            await service.counterChallenge('user-2', 'challenge-1', {
+                teamSize: 3,
+                counterMessage: 'how about 3v3 instead?',
+            });
+
+            const data = prisma.clanChallenge.update.mock.calls[0][0].data;
+            expect(data.status).toBe(ClanChallengeStatus.COUNTERED);
+            expect(data.counterTeamSize).toBe(3);
+            expect(data.counterTimeLimitMinutes).toBe(30);
+            expect(data.counterEnabledSkills).toEqual(['FREEZE']);
+            expect(data.counterPreferredTopic).toBe('dp');
+            expect(data.counterClanWarsFormat).toBe(
+                ClanWarsFormat.SAME_PROBLEM,
+            );
+            expect(data.counterRounds).toEqual([{ timeLimitSeconds: 300 }]);
+        });
+
+        it('CLAN_WARS counter: explicit empty enabledSkills=[] overrides original (no silent fallback)', async () => {
+            const cwChallenge = {
+                ...mockChallenge,
+                mode: BattleMode.CLAN_WARS,
+                clanWarsFormat: ClanWarsFormat.SAME_PROBLEM,
+                rounds: [{ timeLimitSeconds: 300 }],
+                enabledSkills: ['FREEZE', 'SABOTAGE'],
+            };
+            prisma.clanChallenge.findUnique.mockResolvedValue(cwChallenge);
+            prisma.clan.findUnique.mockResolvedValue(mockClan2);
+            prisma.clanChallenge.update.mockResolvedValue({
+                ...cwChallenge,
+                status: ClanChallengeStatus.COUNTERED,
+            });
+
+            await service.counterChallenge('user-2', 'challenge-1', {
+                enabledSkills: [],
+            });
+
+            const data = prisma.clanChallenge.update.mock.calls[0][0].data;
+            // Critical: previously '?? challenge.enabledSkills' would
+            // fall through empty arrays; now `[]` is respected as an
+            // intentional "no skills" counter.
+            expect(data.counterEnabledSkills).toEqual([]);
+        });
+
+        it('CLAN_WARS counter: DTO rounds override original counterRounds', async () => {
+            const cwChallenge = {
+                ...mockChallenge,
+                mode: BattleMode.CLAN_WARS,
+                clanWarsFormat: ClanWarsFormat.SAME_PROBLEM,
+                rounds: [{ timeLimitSeconds: 300 }],
+            };
+            prisma.clanChallenge.findUnique.mockResolvedValue(cwChallenge);
+            prisma.clan.findUnique.mockResolvedValue(mockClan2);
+            prisma.clanChallenge.update.mockResolvedValue({
+                ...cwChallenge,
+                status: ClanChallengeStatus.COUNTERED,
+            });
+
+            await service.counterChallenge('user-2', 'challenge-1', {
+                rounds: [
+                    { timeLimitSeconds: 600 },
+                    { timeLimitSeconds: 600 },
+                    { timeLimitSeconds: 600 },
+                ],
+            });
+
+            const data = prisma.clanChallenge.update.mock.calls[0][0].data;
+            expect(data.counterRounds).toEqual([
+                { timeLimitSeconds: 600 },
+                { timeLimitSeconds: 600 },
+                { timeLimitSeconds: 600 },
+            ]);
+        });
+
+        it('CLAN_WARS counter: rejects when mode becomes CLAN_WARS but original had no format', async () => {
+            const originalNoFormat = {
+                ...mockChallenge,
+                mode: BattleMode.CLAN_VS_CLAN, // originally not CW
+                clanWarsFormat: null,
+                rounds: null,
+            };
+            prisma.clanChallenge.findUnique.mockResolvedValue(originalNoFormat);
+            prisma.clan.findUnique.mockResolvedValue(mockClan2);
+
+            await expect(
+                service.counterChallenge('user-2', 'challenge-1', {
+                    mode: BattleMode.CLAN_WARS,
+                    rounds: [{ timeLimitSeconds: 300 }],
+                }),
+            ).rejects.toThrow(/clanWarsFormat is required/);
+        });
+
+        it('CLAN_WARS counter: rejects when mode becomes CLAN_WARS but no rounds anywhere', async () => {
+            const originalNoRounds = {
+                ...mockChallenge,
+                mode: BattleMode.CLAN_VS_CLAN,
+                clanWarsFormat: null,
+                rounds: null,
+            };
+            prisma.clanChallenge.findUnique.mockResolvedValue(originalNoRounds);
+            prisma.clan.findUnique.mockResolvedValue(mockClan2);
+
+            await expect(
+                service.counterChallenge('user-2', 'challenge-1', {
+                    mode: BattleMode.CLAN_WARS,
+                    clanWarsFormat: ClanWarsFormat.SAME_PROBLEM,
+                }),
+            ).rejects.toThrow(/rounds \(non-empty\) are required/);
         });
     });
 

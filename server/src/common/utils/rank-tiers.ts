@@ -24,3 +24,11 @@ export function getRankTier(mmr: number): RankTier {
   }
   return RANK_TIERS[RANK_TIERS.length - 1];
 }
+
+/**
+ * Clan rank tier — reuses the same thresholds as user tiers so a clan's
+ * "rating" visibly maps onto the same leaderboard rungs.
+ */
+export function getClanRankTier(clanMmr: number): RankTier {
+  return getRankTier(clanMmr);
+}

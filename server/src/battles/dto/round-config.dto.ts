@@ -1,11 +1,13 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, Min, Max } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsInt, IsOptional, Min, Max } from 'class-validator';
 
 /**
- * Configuration for a single Battle Royale round.
+ * Configuration for a single round.
  *
- * Clients provide one of these per round when creating a BR battle.
- * Each round has an independent time limit and elimination count,
+ * Used for both Battle Royale (where `eliminateCount` is required) and
+ * Clan Wars (where `eliminateCount` is ignored — teams aren't eliminated).
+ *
+ * Each round has an independent time limit and (for BR) elimination count,
  * so arbitrary formats like "20 players, 5 rounds, eliminate [5,5,5,3,1]"
  * are supported.
  */
@@ -21,13 +23,14 @@ export class RoundConfigDto {
     @Max(7200)
     timeLimitSeconds!: number;
 
-    @ApiProperty({
+    @ApiPropertyOptional({
         description:
-            'Number of players eliminated at the end of this round (>= 0). Sum across rounds must equal maxPlayers - 1.',
+            'Battle Royale only: number of players eliminated at the end of this round (>= 0). Sum across rounds must equal maxPlayers - 1. Ignored for Clan Wars.',
         example: 2,
         minimum: 0,
     })
     @IsInt()
     @Min(0)
-    eliminateCount!: number;
+    @IsOptional()
+    eliminateCount?: number;
 }

@@ -578,6 +578,100 @@ export class BattlesGateway
         this.server.to(`battle:${battleId}`).emit('battle.royale_standings', data);
     }
 
+    // ========================================
+    // Clan Wars emits
+    // ========================================
+
+    /**
+     * Emit when a Clan Wars round starts (IN_PROGRESS). Fired once per round.
+     */
+    emitClanWarsRoundStart(
+        battleId: string,
+        data: {
+            battleId: string;
+            roundNumber: number;
+            totalRounds: number;
+            problemId: string | null;
+            timeLimitSeconds: number;
+            startedAt: Date;
+            participantUserIds: string[];
+        },
+    ) {
+        this.server.to(`battle:${battleId}`).emit('clan_wars.round_start', data);
+    }
+
+    /**
+     * Emit when a Clan Wars round ends (COMPLETED).
+     */
+    emitClanWarsRoundEnd(
+        battleId: string,
+        data: {
+            battleId: string;
+            roundNumber: number;
+            endedReason: BattleRoundEndReason;
+            roundWinner: 'team-1' | 'team-2' | null;
+            teams: any[];
+        },
+    ) {
+        this.server.to(`battle:${battleId}`).emit('clan_wars.round_end', data);
+    }
+
+    /**
+     * Emit team standings updates during an in-progress round (after each
+     * submission).
+     */
+    emitClanWarsTeamStandings(
+        battleId: string,
+        data: {
+            battleId: string;
+            roundNumber: number;
+            teams: any[];
+        },
+    ) {
+        this.server
+            .to(`battle:${battleId}`)
+            .emit('clan_wars.team_standings', data);
+    }
+
+    /**
+     * Emit when a Clan Wars round just ended and the battle enters
+     * intermission. The next round will NOT start automatically — every
+     * participant must explicitly ready up.
+     */
+    emitClanWarsRoundIntermission(
+        battleId: string,
+        data: {
+            battleId: string;
+            justEndedRound: number;
+            nextRoundNumber: number;
+            readyUserIds: string[];
+        },
+    ) {
+        this.server
+            .to(`battle:${battleId}`)
+            .emit('clan_wars.round_intermission', data);
+    }
+
+    /**
+     * Emit when a participant (un)readies up for the next round during
+     * intermission. Includes the full list of currently-ready userIds and an
+     * `allReady` flag indicating whether the next round has fired.
+     */
+    emitClanWarsPlayerReadyNextRound(
+        battleId: string,
+        data: {
+            battleId: string;
+            userId: string;
+            nextRoundNumber: number;
+            readyUserIds: string[];
+            allReady: boolean;
+        },
+    ) {
+        this.server
+            .to(`battle:${battleId}`)
+            .emit('clan_wars.player_ready_next_round', data);
+    }
+
     /**
      * Emit battle status update to room
      */

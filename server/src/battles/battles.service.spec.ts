@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BattlesService } from './battles.service';
 import { BattleRoyaleService } from './battle-royale.service';
+import { ClanWarsService } from './clan-wars.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -170,6 +171,21 @@ describe('BattlesService', () => {
                         enforceRoyaleJoinCap: jest.fn(),
                         startRoyale: jest.fn(),
                         submitRoyaleRound: jest.fn(),
+                    },
+                },
+                {
+                    provide: ClanWarsService,
+                    useValue: {
+                        createClanWarsBattle: jest.fn(),
+                        joinClanWarsBattle: jest.fn(),
+                        startClanWars: jest.fn(),
+                        submitClanWarsRound: jest.fn(),
+                        readyForNextRound: jest
+                            .fn()
+                            .mockResolvedValue({ allReady: false }),
+                        unreadyForNextRound: jest
+                            .fn()
+                            .mockResolvedValue(undefined),
                     },
                 },
             ],
@@ -2314,10 +2330,18 @@ describe('BattlesService', () => {
 
         beforeEach(() => {
             prisma.$transaction.mockImplementation(async (callback) => callback(prisma));
+            // Default: the in-tx fresh read (post self-update) sees only
+            // user-1 ready so by default we don't start the battle. Tests
+            // that need the "all ready" case override this explicitly.
+            prisma.battleParticipant.findMany.mockResolvedValue([
+                { userId: 'user-1', isReady: true },
+                { userId: 'user-2', isReady: false },
+            ]);
         });
 
         it('should mark a participant as ready', async () => {
             prisma.battle.findUnique
+                .mockResolvedValueOnce(twoPlayerBattle) // readyUp preflight
                 .mockResolvedValueOnce(twoPlayerBattle) // readyUp tx lookup
                 .mockResolvedValueOnce({                 // getBattleDetails
                     ...twoPlayerBattle,
@@ -2354,6 +2378,7 @@ describe('BattlesService', () => {
             };
 
             prisma.battle.findUnique
+                .mockResolvedValueOnce(battleOneReady) // readyUp preflight
                 .mockResolvedValueOnce(battleOneReady) // readyUp tx lookup
                 .mockResolvedValueOnce({               // getBattleDetails after start
                     ...battleOneReady,
@@ -2372,6 +2397,12 @@ describe('BattlesService', () => {
             prisma.battleParticipant.update.mockResolvedValue({
                 ...battleOneReady.participants[1], isReady: true,
             });
+            // Fresh in-tx read: both participants ready now that user-2
+            // just flipped. This is what drives the "start battle" branch.
+            prisma.battleParticipant.findMany.mockResolvedValue([
+                { userId: 'user-1', isReady: true },
+                { userId: 'user-2', isReady: true },
+            ]);
             prisma.battle.update.mockResolvedValue({
                 ...battleOneReady,
                 status: BattleStatus.IN_PROGRESS,
@@ -2462,6 +2493,7 @@ describe('BattlesService', () => {
             };
 
             prisma.battle.findUnique
+                .mockResolvedValueOnce(threePlayerBattle) // preflight
                 .mockResolvedValueOnce(threePlayerBattle) // tx lookup
                 .mockResolvedValueOnce({                   // getBattleDetails
                     ...threePlayerBattle,
@@ -2475,6 +2507,13 @@ describe('BattlesService', () => {
             prisma.battleParticipant.update.mockResolvedValue({
                 ...threePlayerBattle.participants[0], isReady: true,
             });
+            // Fresh in-tx read: user-1 just readied but user-2 and user-3
+            // are still not ready → no start.
+            prisma.battleParticipant.findMany.mockResolvedValue([
+                { userId: 'user-1', isReady: true },
+                { userId: 'user-2', isReady: false },
+                { userId: 'user-3', isReady: false },
+            ]);
 
             const result = await service.readyUp('battle-1', 'user-1');
 
@@ -2485,6 +2524,7 @@ describe('BattlesService', () => {
 
         it('should execute readyUp within a transaction', async () => {
             prisma.battle.findUnique
+                .mockResolvedValueOnce(twoPlayerBattle) // preflight
                 .mockResolvedValueOnce(twoPlayerBattle)
                 .mockResolvedValueOnce({
                     ...twoPlayerBattle,
@@ -2503,6 +2543,230 @@ describe('BattlesService', () => {
 
             expect(prisma.$transaction).toHaveBeenCalledTimes(1);
             expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+        });
+
+        // ============================================================
+        // CLAN_WARS branch — lobby ready-up vs. intermission ready-up
+        // ============================================================
+
+        describe('CLAN_WARS branch', () => {
+            const makeCwParticipant = (
+                id: string,
+                userId: string,
+                teamId: 'team-1' | 'team-2',
+                isReady = false,
+            ) => ({
+                id,
+                battleId: 'battle-1',
+                userId,
+                teamId,
+                code: null,
+                language: null,
+                testsPassed: 0,
+                totalTests: 0,
+                pointsEarned: 0,
+                isReady,
+                submittedAt: null,
+                mmrChange: null,
+            });
+
+            // 2v2 full, balanced, everyone ready except user-1 → readying
+            // user-1 in WAITING should flip allReady=true and delegate to
+            // ClanWarsService.startClanWars (outside the tx).
+            it('WAITING + full balanced 2v2: readying the last player starts Clan Wars via clanWarsService.startClanWars', async () => {
+                const cwBattleWaiting = {
+                    ...mockBattle,
+                    mode: BattleMode.CLAN_WARS,
+                    status: BattleStatus.WAITING,
+                    isInIntermission: false,
+                    teamSize: 2,
+                    maxPlayers: 4,
+                    participants: [
+                        makeCwParticipant('p1', 'user-1', 'team-1', false),
+                        makeCwParticipant('p2', 'user-2', 'team-1', true),
+                        makeCwParticipant('p3', 'user-3', 'team-2', true),
+                        makeCwParticipant('p4', 'user-4', 'team-2', true),
+                    ],
+                };
+
+                prisma.battle.findUnique
+                    .mockResolvedValueOnce(cwBattleWaiting) // preflight
+                    .mockResolvedValueOnce(cwBattleWaiting) // tx lookup
+                    .mockResolvedValueOnce({ // getBattleDetails
+                        ...cwBattleWaiting,
+                        status: BattleStatus.IN_PROGRESS,
+                        startedAt: new Date(),
+                        participants: cwBattleWaiting.participants.map((p) => ({
+                            ...p,
+                            isReady: true,
+                            user: { ...mockUser1, id: p.userId, clan: null },
+                        })),
+                        problem: mockProblem,
+                        skillUses: [],
+                    });
+                prisma.battleParticipant.update.mockResolvedValue({
+                    ...cwBattleWaiting.participants[0],
+                    isReady: true,
+                });
+                prisma.battleParticipant.findMany.mockResolvedValue([
+                    { userId: 'user-1', isReady: true },
+                    { userId: 'user-2', isReady: true },
+                    { userId: 'user-3', isReady: true },
+                    { userId: 'user-4', isReady: true },
+                ]);
+
+                const clanWarsService = (service as any)
+                    .clanWarsService as { startClanWars: jest.Mock };
+
+                const result = await service.readyUp('battle-1', 'user-1');
+
+                expect(result.started).toBe(true);
+                // CW path must NOT flip status inside the tx (start path
+                // owns that race-safe flip) and must NOT bump games from
+                // the lobby — startClanWars does both.
+                expect(prisma.battle.update).not.toHaveBeenCalled();
+                expect(
+                    subscriptionsService.incrementGamesPlayed,
+                ).not.toHaveBeenCalled();
+                expect(clanWarsService.startClanWars).toHaveBeenCalledWith(
+                    'battle-1',
+                );
+            });
+
+            it('WAITING + CW lobby not full yet: rejects with "lobby is not full"', async () => {
+                const cwBattleNotFull = {
+                    ...mockBattle,
+                    mode: BattleMode.CLAN_WARS,
+                    status: BattleStatus.WAITING,
+                    isInIntermission: false,
+                    teamSize: 2,
+                    maxPlayers: 4,
+                    participants: [
+                        makeCwParticipant('p1', 'user-1', 'team-1'),
+                        makeCwParticipant('p2', 'user-2', 'team-1'),
+                        makeCwParticipant('p3', 'user-3', 'team-2'),
+                    ],
+                };
+
+                prisma.battle.findUnique
+                    .mockResolvedValueOnce(cwBattleNotFull) // preflight
+                    .mockResolvedValueOnce(cwBattleNotFull); // tx lookup
+
+                await expect(
+                    service.readyUp('battle-1', 'user-1'),
+                ).rejects.toThrow(/lobby is not full/);
+            });
+
+            it('WAITING + CW unbalanced teams (3v1): rejects with "teams unbalanced"', async () => {
+                const cwBattleUnbalanced = {
+                    ...mockBattle,
+                    mode: BattleMode.CLAN_WARS,
+                    status: BattleStatus.WAITING,
+                    isInIntermission: false,
+                    teamSize: 2,
+                    maxPlayers: 4,
+                    participants: [
+                        makeCwParticipant('p1', 'user-1', 'team-1'),
+                        makeCwParticipant('p2', 'user-2', 'team-1'),
+                        makeCwParticipant('p3', 'user-3', 'team-1'),
+                        makeCwParticipant('p4', 'user-4', 'team-2'),
+                    ],
+                };
+
+                prisma.battle.findUnique
+                    .mockResolvedValueOnce(cwBattleUnbalanced) // preflight
+                    .mockResolvedValueOnce(cwBattleUnbalanced); // tx lookup
+
+                await expect(
+                    service.readyUp('battle-1', 'user-1'),
+                ).rejects.toThrow(/teams unbalanced/);
+            });
+
+            it('IN_PROGRESS + isInIntermission: delegates to clanWarsService.readyForNextRound and does NOT enter the WAITING tx', async () => {
+                const cwBattleInIntermission = {
+                    ...mockBattle,
+                    mode: BattleMode.CLAN_WARS,
+                    status: BattleStatus.IN_PROGRESS,
+                    isInIntermission: true,
+                    teamSize: 2,
+                    maxPlayers: 4,
+                    participants: [
+                        makeCwParticipant('p1', 'user-1', 'team-1', false),
+                        makeCwParticipant('p2', 'user-2', 'team-1', true),
+                        makeCwParticipant('p3', 'user-3', 'team-2', true),
+                        makeCwParticipant('p4', 'user-4', 'team-2', true),
+                    ],
+                };
+
+                prisma.battle.findUnique
+                    .mockResolvedValueOnce(cwBattleInIntermission) // preflight
+                    .mockResolvedValueOnce({ // getBattleDetails
+                        ...cwBattleInIntermission,
+                        participants: cwBattleInIntermission.participants.map(
+                            (p) => ({
+                                ...p,
+                                user: {
+                                    ...mockUser1,
+                                    id: p.userId,
+                                    clan: null,
+                                },
+                            }),
+                        ),
+                        problem: mockProblem,
+                        skillUses: [],
+                    });
+
+                const clanWarsService = (service as any)
+                    .clanWarsService as {
+                    readyForNextRound: jest.Mock;
+                    startClanWars: jest.Mock;
+                };
+                clanWarsService.readyForNextRound.mockResolvedValueOnce({
+                    allReady: true,
+                });
+
+                const result = await service.readyUp('battle-1', 'user-1');
+
+                expect(result.started).toBe(true);
+                expect(
+                    clanWarsService.readyForNextRound,
+                ).toHaveBeenCalledWith('battle-1', 'user-1');
+                // Crucially: the intermission path must NOT fall through to
+                // the WAITING transaction and must NOT call startClanWars.
+                expect(prisma.$transaction).not.toHaveBeenCalled();
+                expect(clanWarsService.startClanWars).not.toHaveBeenCalled();
+            });
+
+            it('IN_PROGRESS + NOT in intermission: falls through and rejects with "not in waiting state"', async () => {
+                const cwBattleMidRound = {
+                    ...mockBattle,
+                    mode: BattleMode.CLAN_WARS,
+                    status: BattleStatus.IN_PROGRESS,
+                    isInIntermission: false,
+                    teamSize: 2,
+                    maxPlayers: 4,
+                    participants: [
+                        makeCwParticipant('p1', 'user-1', 'team-1'),
+                        makeCwParticipant('p2', 'user-2', 'team-1'),
+                        makeCwParticipant('p3', 'user-3', 'team-2'),
+                        makeCwParticipant('p4', 'user-4', 'team-2'),
+                    ],
+                };
+
+                prisma.battle.findUnique
+                    .mockResolvedValueOnce(cwBattleMidRound) // preflight
+                    .mockResolvedValueOnce(cwBattleMidRound); // tx lookup
+
+                const clanWarsService = (service as any)
+                    .clanWarsService as { readyForNextRound: jest.Mock };
+
+                await expect(
+                    service.readyUp('battle-1', 'user-1'),
+                ).rejects.toThrow(/not in waiting state/);
+                expect(
+                    clanWarsService.readyForNextRound,
+                ).not.toHaveBeenCalled();
+            });
         });
     });
 
@@ -2921,6 +3185,7 @@ describe('BattlesService', () => {
 
             prisma.$transaction.mockImplementation(async (cb: any) => cb(prisma));
             prisma.battle.findUnique
+                .mockResolvedValueOnce(battle) // preflight
                 .mockResolvedValueOnce(battle) // tx lookup
                 .mockResolvedValueOnce({
                     ...battle,
@@ -2937,6 +3202,11 @@ describe('BattlesService', () => {
                 ...battle.participants[1],
                 isReady: true,
             });
+            // Fresh in-tx read: both BR participants now ready.
+            prisma.battleParticipant.findMany.mockResolvedValue([
+                { userId: 'user-1', isReady: true },
+                { userId: 'user-2', isReady: true },
+            ]);
 
             const result = await service.readyUp('battle-br', 'user-2');
 

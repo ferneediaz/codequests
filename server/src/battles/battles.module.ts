@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BattlesService } from './battles.service';
 import { BattleRoyaleService } from './battle-royale.service';
+import { ClanWarsService } from './clan-wars.service';
 import { BattlesController } from './battles.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CodeExecutionModule } from '../code-execution/code-execution.module';
@@ -21,7 +22,7 @@ import { WebsocketsModule } from '../websockets/websockets.module';
         forwardRef(() => WebsocketsModule),
     ],
     controllers: [BattlesController],
-    providers: [BattlesService, BattleRoyaleService],
-    exports: [BattlesService, BattleRoyaleService],
+    providers: [BattlesService, BattleRoyaleService, ClanWarsService],
+    exports: [BattlesService, BattleRoyaleService, ClanWarsService],
 })
 export class BattlesModule { }

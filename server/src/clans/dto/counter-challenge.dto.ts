@@ -9,8 +9,12 @@ import {
     MaxLength,
     Min,
     Max,
+    ValidateNested,
+    ArrayMinSize,
 } from 'class-validator';
-import { SkillType } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { BattleMode, ClanWarsFormat, SkillType } from '@prisma/client';
+import { RoundConfigDto } from '../../battles/dto/round-config.dto';
 
 export class CounterChallengeDto {
     @ApiPropertyOptional({ description: 'Counter-proposal message', maxLength: 500 })
@@ -18,6 +22,15 @@ export class CounterChallengeDto {
     @IsString()
     @MaxLength(500)
     counterMessage?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'Counter-proposed battle mode. Defaults to whatever the original proposal used.',
+        enum: BattleMode,
+    })
+    @IsOptional()
+    @IsEnum(BattleMode)
+    mode?: BattleMode;
 
     @ApiPropertyOptional({ description: 'Proposed team size', enum: [2, 3, 5] })
     @IsOptional()
@@ -42,4 +55,28 @@ export class CounterChallengeDto {
     @IsOptional()
     @IsString()
     preferredTopic?: string;
+
+    // ==============================
+    // CLAN_WARS-specific counter-proposal
+    // ==============================
+
+    @ApiPropertyOptional({
+        description: 'Counter-proposed Clan Wars format (only meaningful when mode === CLAN_WARS).',
+        enum: ClanWarsFormat,
+    })
+    @IsOptional()
+    @IsEnum(ClanWarsFormat)
+    clanWarsFormat?: ClanWarsFormat;
+
+    @ApiPropertyOptional({
+        description:
+            'Counter-proposed per-round configuration for CLAN_WARS.',
+        type: [RoundConfigDto],
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1)
+    @ValidateNested({ each: true })
+    @Type(() => RoundConfigDto)
+    rounds?: RoundConfigDto[];
 }

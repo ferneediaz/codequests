@@ -138,17 +138,25 @@ model ClanChallenge {
   message String?             // Optional challenge message (max 500 chars)
 
   // Proposed battle config
+  mode             BattleMode @default(CLAN_VS_CLAN) // CLAN_VS_CLAN (legacy single-problem team battle) or CLAN_WARS (multi-round)
   teamSize         Int       @default(2)
   timeLimitMinutes Int       @default(30)
   enabledSkills    SkillType[] @default([])
   preferredTopic   String?
 
+  // CLAN_WARS-specific proposed config (null for CLAN_VS_CLAN challenges)
+  clanWarsFormat ClanWarsFormat?
+  rounds         Json?            // Serialized RoundConfigDto[] for CLAN_WARS
+
   // Counter-proposal config (set when status = COUNTERED)
+  counterMode             BattleMode?
   counterTeamSize         Int?
   counterTimeLimitMinutes Int?
   counterEnabledSkills    SkillType[] @default([])
   counterPreferredTopic   String?
   counterMessage          String?
+  counterClanWarsFormat   ClanWarsFormat?
+  counterRounds           Json?
 
   expiresAt   DateTime  // createdAt + 24h, reset on counter
   respondedAt DateTime?
@@ -233,6 +241,18 @@ model Battle {
   currentRound       Int                 @default(0) // 0 = not started; else matches BattleRound.roundNumber in progress
   rounds             BattleRound[]
 
+  // Clan Wars fields (CLAN_WARS mode only)
+  clanWarsFormat    ClanWarsFormat?
+  teamOneName       String?
+  teamTwoName       String?
+  teamOneTag        String?
+  teamTwoTag        String?
+  teamOneClanId     String? // null = temporary clan (no stats persistence)
+  teamTwoClanId     String?
+  teamOneCaptainId  String?
+  teamTwoCaptainId  String?
+  isInIntermission  Boolean @default(false) // true between rounds; advances only when all participants ready
+
   participants BattleParticipant[]
   skillUses    BattleSkillUse[]
 
@@ -252,6 +272,11 @@ model Battle {
 enum BattleRoyaleFormat {
   SAME_PROBLEM  // Everyone solves the same problem each round; slowest eliminated
   SCORE_ATTACK  // Solve as many pool problems as possible per round; lowest cumulative points eliminated
+}
+
+enum ClanWarsFormat {
+  SAME_PROBLEM  // Both teams solve the same problem each round; round-winner is the team with most distinct members passing all
+  SCORE_ATTACK  // Teams accumulate points from pool problems; cumulative team score determines the overall winner
 }
 
 enum BattleRoundStatus {
@@ -365,6 +390,7 @@ enum BattleMode {
   BATTLE_ROYALE
   CLAN_VS_CLAN
   GROUP
+  CLAN_WARS
 }
 
 enum BattleStatus {

@@ -16,6 +16,7 @@ import { CreateBattleDto } from './dto/create-battle.dto';
 import { getRankTier } from '../common/utils/rank-tiers';
 import { randomBytes } from 'crypto';
 import { BattleRoyaleService } from './battle-royale.service';
+import { ClanWarsService } from './clan-wars.service';
 
 // K-factor for Elo calculation (higher = more volatile ratings)
 const ELO_K_FACTOR = 16;
@@ -57,6 +58,8 @@ export class BattlesService {
         private problemsService: ProblemsService,
         @Inject(forwardRef(() => BattleRoyaleService))
         private battleRoyaleService: BattleRoyaleService,
+        @Inject(forwardRef(() => ClanWarsService))
+        private clanWarsService: ClanWarsService,
     ) { }
 
     /**
@@ -1280,8 +1283,35 @@ export class BattlesService {
      * Returns the updated battle and whether the battle started.
      */
     async readyUp(battleId: string, userId: string) {
+        // Preflight: Clan Wars has two distinct ready-up phases that share
+        // `BattleParticipant.isReady` — lobby ready-up (WAITING) and
+        // per-round intermission ready-up (IN_PROGRESS + isInIntermission).
+        // Handle the intermission case before entering the WAITING-only tx
+        // below so existing state checks continue to work for all other modes.
+        const preflight = await this.prisma.battle.findUnique({
+            where: { id: battleId },
+            select: { mode: true, status: true, isInIntermission: true },
+        });
+        if (!preflight) {
+            throw new NotFoundException(`Battle with ID ${battleId} not found`);
+        }
+        if (
+            preflight.mode === BattleMode.CLAN_WARS &&
+            preflight.status === BattleStatus.IN_PROGRESS &&
+            preflight.isInIntermission
+        ) {
+            const { allReady } = await this.clanWarsService.readyForNextRound(
+                battleId,
+                userId,
+            );
+            return {
+                battle: await this.getBattleDetails(battleId),
+                started: allReady,
+            };
+        }
+
         // Use a transaction to prevent race conditions when multiple players ready up simultaneously
-        const { allReady, isRoyale } = await this.prisma.$transaction(async (tx) => {
+        const { allReady, isRoyale, isClanWars } = await this.prisma.$transaction(async (tx) => {
             const battle = await tx.battle.findUnique({
                 where: { id: battleId },
                 include: {
@@ -1320,20 +1350,49 @@ export class BattlesService {
                 );
             }
 
+            // For Clan Wars, require both teams full (teamSize * 2 exactly) before
+            // anyone can ready up — symmetric with BR's full-lobby gate.
+            const clanWars = battle.mode === BattleMode.CLAN_WARS;
+            if (clanWars) {
+                const requiredLobby = (battle.teamSize ?? 0) * 2;
+                if (requiredLobby <= 0) {
+                    throw new BadRequestException('Clan Wars battle has invalid teamSize');
+                }
+                if (battle.participants.length < requiredLobby) {
+                    throw new BadRequestException(
+                        `Clan Wars lobby is not full (${battle.participants.length}/${requiredLobby})`,
+                    );
+                }
+                // Additionally every team slot must be filled (the cap gate
+                // above is necessary but the team split must also be balanced).
+                const team1Count = battle.participants.filter((p) => p.teamId === 'team-1').length;
+                const team2Count = battle.participants.filter((p) => p.teamId === 'team-2').length;
+                if (team1Count !== battle.teamSize || team2Count !== battle.teamSize) {
+                    throw new BadRequestException(
+                        `Clan Wars teams unbalanced (team-1: ${team1Count}, team-2: ${team2Count}, required: ${battle.teamSize} each)`,
+                    );
+                }
+            }
+
             // Mark this participant as ready
             await tx.battleParticipant.update({
                 where: { id: participant.id },
                 data: { isReady: true },
             });
 
-            // Check if all participants are now ready
-            const otherReady = battle.participants
-                .filter((p) => p.userId !== userId)
-                .every((p) => p.isReady);
+            // Re-read participants INSIDE the tx so two concurrent readying
+            // players don't both see a stale "other not ready" snapshot and
+            // both decline to start the battle (which would hang the lobby).
+            const freshParticipants = await tx.battleParticipant.findMany({
+                where: { battleId },
+                select: { userId: true, isReady: true },
+            });
+            const otherReady = freshParticipants.every((p) => p.isReady);
 
-            if (otherReady && !royale) {
-                // Increment daily game counts for all participants (BR does this
-                // inside startRoyale to keep the BR path self-contained).
+            if (otherReady && !royale && !clanWars) {
+                // Increment daily game counts for all participants (BR + CW
+                // do this inside their respective start methods to keep each
+                // mode's start path self-contained).
                 for (const p of battle.participants) {
                     await this.subscriptionsService.incrementGamesPlayed(p.userId);
                 }
@@ -1348,13 +1407,15 @@ export class BattlesService {
                 });
             }
 
-            return { allReady: otherReady, isRoyale: royale };
+            return { allReady: otherReady, isRoyale: royale, isClanWars: clanWars };
         });
 
-        // Start BR outside the tx since startRoyale itself persists a bunch of
-        // state, schedules timers, and emits websocket events.
+        // Start BR / CW outside the tx since they themselves persist a bunch of
+        // state, schedule timers, and emit websocket events.
         if (allReady && isRoyale) {
             await this.battleRoyaleService.startRoyale(battleId);
+        } else if (allReady && isClanWars) {
+            await this.clanWarsService.startClanWars(battleId);
         }
 
         return {
@@ -1374,6 +1435,17 @@ export class BattlesService {
 
         if (!battle) {
             throw new NotFoundException(`Battle with ID ${battleId} not found`);
+        }
+
+        // Clan Wars intermission: delegate to the clan-wars service so the
+        // unready propagates through the same race-safe flip path.
+        if (
+            battle.mode === BattleMode.CLAN_WARS &&
+            battle.status === BattleStatus.IN_PROGRESS &&
+            battle.isInIntermission
+        ) {
+            await this.clanWarsService.unreadyForNextRound(battleId, userId);
+            return this.getBattleDetails(battleId);
         }
 
         if (battle.status !== BattleStatus.WAITING) {

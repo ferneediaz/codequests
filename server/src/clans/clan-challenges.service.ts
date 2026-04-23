@@ -4,11 +4,16 @@ import {
     BadRequestException,
     ForbiddenException,
     ConflictException,
+    Inject,
+    forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ClanChallengeStatus } from '@prisma/client';
+import { BattleMode, ClanChallengeStatus } from '@prisma/client';
 import { SendChallengeDto } from './dto/send-challenge.dto';
 import { CounterChallengeDto } from './dto/counter-challenge.dto';
+import { ClanWarsService } from '../battles/clan-wars.service';
+import { CreateClanWarsBattleDto } from '../battles/dto/create-clan-wars-battle.dto';
+import { RoundConfigDto } from '../battles/dto/round-config.dto';
 
 const CHALLENGE_EXPIRY_HOURS = 24;
 
@@ -23,7 +28,11 @@ const challengeInclude = {
 
 @Injectable()
 export class ClanChallengeService {
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        @Inject(forwardRef(() => ClanWarsService))
+        private clanWarsService: ClanWarsService,
+    ) {}
 
     /**
      * Send a clan challenge (owner only)
@@ -80,15 +89,38 @@ export class ClanChallengeService {
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + CHALLENGE_EXPIRY_HOURS);
 
+        const mode = dto.mode ?? BattleMode.CLAN_VS_CLAN;
+
+        // When initiating a CLAN_WARS negotiation, rounds + format must be
+        // present so the accepting clan owner knows what they're agreeing to.
+        if (mode === BattleMode.CLAN_WARS) {
+            if (!dto.clanWarsFormat) {
+                throw new BadRequestException(
+                    'clanWarsFormat is required when mode === CLAN_WARS',
+                );
+            }
+            if (!dto.rounds || dto.rounds.length === 0) {
+                throw new BadRequestException(
+                    'rounds (non-empty) are required when mode === CLAN_WARS',
+                );
+            }
+        }
+
         const challenge = await this.prisma.clanChallenge.create({
             data: {
                 challengerClanId: user.clanId,
                 challengedClanId: dto.targetClanId,
                 message: dto.message,
+                mode,
                 teamSize: dto.teamSize ?? 2,
                 timeLimitMinutes: dto.timeLimitMinutes ?? 30,
                 enabledSkills: dto.enabledSkills ?? [],
                 preferredTopic: dto.preferredTopic,
+                clanWarsFormat: dto.clanWarsFormat ?? null,
+                rounds:
+                    mode === BattleMode.CLAN_WARS && dto.rounds
+                        ? (dto.rounds as unknown as object)
+                        : undefined,
                 expiresAt,
             },
             include: challengeInclude,
@@ -136,7 +168,123 @@ export class ClanChallengeService {
             include: challengeInclude,
         });
 
-        return updated;
+        // Clan Wars: materialise the negotiated config into a real Battle. The
+        // challenge's challenger-clan owner acts as team-1 creator; both
+        // clanIds are pre-filled so members can then join via the battle's
+        // join endpoint (clan-gate enforced). `wasCountered` uses the
+        // pre-flip status so the counter* fields are preferred when the
+        // latest agreed state was a counter-proposal (snapshotted at counter
+        // time, see counterChallenge).
+        let battleId: string | null = null;
+        if (updated.mode === BattleMode.CLAN_WARS) {
+            const wasCountered =
+                challenge.status === ClanChallengeStatus.COUNTERED;
+            battleId = await this.createClanWarsBattleFromChallenge(
+                updated,
+                wasCountered,
+            );
+        }
+
+        return { ...updated, battleId };
+    }
+
+    /**
+     * Resolve a CLAN_WARS accepted challenge into an actual `Battle` row.
+     *
+     * - Uses counter* fields when the latest state was a counter-proposal.
+     * - The challenger clan's owner is the creator (team-1 captain) so their
+     *   subscription gate governs the battle.
+     */
+    private async createClanWarsBattleFromChallenge(
+        challenge: {
+            id: string;
+            challengerClanId: string;
+            challengedClanId: string;
+            teamSize: number;
+            counterTeamSize: number | null;
+            enabledSkills: string[];
+            counterEnabledSkills: string[];
+            preferredTopic: string | null;
+            counterPreferredTopic: string | null;
+            clanWarsFormat: any;
+            counterClanWarsFormat: any;
+            rounds: any;
+            counterRounds: any;
+        },
+        wasCountered: boolean,
+    ): Promise<string | null> {
+        const challengerClan = await this.prisma.clan.findUnique({
+            where: { id: challenge.challengerClanId },
+        });
+        if (!challengerClan) {
+            throw new NotFoundException('Challenger clan vanished');
+        }
+
+        const challengedClan = await this.prisma.clan.findUnique({
+            where: { id: challenge.challengedClanId },
+        });
+        if (!challengedClan) {
+            throw new NotFoundException('Challenged clan vanished');
+        }
+
+        // When the latest negotiation state was a counter-proposal, the
+        // counter* row is the authoritative snapshot. counterChallenge now
+        // fills every counter* field from the original on counter time so
+        // that `counterEnabledSkills = []` truthfully means "no skills"
+        // rather than being ambiguous with "counter didn't touch skills".
+        const teamSize = wasCountered
+            ? (challenge.counterTeamSize ?? challenge.teamSize)
+            : challenge.teamSize;
+        const enabledSkills = wasCountered
+            ? (challenge.counterEnabledSkills ?? challenge.enabledSkills)
+            : challenge.enabledSkills;
+        const preferredTopic = wasCountered
+            ? (challenge.counterPreferredTopic ?? challenge.preferredTopic)
+            : challenge.preferredTopic;
+        const clanWarsFormat = wasCountered
+            ? (challenge.counterClanWarsFormat ?? challenge.clanWarsFormat)
+            : challenge.clanWarsFormat;
+        const rawRounds = wasCountered
+            ? (challenge.counterRounds ?? challenge.rounds)
+            : challenge.rounds;
+
+        if (!clanWarsFormat) {
+            throw new BadRequestException(
+                'Challenge is missing clanWarsFormat',
+            );
+        }
+        if (!rawRounds || !Array.isArray(rawRounds) || rawRounds.length === 0) {
+            throw new BadRequestException('Challenge is missing rounds config');
+        }
+
+        const rounds: RoundConfigDto[] = (rawRounds as any[]).map((r) => ({
+            timeLimitSeconds: Number(r.timeLimitSeconds),
+        }));
+
+        const dto: CreateClanWarsBattleDto = {
+            clanWarsFormat,
+            teamSize,
+            rounds,
+            enabledSkills: enabledSkills as any,
+            preferredTopic: preferredTopic ?? undefined,
+            teamOne: {
+                name: challengerClan.name,
+                tag: challengerClan.tag,
+                clanId: challengerClan.id,
+            },
+            teamTwo: {
+                name: challengedClan.name,
+                tag: challengedClan.tag,
+                clanId: challengedClan.id,
+            },
+            withInviteCode: false,
+        };
+
+        const battle = await this.clanWarsService.createClanWarsBattle(
+            challengerClan.ownerId,
+            dto,
+        );
+        return battle.id;
     }
 
     /**
@@ -207,19 +355,61 @@ export class ClanChallengeService {
         // Only challenged clan owner can counter
         await this.validateClanOwner(userId, challenge.challengedClanId);
 
+        // When the counter is itself a CLAN_WARS proposal it MUST still carry
+        // a format and at least one round so the resulting counter row is a
+        // complete, self-contained proposal. This matches the send-side
+        // validation and prevents an accepted counter from resolving to a
+        // half-defined battle config.
+        const counterMode = dto.mode ?? challenge.mode;
+        if (counterMode === BattleMode.CLAN_WARS) {
+            const counterFormat =
+                dto.clanWarsFormat ?? challenge.clanWarsFormat;
+            if (!counterFormat) {
+                throw new BadRequestException(
+                    'clanWarsFormat is required when counter mode === CLAN_WARS',
+                );
+            }
+            const hasCounterRounds = dto.rounds && dto.rounds.length > 0;
+            const hasOriginalRounds =
+                Array.isArray(challenge.rounds) &&
+                (challenge.rounds as unknown[]).length > 0;
+            if (!hasCounterRounds && !hasOriginalRounds) {
+                throw new BadRequestException(
+                    'rounds (non-empty) are required when counter mode === CLAN_WARS',
+                );
+            }
+        }
+
         // Reset expiry on counter
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + CHALLENGE_EXPIRY_HOURS);
 
+        // Snapshot every counter* field from the original when the DTO
+        // doesn't explicitly override it, so that `counterEnabledSkills=[]`
+        // unambiguously means "no skills" (not "counter didn't touch
+        // skills"). The acceptChallenge path then treats the counter row as
+        // the authoritative proposal when `status === COUNTERED`.
         const updated = await this.prisma.clanChallenge.update({
             where: { id: challengeId },
             data: {
                 status: ClanChallengeStatus.COUNTERED,
-                counterTeamSize: dto.teamSize,
-                counterTimeLimitMinutes: dto.timeLimitMinutes,
-                counterEnabledSkills: dto.enabledSkills ?? [],
-                counterPreferredTopic: dto.preferredTopic,
+                counterTeamSize: dto.teamSize ?? challenge.teamSize,
+                counterTimeLimitMinutes:
+                    dto.timeLimitMinutes ?? challenge.timeLimitMinutes,
+                counterEnabledSkills:
+                    dto.enabledSkills ?? challenge.enabledSkills,
+                counterPreferredTopic:
+                    dto.preferredTopic ?? challenge.preferredTopic,
                 counterMessage: dto.counterMessage,
+                counterClanWarsFormat:
+                    dto.clanWarsFormat ?? challenge.clanWarsFormat ?? null,
+                counterRounds:
+                    counterMode === BattleMode.CLAN_WARS
+                        ? dto.rounds
+                            ? (dto.rounds as unknown as object)
+                            : ((challenge.rounds as unknown as object) ??
+                              undefined)
+                        : undefined,
                 expiresAt,
             },
             include: challengeInclude,

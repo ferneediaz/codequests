@@ -7,16 +7,26 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClanDto } from './dto/create-clan.dto';
 import { UpdateClanDto } from './dto/update-clan.dto';
+import { getClanRankTier } from '../common/utils/rank-tiers';
 
 @Injectable()
 export class ClansService {
     constructor(private prisma: PrismaService) { }
 
     /**
+     * Attach the MMR-derived rank tier to a clan response object. Idempotent
+     * and non-destructive — callers can hand any clan row through this
+     * function before returning it from a controller.
+     */
+    private withTier<T extends { mmr: number }>(clan: T): T & { tier: ReturnType<typeof getClanRankTier> } {
+        return { ...clan, tier: getClanRankTier(clan.mmr) };
+    }
+
+    /**
      * Get all clans with member counts
      */
     async findAll(options?: { limit?: number; offset?: number }) {
-        return this.prisma.clan.findMany({
+        const clans = await this.prisma.clan.findMany({
             take: options?.limit || 50,
             skip: options?.offset || 0,
             orderBy: { mmr: 'desc' },
@@ -31,6 +41,7 @@ export class ClansService {
                 },
             },
         });
+        return clans.map((c) => this.withTier(c));
     }
 
     /**
@@ -58,7 +69,7 @@ export class ClansService {
             throw new NotFoundException(`Clan with ID ${id} not found`);
         }
 
-        return clan;
+        return this.withTier(clan);
     }
 
     /**
@@ -83,7 +94,7 @@ export class ClansService {
             throw new NotFoundException(`Clan [${tag}] not found`);
         }
 
-        return clan;
+        return this.withTier(clan);
     }
 
     /**

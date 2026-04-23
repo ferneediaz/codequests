@@ -225,7 +225,11 @@ export class BattleRoyaleService {
                     `Round ${i + 1}: timeLimitSeconds must be between ${MIN_ROUND_SECONDS} and ${MAX_ROUND_SECONDS}`,
                 );
             }
-            if (!Number.isInteger(r.eliminateCount) || r.eliminateCount < 0) {
+            if (
+                r.eliminateCount === undefined ||
+                !Number.isInteger(r.eliminateCount) ||
+                r.eliminateCount < 0
+            ) {
                 throw new BadRequestException(
                     `Round ${i + 1}: eliminateCount must be a non-negative integer`,
                 );
@@ -349,7 +353,7 @@ export class BattleRoyaleService {
                     create: rounds.map((r, idx) => ({
                         roundNumber: idx + 1,
                         timeLimitSeconds: r.timeLimitSeconds,
-                        eliminateCount: r.eliminateCount,
+                        eliminateCount: r.eliminateCount ?? 0,
                         status: BattleRoundStatus.PENDING,
                     })),
                 },

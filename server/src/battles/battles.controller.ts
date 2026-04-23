@@ -22,6 +22,7 @@ import {
 } from '@nestjs/swagger';
 import { BattlesService } from './battles.service';
 import { BattleRoyaleService } from './battle-royale.service';
+import { ClanWarsService } from './clan-wars.service';
 import {
     CreateBattleDto,
     SubmitSolutionDto,
@@ -30,6 +31,9 @@ import {
     BattleRoundResponseDto,
     BattleRoyaleStandingsResponseDto,
     RoyalePresetDto,
+    CreateClanWarsBattleDto,
+    ClanWarsPresetDto,
+    ClanWarsStandingsResponseDto,
 } from './dto';
 
 // Extend Express Request to include user
@@ -49,6 +53,7 @@ export class BattlesController {
     constructor(
         private readonly battlesService: BattlesService,
         private readonly battleRoyaleService: BattleRoyaleService,
+        private readonly clanWarsService: ClanWarsService,
     ) { }
 
     // ========================================
@@ -64,6 +69,159 @@ export class BattlesController {
     })
     getRoyalePresets(): RoyalePresetDto[] {
         return this.battleRoyaleService.getPresets();
+    }
+
+    // ========================================
+    // Clan Wars routes (MUST come before :id routes to avoid conflicts)
+    // ========================================
+
+    @Get('clan-wars/presets')
+    @ApiOperation({ summary: 'List server-provided Clan Wars preset configs' })
+    @ApiResponse({
+        status: 200,
+        description:
+            'Returns a list of preset Clan Wars configurations the client can use as-is or mutate before POSTing.',
+        type: [ClanWarsPresetDto],
+    })
+    getClanWarsPresets(): ClanWarsPresetDto[] {
+        return this.clanWarsService.getPresets();
+    }
+
+    @Post('clan-wars')
+    @ApiOperation({
+        summary:
+            'Create a new Clan Wars battle (multi-round, two-team, cumulative team scoring).',
+    })
+    @ApiResponse({
+        status: 201,
+        description: 'Clan Wars battle created successfully',
+        type: BattleResponseDto,
+    })
+    async createClanWars(
+        @Req() req: AuthRequest,
+        @Body() dto: CreateClanWarsBattleDto,
+    ) {
+        return this.clanWarsService.createClanWarsBattle(req.user.sub, dto);
+    }
+
+    @Post('clan-wars/invite/:code/join')
+    @ApiOperation({
+        summary:
+            'Join a Clan Wars battle via invite code. Use ?team=1|2 to pick a side (defaults to team-2).',
+    })
+    @ApiParam({ name: 'code', description: 'Invite code (case-insensitive)' })
+    @ApiQuery({
+        name: 'team',
+        required: false,
+        description: '"1" for team-1, "2" for team-2. Defaults to team-2.',
+    })
+    @ApiResponse({ status: 200, description: 'Joined Clan Wars battle', type: BattleResponseDto })
+    @ApiResponse({ status: 400, description: 'Cannot join battle' })
+    @ApiResponse({ status: 404, description: 'Invalid invite code' })
+    async joinClanWarsByInviteCode(
+        @Req() req: AuthRequest,
+        @Param('code') code: string,
+        @Query('team') teamParam?: string,
+        @Body() body?: {
+            teamMeta?: { name?: string; tag?: string; clanId?: string };
+        },
+    ) {
+        const battle = await this.battlesService.getByInviteCode(code);
+        const team = this.parseTeam(teamParam);
+        return this.clanWarsService.joinClanWarsBattle(req.user.sub, battle.id, {
+            team,
+            viaInvite: true,
+            teamMeta: body?.teamMeta,
+        });
+    }
+
+    @Post(':id/clan-wars/join')
+    @ApiOperation({
+        summary:
+            'Join an existing Clan Wars battle by ID. Use ?team=1|2 to pick a side (defaults to team-2).',
+    })
+    @ApiParam({ name: 'id', description: 'Battle ID' })
+    @ApiQuery({
+        name: 'team',
+        required: false,
+        description: '"1" for team-1, "2" for team-2. Defaults to team-2.',
+    })
+    @ApiResponse({ status: 200, description: 'Joined Clan Wars battle', type: BattleResponseDto })
+    @ApiResponse({ status: 400, description: 'Cannot join battle' })
+    @ApiResponse({ status: 404, description: 'Battle not found' })
+    async joinClanWarsById(
+        @Req() req: AuthRequest,
+        @Param('id') id: string,
+        @Query('team') teamParam?: string,
+        @Body() body?: {
+            teamMeta?: { name?: string; tag?: string; clanId?: string };
+        },
+    ) {
+        const team = this.parseTeam(teamParam);
+        return this.clanWarsService.joinClanWarsBattle(req.user.sub, id, {
+            team,
+            viaInvite: false,
+            teamMeta: body?.teamMeta,
+        });
+    }
+
+    @Post(':id/clan-wars/submit')
+    @ApiOperation({ summary: 'Submit a Clan Wars round solution' })
+    @ApiParam({ name: 'id', description: 'Battle ID' })
+    @ApiResponse({
+        status: 200,
+        description: 'Solution submitted and evaluated',
+    })
+    @ApiResponse({ status: 400, description: 'Battle not in progress / invalid problem' })
+    @ApiResponse({ status: 403, description: 'Not a participant' })
+    @ApiResponse({ status: 404, description: 'Battle not found' })
+    async submitClanWars(
+        @Req() req: AuthRequest,
+        @Param('id') id: string,
+        @Body() submitDto: SubmitSolutionDto,
+    ) {
+        return this.clanWarsService.submitClanWarsRound(
+            id,
+            req.user.sub,
+            submitDto.code,
+            submitDto.language,
+            submitDto.problemId,
+        );
+    }
+
+    @Get(':id/clan-wars/standings')
+    @ApiOperation({ summary: 'Get current Clan Wars team standings' })
+    @ApiParam({ name: 'id', description: 'Battle ID' })
+    @ApiResponse({
+        status: 200,
+        description: 'Returns per-team standings with cumulative + current-round points.',
+        type: ClanWarsStandingsResponseDto,
+    })
+    @ApiResponse({ status: 404, description: 'Battle not found' })
+    async getClanWarsStandings(@Param('id') id: string) {
+        const teams = await this.clanWarsService.getTeamStandings(id);
+        const battle = await this.clanWarsService.getClanWarsDetails(id);
+        return {
+            battleId: id,
+            currentRound: battle.currentRound ?? 0,
+            isInIntermission: battle.isInIntermission ?? false,
+            teams,
+        };
+    }
+
+    /**
+     * Normalize a ?team= query string into a canonical team id.
+     * Accepts "1", "2", "team-1", "team-2". Defaults to team-2 (the
+     * "opposition" side) so a naked join lands opponents on team-2 by default.
+     */
+    private parseTeam(teamParam?: string): 'team-1' | 'team-2' {
+        if (!teamParam) return 'team-2';
+        const normalized = teamParam.toString().trim().toLowerCase();
+        if (normalized === '1' || normalized === 'team-1') return 'team-1';
+        if (normalized === '2' || normalized === 'team-2') return 'team-2';
+        throw new BadRequestException(
+            'team must be "1"/"2" or "team-1"/"team-2"',
+        );
     }
 
     @Post()

@@ -47,12 +47,16 @@ import type {
     RoundConfig,
     RoyalePreset,
     CreateBattleRequest,
+    ClanWarsFormat,
+    ClanWarsPreset,
+    CreateClanWarsRequest,
 } from '@/types/api';
 import api from '@/services/api';
 import { toast } from 'sonner';
 import { getRankTier } from '@/utils/rank';
 import { usePaywall } from '@/hooks/usePaywall';
 import { useSubscription } from '@/hooks/useSubscription';
+import { listClans } from '@/services/clans';
 
 const MODES: {
     value: BattleMode;
@@ -170,6 +174,27 @@ const ROYALE_FORMATS: {
     ];
 
 const ROUND_TIME_PRESETS = [60, 120, 180, 300, 600, 900, 1800, 3600];
+const CW_MIN_TEAM_SIZE = 1;
+const CW_MAX_TEAM_SIZE = 10;
+const CW_MIN_ROUND_SECONDS = 10;
+const CW_MAX_ROUND_SECONDS = 7200;
+
+const CLAN_WARS_FORMATS: {
+    value: ClanWarsFormat;
+    label: string;
+    description: string;
+}[] = [
+        {
+            value: 'SAME_PROBLEM',
+            label: 'Same Problem',
+            description: 'Both teams solve the same problem each round. Better team execution wins.',
+        },
+        {
+            value: 'SCORE_ATTACK',
+            label: 'Score Attack',
+            description: 'Teams solve from a shared pool and stack cumulative points across rounds.',
+        },
+    ];
 
 /**
  * Build a sensible default round list for a given lobby size that satisfies
@@ -312,6 +337,35 @@ function formatSeconds(n: number): string {
     return s === 0 ? `${m}m` : `${m}m ${s}s`;
 }
 
+function buildDefaultClanWarRounds(): { timeLimitSeconds: number }[] {
+    return [{ timeLimitSeconds: 300 }, { timeLimitSeconds: 300 }, { timeLimitSeconds: 300 }];
+}
+
+function validateClanWarsConfig(cfg: {
+    teamSize: number;
+    rounds: { timeLimitSeconds: number }[];
+}): string[] {
+    const errors: string[] = [];
+    if (!Number.isInteger(cfg.teamSize) || cfg.teamSize < CW_MIN_TEAM_SIZE || cfg.teamSize > CW_MAX_TEAM_SIZE) {
+        errors.push(`Team size must be between ${CW_MIN_TEAM_SIZE} and ${CW_MAX_TEAM_SIZE}.`);
+    }
+    if (!cfg.rounds.length) {
+        errors.push('At least one round is required.');
+    }
+    cfg.rounds.forEach((r, i) => {
+        if (!Number.isInteger(r.timeLimitSeconds)) {
+            errors.push(`Round ${i + 1}: time must be a whole number.`);
+            return;
+        }
+        if (r.timeLimitSeconds < CW_MIN_ROUND_SECONDS || r.timeLimitSeconds > CW_MAX_ROUND_SECONDS) {
+            errors.push(
+                `Round ${i + 1}: time must be between ${CW_MIN_ROUND_SECONDS}s and ${CW_MAX_ROUND_SECONDS}s.`,
+            );
+        }
+    });
+    return errors;
+}
+
 export default function Play() {
     const navigate = useNavigate();
     const user = useAppSelector((state) => state.auth.user);
@@ -337,6 +391,19 @@ export default function Play() {
     const [presetsError, setPresetsError] = useState<string | null>(null);
     const [royaleRulesExpanded, setRoyaleRulesExpanded] = useState(false);
 
+    // Clan Wars config state
+    const [cwFormat, setCwFormat] = useState<ClanWarsFormat>('SAME_PROBLEM');
+    const [cwTeamSize, setCwTeamSize] = useState(3);
+    const [cwRounds, setCwRounds] = useState<{ timeLimitSeconds: number }[]>(() =>
+        buildDefaultClanWarRounds(),
+    );
+    const [cwPresets, setCwPresets] = useState<ClanWarsPreset[]>([]);
+    const [cwPresetId, setCwPresetId] = useState<string | null>(null);
+    const [cwPresetsLoading, setCwPresetsLoading] = useState(false);
+    const [cwPresetsError, setCwPresetsError] = useState<string | null>(null);
+    const [myClanId, setMyClanId] = useState<string | null>(null);
+    const [cwRulesExpanded, setCwRulesExpanded] = useState(false);
+
     // Action state
     const [isCreatingPrivate, setIsCreatingPrivate] = useState(false);
     const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -361,6 +428,28 @@ export default function Play() {
             .finally(() => setPresetsLoading(false));
     }, [mode, presets.length, presetsLoading]);
 
+    useEffect(() => {
+        if (mode !== 'GROUP') return;
+        if (cwPresets.length > 0 || cwPresetsLoading) return;
+        setCwPresetsLoading(true);
+        setCwPresetsError(null);
+        api
+            .get<ClanWarsPreset[]>('/battles/clan-wars/presets')
+            .then(({ data }) => setCwPresets(data))
+            .catch(() => setCwPresetsError('Failed to load clan war presets. You can still use custom settings.'))
+            .finally(() => setCwPresetsLoading(false));
+    }, [mode, cwPresets.length, cwPresetsLoading]);
+
+    useEffect(() => {
+        if (!user?.id) return;
+        listClans(200)
+            .then((all) => {
+                const mine = all.find((c) => c.members.some((m) => m.id === user.id));
+                setMyClanId(mine?.id ?? null);
+            })
+            .catch(() => setMyClanId(null));
+    }, [user?.id]);
+
     // Live validation of the BR config.
     const royaleErrors = useMemo(
         () =>
@@ -381,6 +470,15 @@ export default function Play() {
     const royaleTotalElim = useMemo(
         () => royaleRounds.reduce((acc, r) => acc + (r.eliminateCount || 0), 0),
         [royaleRounds],
+    );
+    const cwErrors = useMemo(
+        () => (mode === 'GROUP' ? validateClanWarsConfig({ teamSize: cwTeamSize, rounds: cwRounds }) : []),
+        [mode, cwTeamSize, cwRounds],
+    );
+    const cwValid = cwErrors.length === 0;
+    const cwTotalSeconds = useMemo(
+        () => cwRounds.reduce((acc, r) => acc + (r.timeLimitSeconds || 0), 0),
+        [cwRounds],
     );
 
     // Detect when the user has diverged from the active preset.
@@ -437,6 +535,28 @@ export default function Play() {
         setSelectedPresetId(null);
     };
 
+    const applyCwPreset = (preset: ClanWarsPreset) => {
+        setCwPresetId(preset.id);
+        setCwFormat(preset.clanWarsFormat);
+        setCwTeamSize(preset.teamSize);
+        setCwRounds(preset.rounds.map((r) => ({ timeLimitSeconds: r.timeLimitSeconds })));
+    };
+
+    const updateCwRound = (index: number, patch: { timeLimitSeconds?: number }) => {
+        setCwRounds((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+        setCwPresetId(null);
+    };
+
+    const addCwRound = () => {
+        setCwRounds((prev) => [...prev, { timeLimitSeconds: 300 }]);
+        setCwPresetId(null);
+    };
+
+    const removeCwRound = (index: number) => {
+        setCwRounds((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+        setCwPresetId(null);
+    };
+
     const removeRound = (index: number) => {
         if (royaleRounds.length <= BR_MIN_ROUNDS) return;
         // Never allow removing the last (finale) round directly.
@@ -465,9 +585,11 @@ export default function Play() {
     });
 
     const handleFindMatch = () => {
-        if (mode === 'BATTLE_ROYALE') {
+        if (mode === 'BATTLE_ROYALE' || mode === 'GROUP') {
             toast.error(
-                'Battle Royale is lobby-only. Create a private game and share the invite code.',
+                mode === 'BATTLE_ROYALE'
+                    ? 'Battle Royale is lobby-only. Create a private game and share the invite code.'
+                    : 'Clan Wars is lobby-only. Create a clan war lobby and share the invite code.',
             );
             return;
         }
@@ -480,6 +602,37 @@ export default function Play() {
 
         if (mode === 'BATTLE_ROYALE' && !royaleValid) {
             toast.error(royaleErrors[0]?.message ?? 'Invalid Battle Royale configuration.');
+            return;
+        }
+        if (mode === 'GROUP' && !cwValid) {
+            toast.error(cwErrors[0] ?? 'Invalid Clan Wars configuration.');
+            return;
+        }
+
+        if (mode === 'GROUP') {
+            const payload: CreateClanWarsRequest = {
+                clanWarsFormat: cwFormat,
+                teamSize: cwTeamSize,
+                rounds: cwRounds.map((r) => ({ timeLimitSeconds: r.timeLimitSeconds })),
+                enabledSkills: enabledSkills.length > 0 ? enabledSkills : undefined,
+                preferredTopic: topic ?? undefined,
+                preferredDifficulty: difficulty === 'ANY' ? undefined : difficulty,
+                withInviteCode: true,
+                teamOne: myClanId ? { clanId: myClanId } : undefined,
+            };
+            setIsCreatingPrivate(true);
+            try {
+                const { data } = await api.post('/battles/clan-wars', payload);
+                setInviteCode(data.inviteCode);
+                void refreshSubscription();
+            } catch (error: unknown) {
+                const message =
+                    (error as { response?: { data?: { message?: string } } })?.response?.data
+                        ?.message ?? 'Failed to create clan wars lobby';
+                toast.error(message);
+            } finally {
+                setIsCreatingPrivate(false);
+            }
             return;
         }
 
@@ -529,7 +682,11 @@ export default function Play() {
         if (!requireCanPlay()) return;
         setIsJoining(true);
         try {
-            const { data } = await api.post(`/battles/invite/${joinCode.trim()}/join`);
+            const path =
+                mode === 'GROUP'
+                    ? `/battles/clan-wars/invite/${joinCode.trim()}/join`
+                    : `/battles/invite/${joinCode.trim()}/join`;
+            const { data } = await api.post(path);
             void refreshSubscription();
             navigate(`/battle/${data.id}`);
         } catch (error) {
@@ -655,7 +812,7 @@ export default function Play() {
                         </AnimateIn>
 
                         {/* Settings — generic (hidden for Battle Royale) */}
-                        {mode !== 'BATTLE_ROYALE' && (
+                        {mode !== 'BATTLE_ROYALE' && mode !== 'GROUP' && (
                             <AnimateIn direction="up" delay={75}>
                                 <Card>
                                     <CardContent className="space-y-6 p-6">
@@ -1382,6 +1539,374 @@ export default function Play() {
                             </AnimateIn>
                         )}
 
+                        {mode === 'GROUP' && (
+                            <AnimateIn direction="up" delay={75}>
+                                <Card>
+                                    <CardContent className="space-y-6 p-6">
+                                        <SectionHeader
+                                            icon={<Users className="h-4 w-4 text-primary" />}
+                                            title="Clan Wars Settings"
+                                            subtitle="Configure format, team size, and rounds. Rules mirror Battle Royale style."
+                                        />
+
+                                        <div>
+                                            <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                <Sparkles className="h-3 w-3" />
+                                                Presets
+                                            </p>
+                                            {cwPresetsLoading ? (
+                                                <div className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                                                    Loading presets...
+                                                </div>
+                                            ) : cwPresetsError ? (
+                                                <div className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                                                    {cwPresetsError}
+                                                </div>
+                                            ) : (
+                                                <div className="grid gap-2 sm:grid-cols-2">
+                                                    {cwPresets.map((p) => {
+                                                        const active = cwPresetId === p.id;
+                                                        return (
+                                                            <button
+                                                                key={p.id}
+                                                                onClick={() => applyCwPreset(p)}
+                                                                className={`rounded-lg border-2 p-3 text-left transition-all ${active
+                                                                    ? 'border-primary bg-primary/5'
+                                                                    : 'border-border hover:border-primary/40'
+                                                                    }`}
+                                                            >
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <span className="text-sm font-semibold">{p.name}</span>
+                                                                    <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+                                                                        {p.teamSize}v{p.teamSize} - {p.rounds.length}r
+                                                                    </Badge>
+                                                                </div>
+                                                                <p className="mt-1 text-xs text-muted-foreground">{p.description}</p>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Format</p>
+                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                {CLAN_WARS_FORMATS.map((f) => {
+                                                    const active = cwFormat === f.value;
+                                                    return (
+                                                        <button
+                                                            key={f.value}
+                                                            onClick={() => {
+                                                                setCwFormat(f.value);
+                                                                setCwPresetId(null);
+                                                            }}
+                                                            className={`rounded-lg border-2 p-3 text-left transition-all ${active
+                                                                ? 'border-primary bg-primary/5'
+                                                                : 'border-border hover:border-primary/40'
+                                                                }`}
+                                                        >
+                                                            <span className="text-sm font-semibold">{f.label}</span>
+                                                            <p className="mt-1 text-xs text-muted-foreground">{f.description}</p>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-xl border border-primary/20 bg-primary/[0.03]">
+                                            <button
+                                                type="button"
+                                                onClick={() => setCwRulesExpanded((v) => !v)}
+                                                aria-expanded={cwRulesExpanded}
+                                                className="flex w-full items-center justify-between gap-2 rounded-xl p-3 text-left transition-colors hover:bg-primary/[0.05]"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <Info className="h-4 w-4 text-primary" />
+                                                    <span className="text-sm font-semibold">How it works</span>
+                                                    <span className="hidden text-[11px] text-muted-foreground sm:inline">
+                                                        · {cwFormat === 'SAME_PROBLEM' ? 'Same Problem rules' : 'Score Attack rules'}
+                                                    </span>
+                                                </div>
+                                                {cwRulesExpanded ? (
+                                                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                                ) : (
+                                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                                )}
+                                            </button>
+
+                                            <div className="px-3 pb-3">
+                                                {cwFormat === 'SAME_PROBLEM' ? (
+                                                    <p className="text-[12px] text-muted-foreground">
+                                                        Both teams solve the same round problem. The round can end early on a full
+                                                        team sweep; otherwise it ends when the timer hits{' '}
+                                                        <span className="font-medium text-foreground">0</span>.
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-[12px] text-muted-foreground">
+                                                        Teams solve from the SCORE_ATTACK pool and earn cumulative points across rounds.
+                                                        Rounds end only when the timer hits{' '}
+                                                        <span className="font-medium text-foreground">0</span>.
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {cwRulesExpanded && (
+                                                <div className="space-y-4 border-t border-primary/15 px-3 py-3 text-[12px] text-muted-foreground">
+                                                    <div>
+                                                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                                                            Round Flow
+                                                        </p>
+                                                        <ol className="space-y-1 pl-1">
+                                                            <li className="flex gap-2">
+                                                                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                                                                    1
+                                                                </span>
+                                                                <span>
+                                                                    Teams play as{' '}
+                                                                    <span className="font-medium text-foreground">
+                                                                        {cwTeamSize}v{cwTeamSize}
+                                                                    </span>{' '}
+                                                                    for <span className="font-medium text-foreground">{cwRounds.length}</span> round{cwRounds.length === 1 ? '' : 's'}.
+                                                                </span>
+                                                            </li>
+                                                            <li className="flex gap-2">
+                                                                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                                                                    2
+                                                                </span>
+                                                                <span>
+                                                                    There is{' '}
+                                                                    <span className="font-medium text-foreground">no elimination</span> in Clan Wars; teams accumulate performance across rounds.
+                                                                </span>
+                                                            </li>
+                                                            <li className="flex gap-2">
+                                                                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                                                                    3
+                                                                </span>
+                                                                <span>
+                                                                    After each round, the lobby enters{' '}
+                                                                    <span className="font-medium text-foreground">
+                                                                        intermission
+                                                                    </span>{' '}
+                                                                    and every player must ready up to start the next round.
+                                                                </span>
+                                                            </li>
+                                                        </ol>
+                                                    </div>
+
+                                                    <div>
+                                                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                                                            Round Winner
+                                                        </p>
+                                                        {cwFormat === 'SAME_PROBLEM' ? (
+                                                            <ul className="space-y-1 pl-1">
+                                                                <li className="flex items-start gap-2">
+                                                                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                                                                    <span>
+                                                                        Team with more{' '}
+                                                                        <span className="font-medium text-foreground">
+                                                                            full-pass solves
+                                                                        </span>{' '}
+                                                                        wins the round.
+                                                                    </span>
+                                                                </li>
+                                                                <li className="flex items-start gap-2">
+                                                                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
+                                                                    <span>
+                                                                        If tied, higher total{' '}
+                                                                        <span className="font-medium text-foreground">
+                                                                            tests passed
+                                                                        </span>{' '}
+                                                                        breaks the tie.
+                                                                    </span>
+                                                                </li>
+                                                            </ul>
+                                                        ) : (
+                                                            <ul className="space-y-1 pl-1">
+                                                                <li className="flex items-start gap-2">
+                                                                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                                                                    <span>
+                                                                        Team with more{' '}
+                                                                        <span className="font-medium text-foreground">
+                                                                            round points
+                                                                        </span>{' '}
+                                                                        wins the round.
+                                                                    </span>
+                                                                </li>
+                                                                <li className="flex items-start gap-2">
+                                                                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
+                                                                    <span>Exact point tie means no round winner is assigned.</span>
+                                                                </li>
+                                                            </ul>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/[0.05] px-2 py-1.5 text-[11px] text-foreground">
+                                                        <Trophy className="h-3 w-3 shrink-0 text-primary" />
+                                                        <span>
+                                                            Match winner is decided by{' '}
+                                                            <span className="font-semibold">cumulative team points</span>, then{' '}
+                                                            <span className="font-semibold">rounds won</span> as the tie-break.
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                <Users className="h-3 w-3" />
+                                                Team Size
+                                            </p>
+                                            <div className="flex items-center gap-3">
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() => {
+                                                        setCwTeamSize((v) => Math.max(CW_MIN_TEAM_SIZE, v - 1));
+                                                        setCwPresetId(null);
+                                                    }}
+                                                >
+                                                    <Minus className="h-4 w-4" />
+                                                </Button>
+                                                <input
+                                                    type="number"
+                                                    min={CW_MIN_TEAM_SIZE}
+                                                    max={CW_MAX_TEAM_SIZE}
+                                                    value={cwTeamSize}
+                                                    onChange={(e) => {
+                                                        const n = parseInt(e.target.value, 10);
+                                                        if (Number.isFinite(n)) {
+                                                            setCwTeamSize(Math.max(CW_MIN_TEAM_SIZE, Math.min(CW_MAX_TEAM_SIZE, n)));
+                                                            setCwPresetId(null);
+                                                        }
+                                                    }}
+                                                    className="w-20 rounded-md border border-input bg-background px-3 py-2 text-center text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-ring"
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() => {
+                                                        setCwTeamSize((v) => Math.min(CW_MAX_TEAM_SIZE, v + 1));
+                                                        setCwPresetId(null);
+                                                    }}
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                </Button>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {cwTeamSize}v{cwTeamSize} ({cwTeamSize * 2} players)
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="mb-2 flex items-center justify-between">
+                                                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                    Rounds ({cwRounds.length})
+                                                </p>
+                                                <Button variant="outline" size="sm" onClick={addCwRound}>
+                                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                                    Add Round
+                                                </Button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {cwRounds.map((round, i) => (
+                                                    <div key={i} className="rounded-lg border p-3">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                                                Round {i + 1}
+                                                            </span>
+                                                            {cwRounds.length > 1 && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-7 w-7"
+                                                                    onClick={() => removeCwRound(i)}
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                        <label className="mt-2 block">
+                                                            <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">
+                                                                Time limit (sec)
+                                                            </span>
+                                                            <input
+                                                                type="number"
+                                                                min={CW_MIN_ROUND_SECONDS}
+                                                                max={CW_MAX_ROUND_SECONDS}
+                                                                value={round.timeLimitSeconds}
+                                                                onChange={(e) => {
+                                                                    const n = parseInt(e.target.value, 10);
+                                                                    updateCwRound(i, { timeLimitSeconds: Number.isFinite(n) ? n : 0 });
+                                                                }}
+                                                                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                                            />
+                                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                                {ROUND_TIME_PRESETS.map((t) => (
+                                                                    <button
+                                                                        key={t}
+                                                                        type="button"
+                                                                        onClick={() => updateCwRound(i, { timeLimitSeconds: t })}
+                                                                        className={`rounded border px-1.5 py-0.5 text-[10px] transition-colors ${round.timeLimitSeconds === t
+                                                                            ? 'border-primary bg-primary/10 text-primary'
+                                                                            : 'border-border text-muted-foreground hover:border-primary/40'
+                                                                            }`}
+                                                                    >
+                                                                        {formatSeconds(t)}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {cwErrors.length > 0 && (
+                                            <div className="rounded-lg border border-red-500/40 bg-red-500/5 p-3">
+                                                <p className="mb-1 text-[11px] font-semibold text-red-500">Fix these before creating:</p>
+                                                <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-red-500/90">
+                                                    {cwErrors.map((err) => (
+                                                        <li key={err}>{err}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        <Separator />
+                                        <div className="grid gap-4 sm:grid-cols-2">
+                                            <div>
+                                                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                    Preferred Difficulty
+                                                </p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {DIFFICULTIES.map((d) => (
+                                                        <Chip key={d.value} active={difficulty === d.value} onClick={() => setDifficulty(d.value)}>
+                                                            <span className={difficulty === d.value ? '' : d.color}>{d.label}</span>
+                                                        </Chip>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                    Preferred Topic
+                                                </p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <Chip active={topic === null} onClick={() => setTopic(null)}>Any</Chip>
+                                                    {TOPICS.map((t) => (
+                                                        <Chip key={t} active={topic === t} onClick={() => setTopic(t)}>
+                                                            {t}
+                                                        </Chip>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </AnimateIn>
+                        )}
+
                         {/* Skills */}
                         <AnimateIn direction="up" delay={150}>
                             <Card>
@@ -1502,6 +2027,21 @@ export default function Play() {
                                                     <SummaryRow label="Difficulty" value={diffMeta.label} />
                                                     <SummaryRow label="Topic" value={topic ?? 'Any'} />
                                                 </>
+                                            ) : mode === 'GROUP' ? (
+                                                <>
+                                                    <SummaryRow
+                                                        label="Format"
+                                                        value={
+                                                            CLAN_WARS_FORMATS.find((f) => f.value === cwFormat)?.label ??
+                                                            cwFormat
+                                                        }
+                                                    />
+                                                    <SummaryRow label="Teams" value={`${cwTeamSize}v${cwTeamSize}`} />
+                                                    <SummaryRow label="Rounds" value={`${cwRounds.length}`} />
+                                                    <SummaryRow label="Total time" value={formatSeconds(cwTotalSeconds)} />
+                                                    <SummaryRow label="Difficulty" value={diffMeta.label} />
+                                                    <SummaryRow label="Topic" value={topic ?? 'Any'} />
+                                                </>
                                             ) : (
                                                 <>
                                                     <SummaryRow label="Difficulty" value={diffMeta.label} />
@@ -1543,6 +2083,16 @@ export default function Play() {
                                                     the invite code with your players.
                                                 </p>
                                             </div>
+                                        ) : mode === 'GROUP' ? (
+                                            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-[11px] text-muted-foreground">
+                                                <p className="flex items-center gap-1 font-medium text-primary">
+                                                    <Users className="h-3.5 w-3.5" />
+                                                    Lobby-only mode
+                                                </p>
+                                                <p className="mt-1">
+                                                    Clan Wars lobbies are private. Create a lobby and share the invite code with both teams.
+                                                </p>
+                                            </div>
                                         ) : (
                                             <Button
                                                 className="h-12 w-full text-base"
@@ -1556,29 +2106,34 @@ export default function Play() {
                                         <div className="relative">
                                             <Separator />
                                             <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                                                {mode === 'BATTLE_ROYALE' ? 'Create' : 'OR'}
+                                                {mode === 'BATTLE_ROYALE' || mode === 'GROUP' ? 'Create' : 'OR'}
                                             </span>
                                         </div>
 
                                         {!inviteCode ? (
                                             <Button
-                                                variant={mode === 'BATTLE_ROYALE' ? 'default' : 'outline'}
-                                                className={mode === 'BATTLE_ROYALE' ? 'h-12 w-full text-base' : 'h-11 w-full'}
+                                                variant={mode === 'BATTLE_ROYALE' || mode === 'GROUP' ? 'default' : 'outline'}
+                                                className={mode === 'BATTLE_ROYALE' || mode === 'GROUP' ? 'h-12 w-full text-base' : 'h-11 w-full'}
                                                 onClick={handleCreatePrivate}
                                                 disabled={
                                                     isCreatingPrivate ||
-                                                    (mode === 'BATTLE_ROYALE' && !royaleValid)
+                                                    (mode === 'BATTLE_ROYALE' && !royaleValid) ||
+                                                    (mode === 'GROUP' && !cwValid)
                                                 }
                                             >
                                                 {isCreatingPrivate ? (
                                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                                 ) : mode === 'BATTLE_ROYALE' ? (
                                                     <Crown className="mr-2 h-4 w-4" />
+                                                ) : mode === 'GROUP' ? (
+                                                    <Users className="mr-2 h-4 w-4" />
                                                 ) : (
                                                     <Link2 className="mr-2 h-4 w-4" />
                                                 )}
                                                 {mode === 'BATTLE_ROYALE'
                                                     ? 'Create Royale Lobby'
+                                                    : mode === 'GROUP'
+                                                        ? 'Create Clan Wars Lobby'
                                                     : 'Create Private Game'}
                                             </Button>
                                         ) : (

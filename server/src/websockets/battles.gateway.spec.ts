@@ -574,6 +574,108 @@ describe('BattlesGateway', () => {
             });
         });
 
+        describe('Clan Wars emits', () => {
+            it('emits clan_wars.round_start with full payload', () => {
+                const startedAt = new Date();
+                gateway.emitClanWarsRoundStart('battle-cw', {
+                    battleId: 'battle-cw',
+                    roundNumber: 1,
+                    totalRounds: 3,
+                    problemId: 'problem-1',
+                    timeLimitSeconds: 300,
+                    startedAt,
+                    participantUserIds: ['u1', 'u2', 'u3', 'u4'],
+                });
+                expect(mockServer.to).toHaveBeenCalledWith('battle:battle-cw');
+                expect(mockServer.emit).toHaveBeenCalledWith(
+                    'clan_wars.round_start',
+                    expect.objectContaining({
+                        battleId: 'battle-cw',
+                        roundNumber: 1,
+                        totalRounds: 3,
+                        problemId: 'problem-1',
+                        timeLimitSeconds: 300,
+                        participantUserIds: ['u1', 'u2', 'u3', 'u4'],
+                    }),
+                );
+            });
+
+            it('emits clan_wars.round_end with round winner + standings', () => {
+                gateway.emitClanWarsRoundEnd('battle-cw', {
+                    battleId: 'battle-cw',
+                    roundNumber: 2,
+                    endedReason: 'TIMER' as any,
+                    roundWinner: 'team-1',
+                    teams: [{ team: 'team-1' }, { team: 'team-2' }],
+                });
+                expect(mockServer.emit).toHaveBeenCalledWith(
+                    'clan_wars.round_end',
+                    expect.objectContaining({
+                        battleId: 'battle-cw',
+                        roundNumber: 2,
+                        roundWinner: 'team-1',
+                    }),
+                );
+            });
+
+            it('emits clan_wars.team_standings with current team totals', () => {
+                gateway.emitClanWarsTeamStandings('battle-cw', {
+                    battleId: 'battle-cw',
+                    roundNumber: 1,
+                    teams: [],
+                });
+                expect(mockServer.emit).toHaveBeenCalledWith(
+                    'clan_wars.team_standings',
+                    expect.objectContaining({
+                        battleId: 'battle-cw',
+                        roundNumber: 1,
+                    }),
+                );
+            });
+
+            it('emits clan_wars.round_intermission without any deadline field', () => {
+                gateway.emitClanWarsRoundIntermission('battle-cw', {
+                    battleId: 'battle-cw',
+                    justEndedRound: 1,
+                    nextRoundNumber: 2,
+                    readyUserIds: [],
+                });
+                const call = mockServer.emit.mock.calls.find(
+                    (c) => c[0] === 'clan_wars.round_intermission',
+                );
+                expect(call).toBeDefined();
+                const payload = call![1];
+                expect(payload).toMatchObject({
+                    battleId: 'battle-cw',
+                    justEndedRound: 1,
+                    nextRoundNumber: 2,
+                    readyUserIds: [],
+                });
+                expect(payload).not.toHaveProperty('deadline');
+                expect(payload).not.toHaveProperty('deadlineAt');
+                expect(payload).not.toHaveProperty('intermissionEndsAt');
+            });
+
+            it('emits clan_wars.player_ready_next_round with readyUserIds + allReady flag', () => {
+                gateway.emitClanWarsPlayerReadyNextRound('battle-cw', {
+                    battleId: 'battle-cw',
+                    userId: 'u1',
+                    nextRoundNumber: 2,
+                    readyUserIds: ['u1'],
+                    allReady: false,
+                });
+                expect(mockServer.emit).toHaveBeenCalledWith(
+                    'clan_wars.player_ready_next_round',
+                    expect.objectContaining({
+                        battleId: 'battle-cw',
+                        userId: 'u1',
+                        allReady: false,
+                        readyUserIds: ['u1'],
+                    }),
+                );
+            });
+        });
+
         describe('battle.status_update', () => {
             it('should emit battle.status_update when status changes', () => {
                 const battleId = 'battle-1';

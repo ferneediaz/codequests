@@ -15,6 +15,7 @@ import AuthorList from '@/pages/AuthorList';
 import AuthorPreview from '@/pages/AuthorPreview';
 import InviteJoin from '@/pages/InviteJoin';
 import Pricing from '@/pages/Pricing';
+import ClanPage from '@/pages/Clan';
 
 export const router = createBrowserRouter([
     {
@@ -49,6 +50,10 @@ export const router = createBrowserRouter([
                     {
                         path: '/play',
                         element: <Play />,
+                    },
+                    {
+                        path: '/clan',
+                        element: <ClanPage />,
                     },
                     {
                         path: '/matchmaking',

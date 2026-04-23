@@ -4,3 +4,6 @@ export * from './battle-response.dto';
 export * from './round-config.dto';
 export * from './battle-round.dto';
 export * from './royale-preset.dto';
+export * from './create-clan-wars-battle.dto';
+export * from './clan-wars-standings.dto';
+export * from './clan-wars-preset.dto';
