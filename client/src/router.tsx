@@ -6,6 +6,7 @@ import Login from '@/pages/Login';
 import AuthCallback from '@/pages/AuthCallback';
 import Dashboard from '@/pages/Dashboard';
 import Play from '@/pages/Play';
+import Lobby from '@/pages/Lobby';
 import Matchmaking from '@/pages/Matchmaking';
 import Battle from '@/pages/Battle';
 import Results from '@/pages/Results';
@@ -50,6 +51,10 @@ export const router = createBrowserRouter([
                     {
                         path: '/play',
                         element: <Play />,
+                    },
+                    {
+                        path: '/lobby',
+                        element: <Lobby />,
                     },
                     {
                         path: '/clan',

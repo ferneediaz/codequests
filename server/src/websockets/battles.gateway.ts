@@ -64,6 +64,11 @@ interface InviteUserPayload {
     targetUsername: string;
 }
 
+// Name of the Socket.IO room used to broadcast lobby presence deltas. Only
+// clients currently viewing the lobby join this room (via lobby.subscribe),
+// so presence events don't fan out to every connected socket.
+const LOBBY_PRESENCE_ROOM = 'lobby:presence';
+
 // Duration in seconds for each skill effect (0 = instant)
 // TIME_STEAL deducts this many seconds from the target's remaining time.
 const TIME_STEAL_SECONDS = 300; // 5 minutes
@@ -143,6 +148,9 @@ export class BattlesGateway
             // Notify friends about online status
             await this.notifyFriendsPresence(user.id, user.username, true);
 
+            // Notify lobby subscribers about online status
+            await this.broadcastLobbyPresence(user.id, true);
+
             // Auto-rejoin active battle rooms on reconnection
             await this.rejoinActiveBattles(client);
 
@@ -175,6 +183,9 @@ export class BattlesGateway
 
             // Notify friends about offline status
             await this.notifyFriendsPresence(user.id, user.username, false);
+
+            // Notify lobby subscribers about offline status
+            await this.broadcastLobbyPresence(user.id, false);
         }
 
         // Remove from connected clients
@@ -738,6 +749,71 @@ export class BattlesGateway
             if (socket) {
                 socket.emit(event, data);
             }
+        }
+    }
+
+    /**
+     * Handle lobby presence subscription. Authenticated clients join a
+     * dedicated `lobby:presence` room so they receive presence deltas for
+     * everyone on the platform — not just their friends.
+     */
+    @UseGuards(WsAuthGuard)
+    @SubscribeMessage('lobby.subscribe')
+    async handleLobbySubscribe(
+        @ConnectedSocket() client: AuthenticatedSocket,
+    ): Promise<RoomResult> {
+        const user = client.data.user;
+        if (!user) {
+            return { success: false, error: 'Not authenticated' };
+        }
+        client.join(LOBBY_PRESENCE_ROOM);
+        return { success: true };
+    }
+
+    /**
+     * Handle lobby presence unsubscription. Clients call this when they
+     * navigate away from the lobby page so presence fan-out shrinks.
+     */
+    @UseGuards(WsAuthGuard)
+    @SubscribeMessage('lobby.unsubscribe')
+    async handleLobbyUnsubscribe(
+        @ConnectedSocket() client: AuthenticatedSocket,
+    ): Promise<RoomResult> {
+        client.leave(LOBBY_PRESENCE_ROOM);
+        return { success: true };
+    }
+
+    /**
+     * Emit a presence delta to every client currently subscribed to the
+     * lobby presence room. Looks up the user row to enrich the payload with
+     * clan + avatar so the lobby UI can render a full row without a second
+     * round-trip. Offline events only need the userId; we still enrich when
+     * available for consistency.
+     */
+    private async broadcastLobbyPresence(userId: string, online: boolean) {
+        try {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: {
+                    id: true,
+                    username: true,
+                    avatarUrl: true,
+                    mmr: true,
+                    clan: {
+                        select: { id: true, name: true, tag: true, mmr: true },
+                    },
+                },
+            });
+            if (!user) return;
+
+            this.server.to(LOBBY_PRESENCE_ROOM).emit('lobby.presence_delta', {
+                type: online ? 'online' : 'offline',
+                user,
+            });
+        } catch (error) {
+            this.logger.error(
+                `Error broadcasting lobby presence: ${(error as Error).message}`,
+            );
         }
     }
 

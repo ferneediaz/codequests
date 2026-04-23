@@ -17,6 +17,7 @@ import {
     LayoutDashboard,
     Crown,
     Shield,
+    Users,
 } from 'lucide-react';
 import { SubscriptionBadge } from './SubscriptionBadge';
 
@@ -49,6 +50,12 @@ export function Navbar() {
                                 <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                                     <Swords className="mr-1.5 h-4 w-4" />
                                     Play
+                                </Button>
+                            </Link>
+                            <Link to="/lobby">
+                                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                                    <Users className="mr-1.5 h-4 w-4" />
+                                    Lobby
                                 </Button>
                             </Link>
                             <Link to="/clan">

@@ -11,6 +11,7 @@ export const createMockPrismaService = () => {
             delete: jest.fn(),
             upsert: jest.fn(),
             count: jest.fn(),
+            groupBy: jest.fn(),
         },
         problem: {
             create: jest.fn(),

@@ -269,6 +269,73 @@ describe('BattlesGateway', () => {
         });
     });
 
+    describe('Lobby Presence', () => {
+        it('broadcasts lobby.presence_delta online on connect', async () => {
+            const socket = createMockSocket('user-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
+            prisma.user.findUnique.mockResolvedValue({
+                id: 'user-1',
+                username: 'alice',
+                avatarUrl: null,
+                mmr: 1000,
+                clan: null,
+            });
+
+            await gateway.handleConnection(socket);
+
+            expect(mockServer.to).toHaveBeenCalledWith('lobby:presence');
+            expect(mockServer.emit).toHaveBeenCalledWith(
+                'lobby.presence_delta',
+                expect.objectContaining({
+                    type: 'online',
+                    user: expect.objectContaining({ id: 'user-1' }),
+                }),
+            );
+        });
+
+        it('broadcasts lobby.presence_delta offline on disconnect', async () => {
+            const socket = createMockSocket('user-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValue(mockUser);
+            prisma.user.findUnique.mockResolvedValue({
+                id: 'user-1',
+                username: 'alice',
+                avatarUrl: null,
+                mmr: 1000,
+                clan: null,
+            });
+
+            await gateway.handleConnection(socket);
+            mockServer.emit.mockClear();
+
+            await gateway.handleDisconnect(socket);
+
+            expect(mockServer.emit).toHaveBeenCalledWith(
+                'lobby.presence_delta',
+                expect.objectContaining({ type: 'offline' }),
+            );
+        });
+
+        it('joins the socket into the lobby presence room on subscribe', async () => {
+            const socket = createMockSocket('user-1');
+            socket.data.user = mockUser;
+
+            const result = await gateway.handleLobbySubscribe(socket);
+
+            expect(socket.join).toHaveBeenCalledWith('lobby:presence');
+            expect(result).toEqual({ success: true });
+        });
+
+        it('removes the socket from the lobby presence room on unsubscribe', async () => {
+            const socket = createMockSocket('user-1');
+            socket.data.user = mockUser;
+
+            const result = await gateway.handleLobbyUnsubscribe(socket);
+
+            expect(socket.leave).toHaveBeenCalledWith('lobby:presence');
+            expect(result).toEqual({ success: true });
+        });
+    });
+
     describe('Battle Room Management', () => {
         describe('joinBattleRoom', () => {
             it('should allow participant to join battle room', async () => {

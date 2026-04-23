@@ -15,6 +15,7 @@ import { FriendsModule } from './friends/friends.module';
 import { ChatModule } from './chat/chat.module';
 import { PracticeModule } from './practice/practice.module';
 import { AuthoringModule } from './problems/authoring/authoring.module';
+import { LobbyModule } from './lobby/lobby.module';
 
 @Module({
     imports: [
@@ -40,6 +41,7 @@ import { AuthoringModule } from './problems/authoring/authoring.module';
         SeasonsModule,
         FriendsModule,
         ChatModule,
+        LobbyModule,
         PracticeModule,
 
         // Dev-only routes gated by ENABLE_AUTHOR_TOOLS=true at runtime.
