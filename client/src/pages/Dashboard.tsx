@@ -54,6 +54,7 @@ import {
     buildHeatmap,
 } from '@/utils/stats';
 import { usePaywall } from '@/hooks/usePaywall';
+import { supabase } from '@/services/supabase';
 
 const MODE_META: Record<BattleMode, { label: string; icon: typeof Swords }> = {
     ONE_V_ONE: { label: '1v1', icon: Swords },
@@ -65,6 +66,46 @@ const MODE_META: Record<BattleMode, { label: string; icon: typeof Swords }> = {
 function getModeMeta(mode: string): { label: string; icon: typeof Swords } {
     return MODE_META[mode as BattleMode] ?? { label: mode || 'Unknown', icon: Swords };
 }
+
+function toLocalDateKey(value: string): string {
+    const d = new Date(value);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function getHeatmapBounds(selectedYear: string): { from: Date; to: Date } {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (selectedYear === 'rolling') {
+        const from = new Date(today);
+        from.setDate(today.getDate() - 364);
+        from.setHours(0, 0, 0, 0);
+        return { from, to: today };
+    }
+    const year = Number(selectedYear);
+    const from = new Date(year, 0, 1, 0, 0, 0, 0);
+    const to = new Date(year, 11, 31, 23, 59, 59, 999);
+    return { from, to };
+}
+
+type GithubContributionsQuery = {
+    data?: {
+        user?: {
+            contributionsCollection?: {
+                contributionCalendar?: {
+                    weeks?: Array<{
+                        contributionDays?: Array<{
+                            date: string;
+                            contributionCount: number;
+                        }>;
+                    }>;
+                };
+            };
+        };
+    };
+};
 
 export default function Dashboard() {
     const navigate = useNavigate();
@@ -129,6 +170,105 @@ export default function Dashboard() {
         enabled: !!user?.id,
     });
 
+    const { data: githubActivity } = useQuery<{
+        username: string;
+        commitsByDate: Record<string, number>;
+    } | null>({
+        queryKey: ['githubActivity', user?.id, heatmapYear],
+        queryFn: async () => {
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+            const provider = session?.user?.app_metadata?.provider;
+            if (provider !== 'github') return null;
+            const githubUsername =
+                session?.user?.user_metadata?.user_name ??
+                session?.user?.user_metadata?.preferred_username;
+            if (!githubUsername) return null;
+
+            const { from, to } = getHeatmapBounds(heatmapYear);
+            const commitsByDate: Record<string, number> = {};
+            const providerToken = session?.provider_token;
+
+            if (providerToken) {
+                const graphqlRes = await fetch('https://api.github.com/graphql', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${providerToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: `
+                            query($login: String!, $from: DateTime!, $to: DateTime!) {
+                                user(login: $login) {
+                                    contributionsCollection(from: $from, to: $to) {
+                                        contributionCalendar {
+                                            weeks {
+                                                contributionDays {
+                                                    date
+                                                    contributionCount
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        `,
+                        variables: {
+                            login: githubUsername,
+                            from: from.toISOString(),
+                            to: to.toISOString(),
+                        },
+                    }),
+                });
+
+                if (graphqlRes.ok) {
+                    const gqlData = (await graphqlRes.json()) as GithubContributionsQuery;
+                    const weeks =
+                        gqlData.data?.user?.contributionsCollection?.contributionCalendar?.weeks ??
+                        [];
+                    for (const week of weeks) {
+                        for (const day of week.contributionDays ?? []) {
+                            commitsByDate[day.date] = day.contributionCount ?? 0;
+                        }
+                    }
+                    return { username: githubUsername, commitsByDate };
+                }
+            }
+
+            // Fallback for users without provider token (less complete than contribution calendar).
+            for (let page = 1; page <= 10; page++) {
+                const eventsRes = await fetch(
+                    `https://api.github.com/users/${githubUsername}/events/public?per_page=100&page=${page}`,
+                    {
+                        headers: {
+                            Accept: 'application/vnd.github+json',
+                        },
+                    },
+                );
+                if (!eventsRes.ok) break;
+                const events = (await eventsRes.json()) as Array<{
+                    type?: string;
+                    created_at?: string;
+                    payload?: { size?: number };
+                }>;
+                if (!events.length) break;
+                for (const event of events) {
+                    if (event.type !== 'PushEvent' || !event.created_at) continue;
+                    const dateKey = toLocalDateKey(event.created_at);
+                    const eventDate = new Date(event.created_at);
+                    if (eventDate < from || eventDate > to) continue;
+                    const commitCount = Math.max(1, event.payload?.size ?? 1);
+                    commitsByDate[dateKey] = (commitsByDate[dateKey] ?? 0) + commitCount;
+                }
+            }
+
+            return { username: githubUsername, commitsByDate };
+        },
+        enabled: !!user?.id,
+        staleTime: 1000 * 60 * 10,
+    });
+
     const newsItems = useMemo(() => {
         const apiItems = (newsPages?.pages ?? []).flatMap((p) => p.items);
         return [...HARD_CODED_NEWS_PREVIEW, ...apiItems].sort(
@@ -144,8 +284,12 @@ export default function Dashboard() {
             const year = new Date(dateStr).getFullYear();
             if (!Number.isNaN(year)) years.add(year);
         }
+        for (const dateKey of Object.keys(githubActivity?.commitsByDate ?? {})) {
+            const year = new Date(`${dateKey}T00:00:00`).getFullYear();
+            if (!Number.isNaN(year)) years.add(year);
+        }
         return [...years].sort((a, b) => b - a);
-    }, [history]);
+    }, [githubActivity?.commitsByDate, history]);
 
     const mmr = stats?.mmr ?? user?.mmr ?? 1000;
     const wins = stats?.wins ?? user?.wins ?? 0;
@@ -168,9 +312,29 @@ export default function Dashboard() {
             avgTests: computeAverageTestsPassed(h, uid),
             heatmap: buildHeatmap(h, {
                 year: heatmapYear === 'rolling' ? undefined : Number(heatmapYear),
+                githubCommitsByDate: githubActivity?.commitsByDate,
             }),
         };
-    }, [heatmapYear, history, user?.id, wins, losses]);
+    }, [githubActivity?.commitsByDate, heatmapYear, history, user?.id, wins, losses]);
+
+    const longestGithubCodingStreak = useMemo(() => {
+        let longest = 0;
+        let current = 0;
+        for (let wi = 0; wi < derived.heatmap.dates.length; wi++) {
+            for (let di = 0; di < 7; di++) {
+                const date = derived.heatmap.dates[wi]?.[di] ?? null;
+                if (!date) continue;
+                const commitCount = derived.heatmap.breakdown[wi]?.[di]?.githubCommits ?? 0;
+                if (commitCount > 0) {
+                    current += 1;
+                    if (current > longest) longest = current;
+                } else {
+                    current = 0;
+                }
+            }
+        }
+        return longest;
+    }, [derived.heatmap.breakdown, derived.heatmap.dates]);
 
     const visibleMatches = showAllMatches ? history ?? [] : (history ?? []).slice(0, 5);
 
@@ -437,7 +601,15 @@ export default function Dashboard() {
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <span className="text-xs text-muted-foreground">
-                                            {derived.heatmap.totalGames} games · {derived.heatmap.periodLabel}
+                                            {derived.heatmap.totalGames} battles
+                                            {derived.heatmap.totalGithubCommits > 0
+                                                ? ` · ${derived.heatmap.totalGithubCommits} GH commits`
+                                                : ''}
+                                            {longestGithubCodingStreak > 0
+                                                ? ` · ${longestGithubCodingStreak}d coding streak`
+                                                : ''}
+                                            {' · '}
+                                            {derived.heatmap.periodLabel}
                                         </span>
                                         <select
                                             value={heatmapYear}
@@ -460,6 +632,7 @@ export default function Dashboard() {
                                     <Heatmap
                                         grid={derived.heatmap.grid}
                                         dates={derived.heatmap.dates}
+                                        breakdown={derived.heatmap.breakdown}
                                         monthLabels={derived.heatmap.monthLabels}
                                         max={derived.heatmap.max}
                                     />
@@ -699,11 +872,13 @@ function StatTile({
 function Heatmap({
     grid,
     dates,
+    breakdown,
     monthLabels,
     max,
 }: {
     grid: number[][];
     dates: (Date | null)[][];
+    breakdown: { battles: number; githubCommits: number; total: number }[][];
     monthLabels: (string | null)[];
     max: number;
 }) {
@@ -745,14 +920,36 @@ function Heatmap({
                     <div className="flex gap-2">
                         <div
                             className="grid flex-1 grid-rows-7 gap-1"
-                            style={{ gridTemplateColumns: `repeat(${grid.length}, minmax(0, 1fr))` }}
+                            style={{
+                                gridTemplateColumns: `repeat(${grid.length}, minmax(0, 1fr))`,
+                                // Fill each week top-to-bottom before moving right,
+                                // matching GitHub's contribution heatmap orientation.
+                                gridAutoFlow: 'column',
+                            }}
                         >
                             {grid.map((week, wi) =>
                                 week.map((count, di) => {
                                     const date = dates[wi]?.[di] ?? null;
-                                    const title = date
-                                        ? `${count} game${count === 1 ? '' : 's'} on ${date.toLocaleDateString()}`
-                                        : '';
+                                    const cell = breakdown[wi]?.[di] ?? {
+                                        battles: 0,
+                                        githubCommits: 0,
+                                        total: 0,
+                                    };
+                                    const labelParts = [
+                                        `${cell.total} activit${cell.total === 1 ? 'y' : 'ies'}`,
+                                        `on ${date?.toLocaleDateString() ?? ''}`,
+                                    ];
+                                    if (cell.battles > 0) {
+                                        labelParts.push(
+                                            `${cell.battles} battle${cell.battles === 1 ? '' : 's'}`,
+                                        );
+                                    }
+                                    if (cell.githubCommits > 0) {
+                                        labelParts.push(
+                                            `${cell.githubCommits} GitHub commit${cell.githubCommits === 1 ? '' : 's'}`,
+                                        );
+                                    }
+                                    const title = date ? labelParts.join(' - ') : '';
                                     return (
                                         <div
                                             key={`${wi}-${di}`}

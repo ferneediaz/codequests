@@ -20,6 +20,7 @@ import {
     Users,
 } from 'lucide-react';
 import { SubscriptionBadge } from './SubscriptionBadge';
+import { NotificationBell } from './NotificationBell';
 
 export function Navbar() {
     const { user, isAuthenticated, logout } = useAuth();
@@ -72,6 +73,7 @@ export function Navbar() {
                     {isAuthenticated && user ? (
                         <>
                             <SubscriptionBadge />
+                            <NotificationBell />
                             <RankBadge mmr={user.mmr} showMmr />
 
                             <DropdownMenu>

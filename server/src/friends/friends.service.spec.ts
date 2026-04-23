@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FriendsService } from './friends.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { BattlesGateway } from '../websockets/battles.gateway';
 import {
     createMockPrismaService,
     MockPrismaService,
@@ -14,6 +15,11 @@ import {
 describe('FriendsService', () => {
     let service: FriendsService;
     let prisma: MockPrismaService;
+    let mockBattlesGateway: {
+        emitFriendRequestReceived: jest.Mock;
+        emitFriendRequestAccepted: jest.Mock;
+        emitFriendRequestDeclined: jest.Mock;
+    };
 
     const mockUser1 = {
         id: 'user-1',
@@ -43,10 +49,17 @@ describe('FriendsService', () => {
     beforeEach(async () => {
         const mockPrisma = createMockPrismaService();
 
+        mockBattlesGateway = {
+            emitFriendRequestReceived: jest.fn().mockReturnValue(true),
+            emitFriendRequestAccepted: jest.fn().mockReturnValue(true),
+            emitFriendRequestDeclined: jest.fn().mockReturnValue(true),
+        };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 FriendsService,
                 { provide: PrismaService, useValue: mockPrisma },
+                { provide: BattlesGateway, useValue: mockBattlesGateway },
             ],
         }).compile();
 
@@ -60,7 +73,11 @@ describe('FriendsService', () => {
 
     describe('sendRequest', () => {
         it('should send a friend request successfully', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockUser2);
+            // First findUnique lookup is for the addressee by username, the
+            // second is for the requester (inside notifyRequestReceived).
+            prisma.user.findUnique
+                .mockResolvedValueOnce(mockUser2)
+                .mockResolvedValueOnce(mockUser1);
             prisma.friendship.findFirst.mockResolvedValue(null);
             prisma.friendship.create.mockResolvedValue({
                 ...mockFriendship,
@@ -86,6 +103,14 @@ describe('FriendsService', () => {
                 },
             });
             expect(result.addressee.username).toBe('bob');
+            expect(mockBattlesGateway.emitFriendRequestReceived).toHaveBeenCalledWith(
+                'user-2',
+                expect.objectContaining({
+                    friendshipId: 'friendship-1',
+                    requesterId: 'user-1',
+                    requesterUsername: 'alice',
+                }),
+            );
         });
 
         it('should throw NotFoundException when addressee not found', async () => {
@@ -179,6 +204,7 @@ describe('FriendsService', () => {
                 ...mockFriendship,
                 status: 'ACCEPTED',
                 requester: { id: mockUser1.id, username: mockUser1.username, avatarUrl: mockUser1.avatarUrl, mmr: mockUser1.mmr },
+                addressee: { id: mockUser2.id, username: mockUser2.username, avatarUrl: mockUser2.avatarUrl, mmr: mockUser2.mmr },
             });
 
             const result = await service.acceptRequest('user-2', 'friendship-1');
@@ -190,9 +216,20 @@ describe('FriendsService', () => {
                     requester: {
                         select: { id: true, username: true, avatarUrl: true, mmr: true },
                     },
+                    addressee: {
+                        select: { id: true, username: true, avatarUrl: true, mmr: true },
+                    },
                 },
             });
             expect(result.status).toBe('ACCEPTED');
+            expect(mockBattlesGateway.emitFriendRequestAccepted).toHaveBeenCalledWith(
+                'user-1',
+                expect.objectContaining({
+                    friendshipId: 'friendship-1',
+                    friendId: 'user-2',
+                    friendUsername: 'bob',
+                }),
+            );
         });
 
         it('should throw NotFoundException when friendship not found', async () => {
@@ -231,6 +268,7 @@ describe('FriendsService', () => {
             prisma.friendship.update.mockResolvedValue({
                 ...mockFriendship,
                 status: 'DECLINED',
+                addressee: { id: mockUser2.id, username: mockUser2.username },
             });
 
             const result = await service.declineRequest('user-2', 'friendship-1');
@@ -238,6 +276,11 @@ describe('FriendsService', () => {
             expect(prisma.friendship.update).toHaveBeenCalledWith({
                 where: { id: 'friendship-1' },
                 data: { status: 'DECLINED' },
+                include: {
+                    addressee: {
+                        select: { id: true, username: true },
+                    },
+                },
             });
             expect(result.status).toBe('DECLINED');
         });

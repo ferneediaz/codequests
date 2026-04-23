@@ -818,6 +818,69 @@ export class BattlesGateway
     }
 
     /**
+     * Emit a freshly created friend request to the addressee if they are
+     * online, so their notification center lights up immediately without a
+     * manual refresh. Safe to call for offline users — they'll see the
+     * request via REST hydration on next app load.
+     */
+    emitFriendRequestReceived(
+        addresseeId: string,
+        data: {
+            friendshipId: string;
+            requesterId: string;
+            requesterUsername: string;
+            requesterAvatarUrl?: string | null;
+            requesterMmr: number;
+            createdAt: Date | string;
+        },
+    ): boolean {
+        const socket = this.getSocketByUserId(addresseeId);
+        if (!socket) return false;
+        socket.emit('friend.request_received', data);
+        return true;
+    }
+
+    /**
+     * Notify the original requester that their outgoing request was
+     * accepted. The recipient gets to see the new friendship show up in
+     * their friends list without polling.
+     */
+    emitFriendRequestAccepted(
+        requesterId: string,
+        data: {
+            friendshipId: string;
+            friendId: string;
+            friendUsername: string;
+            friendAvatarUrl?: string | null;
+            friendMmr: number;
+        },
+    ): boolean {
+        const socket = this.getSocketByUserId(requesterId);
+        if (!socket) return false;
+        socket.emit('friend.request_accepted', data);
+        return true;
+    }
+
+    /**
+     * Notify the original requester that their outgoing request was
+     * declined. Emitted quietly — clients surface this as a toast rather
+     * than a persistent notification.
+     */
+    emitFriendRequestDeclined(
+        requesterId: string,
+        data: {
+            friendshipId: string;
+            addresseeId: string;
+            addresseeUsername: string;
+        },
+    ): boolean {
+        const socket = this.getSocketByUserId(requesterId);
+        if (!socket) return false;
+        socket.emit('friend.request_declined', data);
+        return true;
+    }
+
+    /**
      * Notify a user's friends about their online/offline status
      */
     private async notifyFriendsPresence(userId: string, username: string, online: boolean) {

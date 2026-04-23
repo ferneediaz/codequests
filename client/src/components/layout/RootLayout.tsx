@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { useInviteNotifications } from '@/hooks/useInviteNotifications';
 import { useSubscription } from '@/hooks/useSubscription';
+import { FriendNotificationsProvider } from '@/context/FriendNotificationsProvider';
 
 export function RootLayout() {
     useInviteNotifications();
@@ -11,11 +12,13 @@ export function RootLayout() {
     useSubscription();
 
     return (
-        <div className="flex min-h-screen flex-col bg-background">
-            <Navbar />
-            <main className="flex-1">
-                <Outlet />
-            </main>
-        </div>
+        <FriendNotificationsProvider>
+            <div className="flex min-h-screen flex-col bg-background">
+                <Navbar />
+                <main className="flex-1">
+                    <Outlet />
+                </main>
+            </div>
+        </FriendNotificationsProvider>
     );
 }

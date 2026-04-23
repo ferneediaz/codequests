@@ -116,3 +116,26 @@ export interface ChatMessagePayload {
     roomId: string;
     createdAt: string;
 }
+
+export interface FriendRequestReceivedPayload {
+    friendshipId: string;
+    requesterId: string;
+    requesterUsername: string;
+    requesterAvatarUrl?: string | null;
+    requesterMmr: number;
+    createdAt: string;
+}
+
+export interface FriendRequestAcceptedPayload {
+    friendshipId: string;
+    friendId: string;
+    friendUsername: string;
+    friendAvatarUrl?: string | null;
+    friendMmr: number;
+}
+
+export interface FriendRequestDeclinedPayload {
+    friendshipId: string;
+    addresseeId: string;
+    addresseeUsername: string;
+}

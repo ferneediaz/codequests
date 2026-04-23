@@ -1416,4 +1416,91 @@ describe('BattlesGateway', () => {
             expect(socket1.emit).toHaveBeenCalledWith('clan.challenge_countered', counterPayload);
         });
     });
+
+    // ====================================================================
+    // Friend request realtime emits
+    // ====================================================================
+
+    describe('Friend request emits', () => {
+        it('emitFriendRequestReceived sends event to online addressee', async () => {
+            const addresseeSocket = createMockSocket('user-2', 'socket-2');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser2);
+            mockFriendsService.getFriendIds.mockResolvedValueOnce([]);
+            await gateway.handleConnection(addresseeSocket);
+
+            const payload = {
+                friendshipId: 'friendship-1',
+                requesterId: 'user-1',
+                requesterUsername: 'alice',
+                requesterAvatarUrl: null,
+                requesterMmr: 1000,
+                createdAt: new Date('2026-04-23T10:00:00Z'),
+            };
+
+            const delivered = gateway.emitFriendRequestReceived('user-2', payload);
+
+            expect(delivered).toBe(true);
+            expect(addresseeSocket.emit).toHaveBeenCalledWith(
+                'friend.request_received',
+                payload,
+            );
+        });
+
+        it('emitFriendRequestReceived returns false for offline addressee', () => {
+            const delivered = gateway.emitFriendRequestReceived('user-offline', {
+                friendshipId: 'friendship-1',
+                requesterId: 'user-1',
+                requesterUsername: 'alice',
+                requesterAvatarUrl: null,
+                requesterMmr: 1000,
+                createdAt: new Date(),
+            });
+
+            expect(delivered).toBe(false);
+        });
+
+        it('emitFriendRequestAccepted sends event to online requester', async () => {
+            const requesterSocket = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser);
+            mockFriendsService.getFriendIds.mockResolvedValueOnce([]);
+            await gateway.handleConnection(requesterSocket);
+
+            const payload = {
+                friendshipId: 'friendship-1',
+                friendId: 'user-2',
+                friendUsername: 'bob',
+                friendAvatarUrl: null,
+                friendMmr: 1100,
+            };
+
+            const delivered = gateway.emitFriendRequestAccepted('user-1', payload);
+
+            expect(delivered).toBe(true);
+            expect(requesterSocket.emit).toHaveBeenCalledWith(
+                'friend.request_accepted',
+                payload,
+            );
+        });
+
+        it('emitFriendRequestDeclined sends event to online requester', async () => {
+            const requesterSocket = createMockSocket('user-1', 'socket-1');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce(mockUser);
+            mockFriendsService.getFriendIds.mockResolvedValueOnce([]);
+            await gateway.handleConnection(requesterSocket);
+
+            const payload = {
+                friendshipId: 'friendship-1',
+                addresseeId: 'user-2',
+                addresseeUsername: 'bob',
+            };
+
+            const delivered = gateway.emitFriendRequestDeclined('user-1', payload);
+
+            expect(delivered).toBe(true);
+            expect(requesterSocket.emit).toHaveBeenCalledWith(
+                'friend.request_declined',
+                payload,
+            );
+        });
+    });
 });

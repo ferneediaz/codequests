@@ -77,14 +77,18 @@ export function computeAverageTestsPassed(
 
 export type HeatmapBuildOptions = {
     year?: number;
+    githubCommitsByDate?: Record<string, number>;
 };
 
 export type HeatmapData = {
     grid: number[][];
     dates: (Date | null)[][];
+    breakdown: { battles: number; githubCommits: number; total: number }[][];
     monthLabels: (string | null)[];
     max: number;
     totalGames: number;
+    totalGithubCommits: number;
+    totalActivity: number;
     periodLabel: string;
 };
 
@@ -134,16 +138,28 @@ export function buildHeatmap(
         const key = toDateKey(d);
         countsByDate.set(key, (countsByDate.get(key) ?? 0) + 1);
     }
+    const githubCountsByDate = new Map<string, number>();
+    for (const [dateKey, commitCount] of Object.entries(options?.githubCommitsByDate ?? {})) {
+        if (commitCount <= 0) continue;
+        const d = new Date(`${dateKey}T00:00:00`);
+        if (Number.isNaN(d.getTime())) continue;
+        d.setHours(0, 0, 0, 0);
+        if (d < periodStart || d > periodEnd) continue;
+        githubCountsByDate.set(dateKey, commitCount);
+    }
 
     const grid: number[][] = [];
     const dates: (Date | null)[][] = [];
+    const breakdown: { battles: number; githubCommits: number; total: number }[][] = [];
     const monthLabels: (string | null)[] = new Array(weeks).fill(null);
     let max = 0;
     let totalGames = 0;
+    let totalGithubCommits = 0;
 
     for (let week = 0; week < weeks; week++) {
         const col: number[] = [];
         const dateCol: (Date | null)[] = [];
+        const breakdownCol: { battles: number; githubCommits: number; total: number }[] = [];
         for (let day = 0; day < 7; day++) {
             const cellDate = new Date(alignedStart);
             cellDate.setDate(alignedStart.getDate() + week * 7 + day);
@@ -151,16 +167,27 @@ export function buildHeatmap(
             if (!inRange) {
                 col.push(0);
                 dateCol.push(null);
+                breakdownCol.push({ battles: 0, githubCommits: 0, total: 0 });
                 continue;
             }
-            const count = countsByDate.get(toDateKey(cellDate)) ?? 0;
-            col.push(count);
+            const dateKey = toDateKey(cellDate);
+            const battleCount = countsByDate.get(dateKey) ?? 0;
+            const githubCommitCount = githubCountsByDate.get(dateKey) ?? 0;
+            const total = battleCount + githubCommitCount;
+            col.push(total);
             dateCol.push(cellDate);
-            if (count > max) max = count;
-            totalGames += count;
+            breakdownCol.push({
+                battles: battleCount,
+                githubCommits: githubCommitCount,
+                total,
+            });
+            if (total > max) max = total;
+            totalGames += battleCount;
+            totalGithubCommits += githubCommitCount;
         }
         grid.push(col);
         dates.push(dateCol);
+        breakdown.push(breakdownCol);
     }
 
     // Show month label at the first visible week where that month appears.
@@ -182,5 +209,16 @@ export function buildHeatmap(
     }
 
     const periodLabel = selectedYear ? `${selectedYear}` : 'last 12 months';
-    return { grid, dates, monthLabels, max, totalGames, periodLabel };
+    const totalActivity = totalGames + totalGithubCommits;
+    return {
+        grid,
+        dates,
+        breakdown,
+        monthLabels,
+        max,
+        totalGames,
+        totalGithubCommits,
+        totalActivity,
+        periodLabel,
+    };
 }

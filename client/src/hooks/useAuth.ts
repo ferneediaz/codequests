@@ -51,7 +51,12 @@ export function useAuth() {
     const loginWithGithub = async () => {
         await supabase.auth.signInWithOAuth({
             provider: 'github',
-            options: { redirectTo: `${window.location.origin}/auth/callback` },
+            options: {
+                redirectTo: `${window.location.origin}/auth/callback`,
+                // Needed so GraphQL contributionsCollection can include
+                // private/internal contribution counts when available.
+                scopes: 'read:user',
+            },
         });
     };
 

@@ -1,10 +1,25 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+    Injectable,
+    NotFoundException,
+    BadRequestException,
+    ConflictException,
+    Inject,
+    forwardRef,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { FriendshipStatus } from '@prisma/client';
+import { BattlesGateway } from '../websockets/battles.gateway';
 
 @Injectable()
 export class FriendsService {
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        // forwardRef to break the FriendsModule <-> WebsocketsModule cycle.
+        // The gateway is only used for best-effort real-time delivery, so
+        // all paths tolerate it being unavailable (no throw).
+        @Inject(forwardRef(() => BattlesGateway))
+        private readonly battlesGateway: BattlesGateway,
+    ) {}
 
     /**
      * Send a friend request to a user by username
@@ -42,7 +57,7 @@ export class FriendsService {
                 throw new ConflictException('A friend request is already pending');
             }
             // DECLINED — delete old record and allow re-request (use transaction to prevent race conditions)
-            return this.prisma.$transaction(async (tx) => {
+            const created = await this.prisma.$transaction(async (tx) => {
                 await tx.friendship.delete({ where: { id: existing.id } });
                 return tx.friendship.create({
                     data: {
@@ -57,9 +72,11 @@ export class FriendsService {
                     },
                 });
             });
+            await this.notifyRequestReceived(created.id, requesterId, addressee.id, created.createdAt);
+            return created;
         }
 
-        return this.prisma.friendship.create({
+        const created = await this.prisma.friendship.create({
             data: {
                 requesterId,
                 addresseeId: addressee.id,
@@ -71,6 +88,39 @@ export class FriendsService {
                 },
             },
         });
+        await this.notifyRequestReceived(created.id, requesterId, addressee.id, created.createdAt);
+        return created;
+    }
+
+    /**
+     * Best-effort realtime push to the addressee when a new pending
+     * request lands. Loads the requester's public profile to enrich the
+     * socket payload so the recipient UI can render a full row without a
+     * follow-up fetch.
+     */
+    private async notifyRequestReceived(
+        friendshipId: string,
+        requesterId: string,
+        addresseeId: string,
+        createdAt: Date,
+    ) {
+        try {
+            const requester = await this.prisma.user.findUnique({
+                where: { id: requesterId },
+                select: { id: true, username: true, avatarUrl: true, mmr: true },
+            });
+            if (!requester) return;
+            this.battlesGateway.emitFriendRequestReceived(addresseeId, {
+                friendshipId,
+                requesterId: requester.id,
+                requesterUsername: requester.username,
+                requesterAvatarUrl: requester.avatarUrl,
+                requesterMmr: requester.mmr,
+                createdAt,
+            });
+        } catch {
+            // Realtime delivery is best-effort — REST hydration covers the gap.
+        }
     }
 
     /**
@@ -93,15 +143,34 @@ export class FriendsService {
             throw new BadRequestException('This request is not pending');
         }
 
-        return this.prisma.friendship.update({
+        const updated = await this.prisma.friendship.update({
             where: { id: friendshipId },
             data: { status: FriendshipStatus.ACCEPTED },
             include: {
                 requester: {
                     select: { id: true, username: true, avatarUrl: true, mmr: true },
                 },
+                addressee: {
+                    select: { id: true, username: true, avatarUrl: true, mmr: true },
+                },
             },
         });
+
+        // Let the original requester know in realtime that they now have
+        // a new friend (socket-only; REST is unchanged).
+        try {
+            this.battlesGateway.emitFriendRequestAccepted(updated.requesterId, {
+                friendshipId: updated.id,
+                friendId: updated.addressee.id,
+                friendUsername: updated.addressee.username,
+                friendAvatarUrl: updated.addressee.avatarUrl,
+                friendMmr: updated.addressee.mmr,
+            });
+        } catch {
+            // best-effort
+        }
+
+        return updated;
     }
 
     /**
@@ -124,10 +193,29 @@ export class FriendsService {
             throw new BadRequestException('This request is not pending');
         }
 
-        return this.prisma.friendship.update({
+        const updated = await this.prisma.friendship.update({
             where: { id: friendshipId },
             data: { status: FriendshipStatus.DECLINED },
+            include: {
+                addressee: {
+                    select: { id: true, username: true },
+                },
+            },
         });
+
+        // Best-effort: quietly let the requester know their request was
+        // declined. Client surfaces this as a subtle toast, not a badge.
+        try {
+            this.battlesGateway.emitFriendRequestDeclined(updated.requesterId, {
+                friendshipId: updated.id,
+                addresseeId: updated.addressee.id,
+                addresseeUsername: updated.addressee.username,
+            });
+        } catch {
+            // best-effort
+        }
+
+        return updated;
     }
 
     /**
