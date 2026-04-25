@@ -106,7 +106,7 @@ A competitive coding battle platform where players learn algorithms through real
 CodeQuest Battles uses a **freemium model** similar to GeoGuessr:
 
 ### Free Tier
-- **2 free games per day** (resets at midnight UTC)
+- **1 free games per day** (resets at midnight UTC)
 - Access to casual matchmaking
 - Basic profile features
 
@@ -127,59 +127,102 @@ CodeQuest Battles uses a **freemium model** similar to GeoGuessr:
 
 ---
 
-## Getting Started
+## Getting Started (Local Development)
 
 ### Prerequisites
-- Node.js 20+
-- pnpm (recommended) or npm
-- Supabase account
-- Docker (for Piston code execution engine)
+- Node.js 20+ (Node 22+ recommended)
+- npm 10+
+- Docker (required for local Piston code execution)
+- A Supabase project (database + auth keys)
 
-### Installation
+### 1) Install dependencies
 
-```bash
-# Clone the repository
-git clone <repo-url>
-cd codequest_battles
-
-# Install client dependencies
-cd client
-pnpm install
-
-# Install server dependencies
-cd ../server
-pnpm install
-```
-
-### Environment Variables
-
-**Client** (`client/.env`):
-```env
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_API_URL=http://localhost:3000
-```
-
-**Server** (`server/.env`):
-```env
-DATABASE_URL=your_supabase_postgres_connection_string
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_KEY=your_supabase_service_role_key
-PISTON_URL=http://localhost:2000
-JWT_SECRET=your_jwt_secret
-```
-
-### Development
+From the repository root:
 
 ```bash
-# Start the server
+npm install
+cd client && npm install
+cd ../server && npm install
+```
+
+### 2) Configure environment variables
+
+Copy both example env files:
+
+```bash
+cp client/.env.example client/.env
+cp server/.env.example server/.env
+```
+
+Update values in:
+
+- `client/.env`
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+  - `VITE_API_URL` (default `http://localhost:3000/api`)
+  - `VITE_WS_URL` (default `http://localhost:3000`)
+- `server/.env`
+  - `DATABASE_URL` (Supabase Postgres connection string)
+  - `SUPABASE_URL`
+  - `SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_KEY`
+  - `JWT_JWK` (Supabase JWT public key JWK JSON)
+  - `PISTON_URL` (default `http://localhost:2000`)
+  - `PORT` (default `3000`)
+
+### 3) Start required local services
+
+Start Piston from the `server` folder:
+
+```bash
 cd server
-pnpm run start:dev
-
-# Start the client (in another terminal)
-cd client
-pnpm run dev
+docker compose up -d
 ```
+
+### 4) Apply database schema (first run)
+
+From `server`:
+
+```bash
+npm run prisma:generate
+npm run prisma:push
+```
+
+Optional seed:
+
+```bash
+npm run prisma:seed
+```
+
+### 5) Start development servers
+
+Use 2 terminals:
+
+Terminal 1 (backend, from `server`):
+
+```bash
+npm run start:dev
+```
+
+Terminal 2 (frontend, from `client`):
+
+```bash
+npm run dev
+```
+
+App URLs:
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:3000/api`
+
+### Optional: Run multiple client sessions
+
+From repo root, this starts multiple Vite sessions on consecutive ports:
+
+```bash
+./run_client.sh 3
+```
+
+Example output ports: `5173`, `5174`, `5175`.
 
 ---
 
