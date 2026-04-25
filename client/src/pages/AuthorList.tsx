@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '@/services/api';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface AuthorProblem {
     filename: string;
@@ -51,10 +52,19 @@ export default function AuthorList() {
 
     return (
         <div className="mx-auto max-w-4xl p-6">
-            <h1 className="mb-1 text-xl font-semibold">Problem drafts</h1>
-            <p className="mb-4 text-xs text-muted-foreground">
-                YAML files under <code>server/problems/</code>. Click one to dry-run it against ad-hoc test cases before committing.
-            </p>
+            <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="mb-1 text-xl font-semibold">Problem drafts</h1>
+                    <p className="text-xs text-muted-foreground">
+                        YAML files under <code>server/problems/</code>. Click one to dry-run it against ad-hoc test cases before committing.
+                    </p>
+                </div>
+                <Link to="/author/new">
+                    <Button size="sm">
+                        <Plus className="mr-1.5 h-3.5 w-3.5" /> New problem
+                    </Button>
+                </Link>
+            </div>
             <div className="divide-y divide-border rounded border border-border">
                 {problems.map((p) => (
                     <Link

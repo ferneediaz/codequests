@@ -15,6 +15,7 @@ import Practice from '@/pages/Practice';
 import PracticeSolve from '@/pages/PracticeSolve';
 import AuthorList from '@/pages/AuthorList';
 import AuthorPreview from '@/pages/AuthorPreview';
+import AuthorNew from '@/pages/AuthorNew';
 import Onboarding from '@/pages/Onboarding';
 import InviteJoin from '@/pages/InviteJoin';
 import Pricing from '@/pages/Pricing';
@@ -99,6 +100,10 @@ export const router = createBrowserRouter([
                             {
                                 path: '/author',
                                 element: <AuthorList />,
+                            },
+                            {
+                                path: '/author/new',
+                                element: <AuthorNew />,
                             },
                             {
                                 path: '/author/problems/:slug',
