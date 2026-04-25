@@ -67,7 +67,22 @@ export class MatchmakingService {
             });
         }
 
-        // Check user is not in an active battle
+        // Active battle guard with targeted cleanup.
+        //
+        // If the previous battle timed out while every participant was away
+        // (e.g. tab closed, browser crash), the client-driven /complete call
+        // never landed and the battle is stuck IN_PROGRESS. Same story for
+        // expired invite lobbies and abandoned public 1v1 WAITING rows.
+        // Finalize those for this user first so a genuinely abandoned battle
+        // doesn't block a fresh queue attempt.
+        try {
+            await this.battlesService.finalizeStaleBattlesForUser(userId);
+        } catch (error) {
+            this.logger.warn(
+                `Stale battle cleanup before joinQueue failed for user ${userId}: ${(error as Error).message}`,
+            );
+        }
+
         const activeBattle = await this.prisma.battleParticipant.findFirst({
             where: {
                 userId,
@@ -75,12 +90,24 @@ export class MatchmakingService {
                     status: { in: ['WAITING', 'IN_PROGRESS'] },
                 },
             },
+            include: {
+                battle: {
+                    select: { id: true, status: true, mode: true },
+                },
+            },
         });
 
         if (activeBattle) {
-            throw new BadRequestException(
-                'Cannot join queue while in an active battle',
-            );
+            // Return a structured payload so the UI can render an actionable
+            // error instead of bouncing the user silently back to /play.
+            throw new BadRequestException({
+                code: 'ACTIVE_BATTLE',
+                message:
+                    'You are already in an active battle. Resume or finish it before queueing again.',
+                battleId: activeBattle.battle.id,
+                battleStatus: activeBattle.battle.status,
+                battleMode: activeBattle.battle.mode,
+            });
         }
 
         // Create queue entry

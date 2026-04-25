@@ -3493,4 +3493,100 @@ describe('BattlesService', () => {
             expect(battleRoyaleService.startRoyale).not.toHaveBeenCalled();
         });
     });
+
+    // ==========================================
+    // Stale battle cleanup
+    // ==========================================
+    describe('stale battle cleanup', () => {
+        const TIME_LIMIT = 5; // minutes
+        // The implementation adds a 30s grace. Comfortably past the deadline.
+        const longAgo = new Date(Date.now() - (TIME_LIMIT * 60_000 + 120_000));
+        const recent = new Date(Date.now() - 10_000);
+
+        it('finalizeStaleBattlesForUser finalizes expired IN_PROGRESS battles', async () => {
+            // First findMany call = IN_PROGRESS scan; second = WAITING scan.
+            prisma.battle.findMany
+                .mockResolvedValueOnce([
+                    { id: 'stale-1', startedAt: longAgo, timeLimitMinutes: TIME_LIMIT },
+                ])
+                .mockResolvedValueOnce([]);
+
+            const completeSpy = jest
+                .spyOn(service, 'completeBattle')
+                .mockResolvedValue({ id: 'stale-1' } as any);
+
+            const changed = await service.finalizeStaleBattlesForUser('user-1');
+
+            expect(changed).toBe(1);
+            expect(completeSpy).toHaveBeenCalledWith('stale-1');
+        });
+
+        it('finalizeStaleBattlesForUser skips fresh IN_PROGRESS battles', async () => {
+            // Battle still within time limit — should NOT be finalized.
+            prisma.battle.findMany
+                .mockResolvedValueOnce([
+                    { id: 'fresh-1', startedAt: recent, timeLimitMinutes: TIME_LIMIT },
+                ])
+                .mockResolvedValueOnce([]);
+
+            const completeSpy = jest
+                .spyOn(service, 'completeBattle')
+                .mockResolvedValue({} as any);
+
+            const changed = await service.finalizeStaleBattlesForUser('user-1');
+
+            expect(changed).toBe(0);
+            expect(completeSpy).not.toHaveBeenCalled();
+        });
+
+        it('finalizeStaleBattlesForUser expires stale WAITING lobbies', async () => {
+            prisma.battle.findMany
+                .mockResolvedValueOnce([]) // no IN_PROGRESS
+                .mockResolvedValueOnce([{ id: 'waiting-1' }]);
+
+            const completeSpy = jest
+                .spyOn(service, 'completeBattle')
+                .mockResolvedValue({ id: 'waiting-1' } as any);
+
+            const changed = await service.finalizeStaleBattlesForUser('user-1');
+
+            expect(changed).toBe(1);
+            expect(completeSpy).toHaveBeenCalledWith('waiting-1');
+        });
+
+        it('finalizeStaleBattlesForUser swallows "already completed" races', async () => {
+            prisma.battle.findMany
+                .mockResolvedValueOnce([
+                    { id: 'racy-1', startedAt: longAgo, timeLimitMinutes: TIME_LIMIT },
+                ])
+                .mockResolvedValueOnce([]);
+
+            // Another path completed the battle between the scan and our
+            // finalize call — completeBattle throws "already completed".
+            jest.spyOn(service, 'completeBattle').mockRejectedValue(
+                new BadRequestException('Battle is already completed'),
+            );
+
+            const changed = await service.finalizeStaleBattlesForUser('user-1');
+
+            expect(changed).toBe(0); // not counted, but also not rethrown
+        });
+
+        it('cleanupStaleBattles runs both sweeps globally', async () => {
+            prisma.battle.findMany
+                .mockResolvedValueOnce([
+                    { id: 'stale-1', startedAt: longAgo, timeLimitMinutes: TIME_LIMIT },
+                ])
+                .mockResolvedValueOnce([{ id: 'waiting-1' }]);
+
+            const completeSpy = jest
+                .spyOn(service, 'completeBattle')
+                .mockResolvedValue({} as any);
+
+            await service.cleanupStaleBattles();
+
+            expect(completeSpy).toHaveBeenCalledWith('stale-1');
+            expect(completeSpy).toHaveBeenCalledWith('waiting-1');
+        });
+    });
 });

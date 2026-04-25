@@ -7,6 +7,7 @@ import {
     Logger,
     forwardRef,
 } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -27,6 +28,19 @@ const MIN_MMR = 0;
 const CLAN_MMR_CHANGE = 15;
 const INVITE_CODE_LENGTH = 8;
 const INVITE_EXPIRY_HOURS = 24;
+
+// Stale battle cleanup tuning.
+// Grace is added on top of timeLimitMinutes so legitimate end-of-match submits
+// (the client Timer posts /complete on zero) have a window to land first.
+const BATTLE_EXPIRY_GRACE_MS = 30_000; // 30s
+// Public 1v1 lobbies without an invite code that nobody joined can stall the
+// matchmaking guard forever. Keep the TTL short but forgiving enough to cover
+// slow connections / friend invites that haven't been accepted.
+const WAITING_PUBLIC_TTL_MS = 15 * 60 * 1000; // 15 minutes
+// How often the global cleanup interval runs. Lightweight scans; keep it
+// frequent enough that a user who abandons a battle can immediately requeue
+// without waiting multiple minutes.
+const STALE_BATTLE_SCAN_INTERVAL_MS = 30_000; // 30s
 
 // Point values by difficulty
 const DIFFICULTY_POINTS: Record<Difficulty, number> = {
@@ -1592,5 +1606,181 @@ export class BattlesService {
             battleMode: battle.mode,
             inviteCode: battle.inviteCode,
         };
+    }
+
+    // ==========================================
+    // Stale battle cleanup
+    // ==========================================
+    //
+    // Battle completion is normally driven by the client: the battle page Timer
+    // calls POST /battles/:id/complete when the clock hits zero, and
+    // submitSolution auto-completes the battle when a 1v1 participant passes
+    // every test. When every player closes the tab (crash, lost tab, refused
+    // paywall, etc.) neither of those fires, the battle rots in IN_PROGRESS,
+    // and matchmaking's "already in an active battle" guard blocks the user
+    // from ever queueing again. The helpers below make the server authoritative
+    // about ending timed-out battles so the guard stops firing on stale rows.
+
+    /**
+     * Find IN_PROGRESS battles whose time limit (plus a small grace window)
+     * has already elapsed. We include `timeLimitMinutes` in the projection so
+     * callers can recompute the deadline precisely — Prisma can't compare two
+     * columns + an arithmetic offset in a WHERE clause directly.
+     */
+    private async findExpiredInProgressBattles(
+        filter: { userId?: string } = {},
+    ): Promise<Array<{ id: string; startedAt: Date; timeLimitMinutes: number }>> {
+        const candidates = await this.prisma.battle.findMany({
+            where: {
+                status: BattleStatus.IN_PROGRESS,
+                startedAt: { not: null },
+                ...(filter.userId
+                    ? { participants: { some: { userId: filter.userId } } }
+                    : {}),
+            },
+            select: {
+                id: true,
+                startedAt: true,
+                timeLimitMinutes: true,
+            },
+        });
+
+        const now = Date.now();
+        return candidates
+            .filter((b): b is { id: string; startedAt: Date; timeLimitMinutes: number } =>
+                b.startedAt !== null,
+            )
+            .filter((b) => {
+                const deadline =
+                    b.startedAt.getTime() +
+                    b.timeLimitMinutes * 60_000 +
+                    BATTLE_EXPIRY_GRACE_MS;
+                return deadline < now;
+            });
+    }
+
+    /**
+     * Find WAITING lobbies that should no longer block matchmaking:
+     *   - Public 1v1 lobbies (no invite code) older than WAITING_PUBLIC_TTL_MS
+     *   - Any invite lobby whose inviteExpiresAt has passed
+     * Team/BR/clan lobbies are left alone — they're host-managed and their
+     * lifecycle isn't a matchmaking concern.
+     */
+    private async findStaleWaitingBattles(
+        filter: { userId?: string } = {},
+    ): Promise<Array<{ id: string }>> {
+        const now = new Date();
+        const publicCutoff = new Date(now.getTime() - WAITING_PUBLIC_TTL_MS);
+
+        const userScope = filter.userId
+            ? { participants: { some: { userId: filter.userId } } }
+            : {};
+
+        return this.prisma.battle.findMany({
+            where: {
+                status: BattleStatus.WAITING,
+                AND: [
+                    userScope,
+                    {
+                        OR: [
+                            {
+                                mode: BattleMode.ONE_V_ONE,
+                                inviteCode: null,
+                                createdAt: { lt: publicCutoff },
+                            },
+                            {
+                                inviteCode: { not: null },
+                                inviteExpiresAt: { not: null, lt: now },
+                            },
+                        ],
+                    },
+                ],
+            },
+            select: { id: true },
+        });
+    }
+
+    /**
+     * Reuse completeBattle so winner/MMR/history/websocket semantics stay
+     * centralized. For battles with zero submissions this gracefully resolves
+     * to a null winner and no MMR movement (see calculateMmrChanges and the
+     * winnerId branch in completeBattle). Races with a live client finishing
+     * the battle first are expected — swallow the "already completed" error.
+     */
+    private async finalizeBattleSafely(battleId: string): Promise<boolean> {
+        try {
+            await this.completeBattle(battleId);
+            return true;
+        } catch (error) {
+            const message = (error as Error).message ?? '';
+            if (message.includes('already completed')) {
+                return false;
+            }
+            this.logger.warn(
+                `Failed to finalize stale battle ${battleId}: ${message}`,
+            );
+            return false;
+        }
+    }
+
+    /**
+     * Targeted cleanup: finalize/expire any stale active battles for this
+     * specific user. Called synchronously from matchmaking before the active
+     * battle guard fires so an abandoned lobby doesn't block a fresh queue.
+     * Returns the number of battles that were transitioned.
+     */
+    async finalizeStaleBattlesForUser(userId: string): Promise<number> {
+        let changed = 0;
+
+        const expired = await this.findExpiredInProgressBattles({ userId });
+        for (const battle of expired) {
+            if (await this.finalizeBattleSafely(battle.id)) {
+                changed += 1;
+                this.logger.log(
+                    `Finalized stale IN_PROGRESS battle ${battle.id} for user ${userId}`,
+                );
+            }
+        }
+
+        const stale = await this.findStaleWaitingBattles({ userId });
+        for (const battle of stale) {
+            if (await this.finalizeBattleSafely(battle.id)) {
+                changed += 1;
+                this.logger.log(
+                    `Expired stale WAITING battle ${battle.id} for user ${userId}`,
+                );
+            }
+        }
+
+        return changed;
+    }
+
+    /**
+     * Global cleanup sweep. Runs on an interval so stale battles don't linger
+     * indefinitely even for users who never try to requeue.
+     */
+    @Interval(STALE_BATTLE_SCAN_INTERVAL_MS)
+    async cleanupStaleBattles() {
+        try {
+            const expired = await this.findExpiredInProgressBattles();
+            for (const battle of expired) {
+                await this.finalizeBattleSafely(battle.id);
+            }
+
+            const stale = await this.findStaleWaitingBattles();
+            for (const battle of stale) {
+                await this.finalizeBattleSafely(battle.id);
+            }
+
+            if (expired.length > 0 || stale.length > 0) {
+                this.logger.log(
+                    `Stale battle sweep finalized ${expired.length} in-progress and ${stale.length} waiting battle(s)`,
+                );
+            }
+        } catch (error) {
+            this.logger.error(
+                `Stale battle cleanup failed: ${(error as Error).message}`,
+            );
+        }
     }
 }

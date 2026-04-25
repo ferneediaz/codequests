@@ -33,6 +33,7 @@ import {
     Repeat,
     XCircle,
     UserCircle2,
+    Skull,
 } from 'lucide-react';
 import api from '@/services/api';
 import type {
@@ -722,7 +723,11 @@ export default function Dashboard() {
                             ) : (
                                 <div className="space-y-2">
                                     {newsItems.map((item) => (
-                                        <NewsRow key={item.id} item={item} />
+                                        <NewsRow
+                                            key={item.id}
+                                            item={item}
+                                            currentUserId={user?.id}
+                                        />
                                     ))}
                                     {hasMoreNews && (
                                         <div className="pt-2 text-center">
@@ -1250,9 +1255,37 @@ const HARD_CODED_NEWS_PREVIEW: NewsItem[] = [
     },
 ];
 
-function NewsRow({ item }: { item: NewsItem }) {
-    const Icon = NEWS_TYPE_ICON[item.type] ?? Newspaper;
-    const style = SEVERITY_STYLES[item.severity];
+function resolveNewsPresentation(
+    item: NewsItem,
+    currentUserId: string | undefined,
+): { Icon: typeof Swords; style: (typeof SEVERITY_STYLES)[NewsItemSeverity] } {
+    if (item.type === 'FRIEND_BATTLE_RESULT' && !item.isDraw && currentUserId) {
+        // Viewer was defeated: flip from the API's default "positive" to a
+        // negative, defeat-themed row so the feed doesn't celebrate losses.
+        if (item.loser?.id === currentUserId) {
+            return { Icon: Skull, style: SEVERITY_STYLES.negative };
+        }
+        // Explicit win styling when viewer or a friend won; the trophy makes
+        // the champion framing obvious even if the API severity changes.
+        if (item.winner) {
+            return { Icon: Trophy, style: SEVERITY_STYLES.positive };
+        }
+    }
+
+    return {
+        Icon: NEWS_TYPE_ICON[item.type] ?? Newspaper,
+        style: SEVERITY_STYLES[item.severity],
+    };
+}
+
+function NewsRow({
+    item,
+    currentUserId,
+}: {
+    item: NewsItem;
+    currentUserId: string | undefined;
+}) {
+    const { Icon, style } = resolveNewsPresentation(item, currentUserId);
     const when = formatRelative(item.timestamp);
 
     return (

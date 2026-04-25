@@ -1,12 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useMatchmaking } from '@/hooks/useMatchmaking';
+import { useMatchmaking, type JoinQueueError } from '@/hooks/useMatchmaking';
 import { useAppDispatch } from '@/store/hooks';
 import { resetQueue } from '@/store/slices/matchmakingSlice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, X } from 'lucide-react';
+import { AlertTriangle, Loader2, Play, X } from 'lucide-react';
 import type { MatchConfig } from '@/types/api';
 
 export default function Matchmaking() {
@@ -15,6 +15,7 @@ export default function Matchmaking() {
     const dispatch = useAppDispatch();
     const { joinQueue, leaveQueue } = useMatchmaking();
     const joinedRef = useRef(false);
+    const [error, setError] = useState<JoinQueueError | null>(null);
 
     const config = (location.state as { config?: MatchConfig })?.config;
 
@@ -22,16 +23,87 @@ export default function Matchmaking() {
         if (!joinedRef.current) {
             joinedRef.current = true;
             dispatch(resetQueue());
-            joinQueue(config).catch(() => {
-                navigate('/play');
+            joinQueue(config).catch((err: unknown) => {
+                // Surface the failure reason on this page instead of
+                // silently bouncing the user back to /play. See
+                // JoinQueueError in useMatchmaking for the shape.
+                const typed =
+                    err &&
+                    typeof err === 'object' &&
+                    'code' in (err as object)
+                        ? (err as JoinQueueError)
+                        : null;
+                if (typed) {
+                    setError(typed);
+                } else {
+                    setError({
+                        name: 'JoinQueueError',
+                        message:
+                            (err as Error | undefined)?.message ??
+                            'Could not join matchmaking. Please try again.',
+                        code: 'GENERIC',
+                    } as JoinQueueError);
+                }
             });
         }
-    }, [dispatch, joinQueue, navigate, config]);
+    }, [dispatch, joinQueue, config]);
 
     const handleCancel = async () => {
         await leaveQueue();
         navigate('/play');
     };
+
+    const handleBackToPlay = () => {
+        navigate('/play');
+    };
+
+    const handleResumeBattle = () => {
+        if (error?.battleId) {
+            navigate(`/battle/${error.battleId}`);
+        }
+    };
+
+    if (error) {
+        const isActiveBattle = error.code === 'ACTIVE_BATTLE' && !!error.battleId;
+        const title = isActiveBattle
+            ? 'You are already in a battle'
+            : error.code === 'PAYWALL'
+              ? 'Daily game limit reached'
+              : "Couldn't start matchmaking";
+
+        return (
+            <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4">
+                <Card className="w-full max-w-md">
+                    <CardContent className="flex flex-col items-center gap-6 pt-8 pb-8">
+                        <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-destructive/40 bg-destructive/10">
+                            <AlertTriangle className="h-10 w-10 text-destructive" />
+                        </div>
+
+                        <div className="text-center">
+                            <h2 className="mb-1 text-xl font-semibold text-foreground">
+                                {title}
+                            </h2>
+                            <p className="text-sm text-muted-foreground">
+                                {error.message}
+                            </p>
+                        </div>
+
+                        <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+                            {isActiveBattle && (
+                                <Button onClick={handleResumeBattle}>
+                                    <Play className="mr-2 h-4 w-4" />
+                                    Resume Battle
+                                </Button>
+                            )}
+                            <Button variant="outline" onClick={handleBackToPlay}>
+                                Back to Play
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4">

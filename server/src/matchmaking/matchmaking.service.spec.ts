@@ -13,7 +13,11 @@ import { BattlesGateway } from '../websockets/battles.gateway';
 describe('MatchmakingService', () => {
     let service: MatchmakingService;
     let prisma: MockPrismaService;
-    let battlesService: { createBattle: jest.Mock; joinBattle: jest.Mock };
+    let battlesService: {
+        createBattle: jest.Mock;
+        joinBattle: jest.Mock;
+        finalizeStaleBattlesForUser: jest.Mock;
+    };
     let battlesGateway: { emitMatchFound: jest.Mock };
 
     const mockUser1 = {
@@ -101,6 +105,7 @@ describe('MatchmakingService', () => {
         const mockBattlesService = {
             createBattle: jest.fn(),
             joinBattle: jest.fn(),
+            finalizeStaleBattlesForUser: jest.fn().mockResolvedValue(0),
         };
 
         const mockBattlesGateway = {
@@ -260,18 +265,79 @@ describe('MatchmakingService', () => {
             expect(result.status).toBe('queued');
         });
 
-        it('should throw BadRequestException if user is in active battle', async () => {
+        it('should throw structured ACTIVE_BATTLE error if user is in active battle', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser1);
             prisma.matchmakingEntry.findUnique.mockResolvedValue(null);
             prisma.battleParticipant.findFirst.mockResolvedValue({
                 id: 'participant-1',
                 battleId: 'battle-1',
                 userId: mockUser1.id,
+                battle: {
+                    id: 'battle-1',
+                    status: BattleStatus.IN_PROGRESS,
+                    mode: BattleMode.ONE_V_ONE,
+                },
             });
 
             await expect(
                 service.joinQueue(mockUser1.id, {}),
-            ).rejects.toThrow(BadRequestException);
+            ).rejects.toMatchObject({
+                response: {
+                    code: 'ACTIVE_BATTLE',
+                    battleId: 'battle-1',
+                    battleStatus: BattleStatus.IN_PROGRESS,
+                    battleMode: BattleMode.ONE_V_ONE,
+                },
+            });
+        });
+
+        it('should run stale battle cleanup before active-battle rejection', async () => {
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            prisma.matchmakingEntry.findUnique.mockResolvedValue(null);
+            // After the cleanup hook runs, the active battle is gone; the
+            // guard finds nothing and we proceed to queue.
+            prisma.battleParticipant.findFirst.mockResolvedValue(null);
+
+            const createdEntry = { ...baseQueueEntry };
+            prisma.matchmakingEntry.create.mockResolvedValue(createdEntry);
+            prisma.matchmakingEntry.findUnique
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(createdEntry);
+            prisma.matchmakingEntry.findMany.mockResolvedValue([]);
+
+            const result = await service.joinQueue(mockUser1.id, {});
+
+            expect(
+                battlesService.finalizeStaleBattlesForUser,
+            ).toHaveBeenCalledWith(mockUser1.id);
+            // Cleanup must happen before findFirst runs.
+            const cleanupCallOrder =
+                battlesService.finalizeStaleBattlesForUser.mock
+                    .invocationCallOrder[0];
+            const findFirstCallOrder =
+                prisma.battleParticipant.findFirst.mock.invocationCallOrder[0];
+            expect(cleanupCallOrder).toBeLessThan(findFirstCallOrder);
+            expect(result.status).toBe('queued');
+        });
+
+        it('should proceed to queue even if stale cleanup throws', async () => {
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            prisma.matchmakingEntry.findUnique.mockResolvedValue(null);
+            prisma.battleParticipant.findFirst.mockResolvedValue(null);
+            battlesService.finalizeStaleBattlesForUser.mockRejectedValueOnce(
+                new Error('db hiccup'),
+            );
+
+            const createdEntry = { ...baseQueueEntry };
+            prisma.matchmakingEntry.create.mockResolvedValue(createdEntry);
+            prisma.matchmakingEntry.findUnique
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(createdEntry);
+            prisma.matchmakingEntry.findMany.mockResolvedValue([]);
+
+            const result = await service.joinQueue(mockUser1.id, {});
+
+            expect(result.status).toBe('queued');
         });
 
         it('should return matched status when immediate match is found', async () => {
