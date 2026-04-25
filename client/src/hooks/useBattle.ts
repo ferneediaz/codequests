@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
     setBattle,
@@ -33,6 +34,7 @@ import type {
 export function useBattle(battleId: string) {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const userId = useAppSelector((state) => state.auth.user?.id);
     const {
         battle,
@@ -130,6 +132,10 @@ export function useBattle(battleId: string) {
                         : p;
                 }) ?? [],
             }));
+            if (userId) {
+                void queryClient.invalidateQueries({ queryKey: ['userStats', userId] });
+                void queryClient.invalidateQueries({ queryKey: ['matchHistory', userId] });
+            }
             navigate(`/battle/${battleId}/results`);
         };
 
@@ -207,7 +213,7 @@ export function useBattle(battleId: string) {
             socket.off('skill.used', handleSkillUsed);
             socket.off('battle.time_updated', handleTimeUpdated);
         };
-    }, [battle, battleId, userId, dispatch, navigate]);
+    }, [battle, battleId, userId, dispatch, navigate, queryClient]);
 
     const submitCode = useCallback(
         async (code: string, language: string) => {
@@ -256,10 +262,14 @@ export function useBattle(battleId: string) {
     const completeBattleManually = useCallback(async () => {
         try {
             await api.post(`/battles/${battleId}/complete`);
+            if (userId) {
+                await queryClient.invalidateQueries({ queryKey: ['userStats', userId] });
+                await queryClient.invalidateQueries({ queryKey: ['matchHistory', userId] });
+            }
         } catch (error) {
             console.error('Failed to complete battle:', error);
         }
-    }, [battleId]);
+    }, [battleId, queryClient, userId]);
 
     const readyUp = useCallback(() => {
         const socket = getSocket();

@@ -4,6 +4,7 @@ import {
     BadRequestException,
     ForbiddenException,
     Inject,
+    Logger,
     forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,6 +18,7 @@ import { getRankTier } from '../common/utils/rank-tiers';
 import { randomBytes } from 'crypto';
 import { BattleRoyaleService } from './battle-royale.service';
 import { ClanWarsService } from './clan-wars.service';
+import { BattlesGateway } from '../websockets/battles.gateway';
 
 // K-factor for Elo calculation (higher = more volatile ratings)
 const ELO_K_FACTOR = 16;
@@ -50,6 +52,8 @@ export interface SubmissionResult {
 
 @Injectable()
 export class BattlesService {
+    private readonly logger = new Logger(BattlesService.name);
+
     constructor(
         private prisma: PrismaService,
         private codeExecutionService: CodeExecutionService,
@@ -60,6 +64,8 @@ export class BattlesService {
         private battleRoyaleService: BattleRoyaleService,
         @Inject(forwardRef(() => ClanWarsService))
         private clanWarsService: ClanWarsService,
+        @Inject(forwardRef(() => BattlesGateway))
+        private gateway: BattlesGateway,
     ) { }
 
     /**
@@ -621,6 +627,7 @@ export class BattlesService {
             isTeam && executionResult.allPassed ? pointValue : 0;
 
         // Update participant with results
+        const submittedAt = new Date();
         await this.prisma.battleParticipant.update({
             where: { id: participant.id },
             data: {
@@ -628,24 +635,65 @@ export class BattlesService {
                 language,
                 testsPassed: executionResult.passed,
                 totalTests: executionResult.total,
-                submittedAt: new Date(),
+                submittedAt,
                 pointsEarned: { increment: pointsAwarded },
             },
         });
 
-        // For single-problem modes, check if all participants have submitted
+        // Broadcast submission progress to every participant in the battle
+        // room so opponents/teammates see live progress. This covers 1v1 and
+        // team modes; BR and CW emit their own standings events elsewhere.
+        const submittingUser = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { username: true },
+        });
+        this.gateway.emitBattleSubmission(battleId, {
+            userId,
+            username: submittingUser?.username ?? '',
+            testsPassed: executionResult.passed,
+            totalTests: executionResult.total,
+            submittedAt,
+        });
+
+        // End-condition evaluation for single-problem (non-team) modes:
+        //   1. If *this* submission passes all tests, the battle is decided
+        //      immediately — fastest correct solution wins, regardless of
+        //      whether the opponent has submitted yet.
+        //   2. Otherwise, fall back to the legacy "all submitted" rule so a
+        //      battle still resolves when both players submit partial
+        //      solutions.
+        // Team modes intentionally do NOT auto-complete here; they resolve
+        // via the timer-triggered /complete call on the controller.
         if (!isTeam) {
-            const updatedBattle = await this.prisma.battle.findUnique({
-                where: { id: battleId },
-                include: { participants: true },
-            });
+            let shouldComplete = executionResult.allPassed;
 
-            const allSubmitted = updatedBattle?.participants.every(
-                (p) => p.submittedAt !== null,
-            );
+            if (!shouldComplete) {
+                const updatedBattle = await this.prisma.battle.findUnique({
+                    where: { id: battleId },
+                    include: { participants: true },
+                });
+                shouldComplete =
+                    !!updatedBattle?.participants.length &&
+                    updatedBattle.participants.every(
+                        (p) => p.submittedAt !== null,
+                    );
+            }
 
-            if (allSubmitted) {
-                await this.completeBattle(battleId);
+            if (shouldComplete) {
+                // Concurrent submissions / a timer-triggered /complete call
+                // can race with us. `completeBattle` throws if the battle is
+                // already COMPLETED — swallow that specific case so the
+                // submitter still gets a clean response.
+                try {
+                    await this.completeBattle(battleId);
+                } catch (err) {
+                    if (!(err instanceof BadRequestException)) {
+                        throw err;
+                    }
+                    this.logger.debug(
+                        `completeBattle race on ${battleId}: ${(err as Error).message}`,
+                    );
+                }
             }
         }
 
@@ -781,14 +829,32 @@ export class BattlesService {
                 const hasProAccess =
                     participant.user.subscriptionTier === 'PRO' ||
                     (participant.user.trialEndsAt && new Date(participant.user.trialEndsAt) > new Date());
+
+                // MMR: Pro / active trial only. Wins & losses: all accounts (dashboard truth).
                 if (!isTeam && hasProAccess) {
                     const newMmr = Math.max(MIN_MMR, participant.user.mmr + mmrChange);
                     await tx.user.update({
                         where: { id: participant.userId },
                         data: {
                             mmr: newMmr,
+                            ...(winnerId
+                                ? {
+                                      wins: isWinner
+                                          ? { increment: 1 }
+                                          : undefined,
+                                      losses: !isWinner
+                                          ? { increment: 1 }
+                                          : undefined,
+                                  }
+                                : {}),
+                        },
+                    });
+                } else if (!isTeam && !hasProAccess && winnerId) {
+                    await tx.user.update({
+                        where: { id: participant.userId },
+                        data: {
                             wins: isWinner ? { increment: 1 } : undefined,
-                            losses: !isWinner && winnerId ? { increment: 1 } : undefined,
+                            losses: !isWinner ? { increment: 1 } : undefined,
                         },
                     });
                 }
@@ -847,8 +913,20 @@ export class BattlesService {
             }
         }
 
-        // Return updated battle
-        return this.getBattleDetails(battleId);
+        // Return updated battle and broadcast to the battle room so every
+        // client (winner, loser, spectators) navigates to the results screen
+        // without relying on the timer firing.
+        const finalBattle = await this.getBattleDetails(battleId);
+        try {
+            this.gateway.emitBattleCompleted(battleId, finalBattle);
+        } catch (err) {
+            // Don't fail the whole completion path if the broadcast hiccups;
+            // REST reads of the battle still reflect the COMPLETED state.
+            this.logger.warn(
+                `Failed to broadcast battle.completed for ${battleId}: ${(err as Error).message}`,
+            );
+        }
+        return finalBattle;
     }
 
     /**

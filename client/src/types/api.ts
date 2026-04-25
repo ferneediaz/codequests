@@ -270,6 +270,8 @@ export interface MatchHistoryEntry {
     mode: BattleMode;
     status: BattleStatus;
     winnerId?: string;
+    /** Team games (e.g. GROUP) — compare with `BattleParticipant.teamId` */
+    winningTeam?: string;
     startedAt?: string;
     endedAt?: string;
     createdAt: string;

@@ -2,16 +2,36 @@ import type { MatchHistoryEntry, BattleMode } from '@/types/api';
 
 export type Streak = { type: 'W' | 'L' | 'D' | 'none'; count: number };
 
+/** Outcome of a completed battle for a user (1v1 / BR, or team modes). */
+export function getMatchResultForUser(
+    m: MatchHistoryEntry,
+    userId: string,
+): 'W' | 'L' | 'D' | 'pending' {
+    if (m.status !== 'COMPLETED') return 'pending';
+    if (m.mode === 'GROUP' || m.mode === 'CLAN_VS_CLAN') {
+        if (!m.winningTeam) return 'D';
+        const me = m.participants?.find((p) => p.userId === userId);
+        if (!me?.teamId) return 'D';
+        return me.teamId === m.winningTeam ? 'W' : 'L';
+    }
+    if (!m.winnerId) return 'D';
+    return m.winnerId === userId ? 'W' : 'L';
+}
+
 export function computeStreak(
     history: MatchHistoryEntry[],
     userId: string,
 ): Streak {
     if (!history.length) return { type: 'none', count: 0 };
-    // History is ordered most-recent first.
-    const results = history.map((m) => {
-        if (!m.winnerId) return 'D' as const;
-        return m.winnerId === userId ? ('W' as const) : ('L' as const);
-    });
+    // History is ordered most-recent first; only completed matches count.
+    const results: ('W' | 'L' | 'D')[] = [];
+    for (const m of history) {
+        if (m.status !== 'COMPLETED') break;
+        const r = getMatchResultForUser(m, userId);
+        if (r === 'pending') break;
+        results.push(r);
+    }
+    if (results.length === 0) return { type: 'none', count: 0 };
     const first = results[0];
     let count = 0;
     for (const r of results) {

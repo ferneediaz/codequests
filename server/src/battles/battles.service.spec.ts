@@ -7,6 +7,7 @@ import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SeasonsService } from '../seasons/seasons.service';
 import { ProblemsService } from '../problems/problems.service';
+import { BattlesGateway } from '../websockets/battles.gateway';
 import {
     createMockPrismaService,
     MockPrismaService,
@@ -29,6 +30,11 @@ describe('BattlesService', () => {
         enforceRoyaleJoinCap: jest.Mock;
         startRoyale: jest.Mock;
         submitRoyaleRound: jest.Mock;
+    };
+    let battlesGateway: {
+        emitBattleSubmission: jest.Mock;
+        emitBattleCompleted: jest.Mock;
+        emitBattleStatusUpdate: jest.Mock;
     };
 
     // Mock data
@@ -188,6 +194,14 @@ describe('BattlesService', () => {
                             .mockResolvedValue(undefined),
                     },
                 },
+                {
+                    provide: BattlesGateway,
+                    useValue: {
+                        emitBattleSubmission: jest.fn(),
+                        emitBattleCompleted: jest.fn(),
+                        emitBattleStatusUpdate: jest.fn(),
+                    },
+                },
             ],
         }).compile();
 
@@ -196,6 +210,7 @@ describe('BattlesService', () => {
         codeExecutionService = module.get(CodeExecutionService);
         subscriptionsService = module.get(SubscriptionsService);
         battleRoyaleService = module.get(BattleRoyaleService) as any;
+        battlesGateway = module.get(BattlesGateway) as any;
     });
 
     describe('createBattle', () => {
@@ -430,71 +445,46 @@ describe('BattlesService', () => {
             mmrChange: null,
         };
 
-        it('should submit and evaluate a solution', async () => {
+        it('should submit and evaluate a partial solution without auto-completing', async () => {
+            // Two-player 1v1 where the submitter passes 1/2 tests and the
+            // opponent hasn't submitted yet. Neither the "first-to-fully-pass"
+            // nor the "all submitted" end-conditions fire, so completeBattle
+            // stays dormant and only the live progress event goes out.
+            const opponentParticipant = {
+                ...mockParticipant,
+                id: 'p2',
+                userId: mockUser2.id,
+                submittedAt: null,
+            };
+
             const inProgressBattle = {
                 ...mockBattle,
                 status: BattleStatus.IN_PROGRESS,
-                participants: [mockParticipant],
+                participants: [mockParticipant, opponentParticipant],
                 problem: mockProblem,
                 problemPool: null,
             };
 
-            const battleAfterSubmission = {
+            const afterSubmit = {
                 ...inProgressBattle,
-                participants: [{ ...mockParticipant, submittedAt: new Date() }],
-            };
-
-            const completedBattle = {
-                ...mockBattle,
-                status: BattleStatus.COMPLETED,
-                winnerId: mockUser1.id,
                 participants: [
-                    {
-                        ...mockParticipant,
-                        submittedAt: new Date(),
-                        testsPassed: 2,
-                        user: mockUser1,
-                    },
+                    { ...mockParticipant, submittedAt: new Date(), testsPassed: 1 },
+                    opponentParticipant,
                 ],
             };
 
-            // First call: initial fetch in submitSolution
-            // Second call: fetch after participant update
-            // Third call: fetch in completeBattle
-            // Fourth call: fetch in getBattleDetails (at end of completeBattle)
             prisma.battle.findUnique
                 .mockResolvedValueOnce(inProgressBattle)
-                .mockResolvedValueOnce(battleAfterSubmission) // Only one participant, so won't trigger completeBattle
-                .mockResolvedValueOnce(completedBattle);
+                .mockResolvedValueOnce(afterSubmit);
 
-            // Change mock to have only one participant who hasn't submitted yet
-            // so completeBattle isn't auto-triggered
-            const singleParticipantBattle = {
-                ...mockBattle,
-                status: BattleStatus.IN_PROGRESS,
-                participants: [mockParticipant],
-                problem: mockProblem,
-                problemPool: null,
-            };
-
-            const afterSubmitSingleParticipant = {
-                ...singleParticipantBattle,
-                participants: [
-                    { ...mockParticipant, submittedAt: new Date() },
-                    { ...mockParticipant, id: 'p2', userId: 'user-2', submittedAt: null }, // Second participant hasn't submitted
-                ],
-            };
-
-            // Reset and re-mock
-            prisma.battle.findUnique.mockReset();
-            prisma.battle.findUnique
-                .mockResolvedValueOnce(singleParticipantBattle)
-                .mockResolvedValueOnce(afterSubmitSingleParticipant);
+            prisma.user.findUnique.mockResolvedValue({
+                username: mockUser1.username,
+            } as any);
 
             codeExecutionService.executeCode.mockResolvedValue({
-                passed: 2,
+                passed: 1,
                 total: 2,
-                allPassed: true,
+                allPassed: false,
                 results: [
                     {
                         testCaseId: 'test-1',
@@ -509,13 +499,13 @@ describe('BattlesService', () => {
                     },
                     {
                         testCaseId: 'test-2',
-                        passed: true,
+                        passed: false,
                         input: '[Hidden]',
                         expectedOutput: '[Hidden]',
-                        actualOutput: '[Hidden]',
+                        actualOutput: null,
                         stdout: null,
                         stderr: null,
-                        error: null,
+                        error: 'failed',
                         executionTime: '0.04s',
                     },
                 ],
@@ -525,7 +515,7 @@ describe('BattlesService', () => {
                 ...mockParticipant,
                 code: 'function twoSum() {}',
                 language: 'javascript',
-                testsPassed: 2,
+                testsPassed: 1,
                 submittedAt: new Date(),
             });
 
@@ -536,14 +526,195 @@ describe('BattlesService', () => {
                 'javascript',
             );
 
-            expect(result.testsPassed).toBe(2);
+            expect(result.testsPassed).toBe(1);
             expect(result.totalTests).toBe(2);
-            expect(result.allPassed).toBe(true);
+            expect(result.allPassed).toBe(false);
             expect(codeExecutionService.executeCode).toHaveBeenCalledWith(
                 mockProblem.id,
                 'function twoSum() {}',
                 'javascript',
             );
+            expect(battlesGateway.emitBattleSubmission).toHaveBeenCalledWith(
+                mockBattle.id,
+                expect.objectContaining({
+                    userId: mockUser1.id,
+                    username: mockUser1.username,
+                    testsPassed: 1,
+                    totalTests: 2,
+                }),
+            );
+            // Battle stays live — no completion event yet.
+            expect(battlesGateway.emitBattleCompleted).not.toHaveBeenCalled();
+        });
+
+        it('should auto-complete a 1v1 when a participant passes all tests (fastest-correct-wins)', async () => {
+            // Regression test for the "opponent never learned about my win"
+            // bug: the 1v1 path must finalize the battle the moment any
+            // participant fully solves the problem, even if the opponent
+            // hasn't submitted anything yet.
+            const opponent = {
+                ...mockParticipant,
+                id: 'p2',
+                userId: mockUser2.id,
+                submittedAt: null,
+                user: { ...mockUser2, clan: null },
+            };
+            const selfWithUser = {
+                ...mockParticipant,
+                user: { ...mockUser1, clan: null },
+            };
+
+            const inProgressBattle = {
+                ...mockBattle,
+                status: BattleStatus.IN_PROGRESS,
+                participants: [mockParticipant, opponent],
+                problem: mockProblem,
+                problemPool: null,
+            };
+
+            // After submitSolution writes the participant row, completeBattle
+            // re-reads the battle (with user.clan include) to decide the winner
+            // and MMR; then getBattleDetails re-reads it one final time for
+            // the response payload and the websocket broadcast.
+            const battleForComplete = {
+                ...mockBattle,
+                status: BattleStatus.IN_PROGRESS,
+                participants: [
+                    { ...selfWithUser, testsPassed: 2, submittedAt: new Date() },
+                    opponent,
+                ],
+            };
+            const finalizedBattle = {
+                ...mockBattle,
+                status: BattleStatus.COMPLETED,
+                winnerId: mockUser1.id,
+                endedAt: new Date(),
+                participants: [
+                    { ...selfWithUser, testsPassed: 2, submittedAt: new Date() },
+                    opponent,
+                ],
+                problem: mockProblem,
+                problemPool: null,
+                skillUses: [],
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(inProgressBattle)
+                .mockResolvedValueOnce(battleForComplete)
+                .mockResolvedValueOnce(finalizedBattle);
+
+            prisma.user.findUnique.mockResolvedValue({
+                username: mockUser1.username,
+            } as any);
+
+            codeExecutionService.executeCode.mockResolvedValue({
+                passed: 2,
+                total: 2,
+                allPassed: true,
+                results: [],
+            });
+
+            prisma.battleParticipant.update.mockResolvedValue({
+                ...mockParticipant,
+                testsPassed: 2,
+                submittedAt: new Date(),
+            });
+            prisma.$transaction.mockImplementation(async (callback) =>
+                callback(prisma),
+            );
+
+            const result = await service.submitSolution(
+                mockBattle.id,
+                mockUser1.id,
+                'function twoSum() { /* solved */ }',
+                'javascript',
+            );
+
+            expect(result.allPassed).toBe(true);
+            // Progress event fires for every submission…
+            expect(battlesGateway.emitBattleSubmission).toHaveBeenCalledWith(
+                mockBattle.id,
+                expect.objectContaining({
+                    userId: mockUser1.id,
+                    testsPassed: 2,
+                    totalTests: 2,
+                }),
+            );
+            // …and the battle.completed event fires immediately because the
+            // submitter fully solved the problem (opponent never needs to
+            // submit for the game to end).
+            expect(battlesGateway.emitBattleCompleted).toHaveBeenCalledWith(
+                mockBattle.id,
+                expect.objectContaining({
+                    status: BattleStatus.COMPLETED,
+                    winnerId: mockUser1.id,
+                }),
+            );
+        });
+
+        it('should broadcast live submission progress in team battles without auto-completing', async () => {
+            // Team modes resolve via the timer-triggered /complete endpoint,
+            // so a submission in a GROUP battle should NEVER auto-complete
+            // the match — but teammates/opponents still need to see live
+            // progress.
+            const teamBattle = {
+                ...mockBattle,
+                mode: BattleMode.GROUP,
+                teamSize: 2,
+                status: BattleStatus.IN_PROGRESS,
+                participants: [
+                    { ...mockParticipant, teamId: 'team-1' },
+                    {
+                        ...mockParticipant,
+                        id: 'p2',
+                        userId: mockUser2.id,
+                        teamId: 'team-2',
+                    },
+                ],
+                problem: null,
+                problemPool: {
+                    items: [
+                        {
+                            problemId: mockProblem.id,
+                            pointValue: 2,
+                        },
+                    ],
+                },
+            };
+
+            prisma.battle.findUnique.mockResolvedValue(teamBattle);
+            prisma.user.findUnique.mockResolvedValue({
+                username: mockUser1.username,
+            } as any);
+
+            codeExecutionService.executeCode.mockResolvedValue({
+                passed: 2,
+                total: 2,
+                allPassed: true,
+                results: [],
+            });
+
+            prisma.battleParticipant.update.mockResolvedValue({
+                ...mockParticipant,
+            });
+
+            await service.submitSolution(
+                mockBattle.id,
+                mockUser1.id,
+                'function solved() {}',
+                'javascript',
+                mockProblem.id,
+            );
+
+            expect(battlesGateway.emitBattleSubmission).toHaveBeenCalledWith(
+                mockBattle.id,
+                expect.objectContaining({
+                    userId: mockUser1.id,
+                    testsPassed: 2,
+                    totalTests: 2,
+                }),
+            );
+            expect(battlesGateway.emitBattleCompleted).not.toHaveBeenCalled();
         });
 
         it('should throw NotFoundException if battle does not exist', async () => {
@@ -1515,7 +1686,7 @@ describe('BattlesService', () => {
             expect(subscriptionsService.canPlay).toHaveBeenCalledWith(mockUser1.id);
         });
 
-        it('should skip stats persistence for free users in completeBattle', async () => {
+        it('should update W/L for free users but not MMR in completeBattle', async () => {
             const freeUser = { ...mockUser1, subscriptionTier: 'FREE' };
             const proUser = { ...mockUser2, subscriptionTier: 'PRO' };
 
@@ -1563,8 +1734,6 @@ describe('BattlesService', () => {
 
             await service.completeBattle(mockBattle.id);
 
-            // Free user (winner) should NOT get stats updated
-            // Pro user (loser) should get stats updated
             const userUpdateCalls = txMock.user.update.mock.calls;
             const proUserUpdate = userUpdateCalls.find(
                 (call) => call[0].where.id === proUser.id,
@@ -1574,7 +1743,13 @@ describe('BattlesService', () => {
             );
 
             expect(proUserUpdate).toBeDefined();
-            expect(freeUserUpdate).toBeUndefined();
+            expect(proUserUpdate![0].data).toEqual(
+                expect.objectContaining({ mmr: expect.any(Number) }),
+            );
+            expect(freeUserUpdate).toBeDefined();
+            expect(freeUserUpdate![0].data).toEqual({
+                wins: { increment: 1 },
+            });
         });
 
         it('should persist stats for pro users in completeBattle', async () => {

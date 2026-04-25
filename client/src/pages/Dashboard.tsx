@@ -52,6 +52,7 @@ import {
     computeModeDistribution,
     computeAverageTestsPassed,
     buildHeatmap,
+    getMatchResultForUser,
 } from '@/utils/stats';
 import { usePaywall } from '@/hooks/usePaywall';
 import { supabase } from '@/services/supabase';
@@ -1033,8 +1034,13 @@ function MatchRow({
     const participants = match.participants ?? [];
     const me = participants.find((p) => p.userId === userId);
     const opponent = participants.find((p) => p.userId !== userId);
-    const won = match.winnerId === userId;
-    const isDraw = match.status === 'COMPLETED' && !match.winnerId;
+    const outcome =
+        match.status === 'COMPLETED'
+            ? getMatchResultForUser(match, userId)
+            : 'pending';
+    const pending = outcome === 'pending';
+    const won = outcome === 'W';
+    const isDraw = match.status === 'COMPLETED' && outcome === 'D';
     const mmrChange = me?.mmrChange;
     const meta = getModeMeta(match.mode);
     const ModeIcon = meta.icon;
@@ -1045,14 +1051,16 @@ function MatchRow({
         <div className="group flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/40 p-3 transition-colors hover:border-primary/40 hover:bg-card/60">
             <div className="flex min-w-0 flex-1 items-center gap-3">
                 <span
-                    className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${isDraw
-                        ? 'bg-muted text-muted-foreground'
-                        : won
+                    className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${pending
+                        ? 'bg-muted/60 text-muted-foreground'
+                        : isDraw
+                          ? 'bg-muted text-muted-foreground'
+                          : won
                             ? 'bg-green-500/15 text-green-500'
                             : 'bg-red-500/15 text-red-500'
                         }`}
                 >
-                    {isDraw ? 'D' : won ? 'W' : 'L'}
+                    {pending ? '…' : isDraw ? 'D' : won ? 'W' : 'L'}
                 </span>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-sm">

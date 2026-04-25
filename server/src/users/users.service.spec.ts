@@ -287,19 +287,127 @@ describe('UsersService', () => {
         });
     });
 
+    describe('getMatchHistory', () => {
+        it('should return flattened match rows with usernames and winner fields for the client', async () => {
+            prisma.user.findUnique.mockResolvedValue({ id: 'u1', username: 'a' });
+            const p1 = {
+                id: 'bp-1',
+                userId: 'u1',
+                battleId: 'b-1',
+                user: { id: 'u1', username: 'alice', mmr: 1000, avatarUrl: null },
+            };
+            const p2 = {
+                id: 'bp-2',
+                userId: 'u2',
+                battleId: 'b-1',
+                user: { id: 'u2', username: 'bob', mmr: 1000, avatarUrl: null },
+            };
+            prisma.battleParticipant.findMany.mockResolvedValue([
+                {
+                    battle: {
+                        id: 'b-1',
+                        mode: 'ONE_V_ONE',
+                        status: 'COMPLETED',
+                        winnerId: 'u1',
+                        winningTeam: null,
+                        startedAt: new Date('2024-01-15T10:00:00Z'),
+                        endedAt: new Date('2024-01-15T10:10:00Z'),
+                        createdAt: new Date('2024-01-15T09:00:00Z'),
+                        timeLimitMinutes: 10,
+                        participants: [
+                            {
+                                id: p1.id,
+                                userId: p1.userId,
+                                teamId: null,
+                                code: null,
+                                language: 'typescript',
+                                testsPassed: 2,
+                                totalTests: 2,
+                                pointsEarned: 0,
+                                isReady: true,
+                                submittedAt: new Date('2024-01-15T10:05:00Z'),
+                                mmrChange: 12,
+                                user: p1.user,
+                            },
+                            {
+                                id: p2.id,
+                                userId: p2.userId,
+                                teamId: null,
+                                code: null,
+                                language: 'python',
+                                testsPassed: 1,
+                                totalTests: 2,
+                                pointsEarned: 0,
+                                isReady: true,
+                                submittedAt: new Date('2024-01-15T10:08:00Z'),
+                                mmrChange: -12,
+                                user: p2.user,
+                            },
+                        ],
+                    },
+                },
+            ]);
+
+            const out = await service.getMatchHistory('u1', 20);
+
+            expect(out).toHaveLength(1);
+            expect(out[0]).toMatchObject({
+                id: 'b-1',
+                mode: 'ONE_V_ONE',
+                status: 'COMPLETED',
+                winnerId: 'u1',
+                timeLimitMinutes: 10,
+            });
+            expect(out[0].participants).toEqual([
+                expect.objectContaining({
+                    userId: 'u1',
+                    username: 'alice',
+                    language: 'typescript',
+                    testsPassed: 2,
+                }),
+                expect.objectContaining({
+                    userId: 'u2',
+                    username: 'bob',
+                }),
+            ]);
+        });
+    });
+
     describe('getStats', () => {
         it('should calculate correct stats and tier', async () => {
             const user = {
+                id: 'user-123',
+                username: 'tester',
                 mmr: 1500,
-                wins: 15,
-                losses: 5,
             };
 
             prisma.user.findUnique.mockResolvedValue(user);
+            const winRows = Array.from({ length: 15 }, () => ({
+                teamId: null,
+                battle: {
+                    mode: 'ONE_V_ONE' as const,
+                    winnerId: 'user-123',
+                    winningTeam: null,
+                },
+            }));
+            const lossRows = Array.from({ length: 5 }, () => ({
+                teamId: null,
+                battle: {
+                    mode: 'ONE_V_ONE' as const,
+                    winnerId: 'opponent-1',
+                    winningTeam: null,
+                },
+            }));
+            prisma.battleParticipant.findMany.mockResolvedValue([
+                ...winRows,
+                ...lossRows,
+            ]);
 
             const result = await service.getStats('user-123');
 
             expect(result).toMatchObject({
+                id: 'user-123',
+                username: 'tester',
                 mmr: 1500,
                 wins: 15,
                 losses: 5,
@@ -313,12 +421,13 @@ describe('UsersService', () => {
 
         it('should handle zero games', async () => {
             const user = {
+                id: 'user-123',
+                username: 'tester',
                 mmr: 1000,
-                wins: 0,
-                losses: 0,
             };
 
             prisma.user.findUnique.mockResolvedValue(user);
+            prisma.battleParticipant.findMany.mockResolvedValue([]);
 
             const result = await service.getStats('user-123');
 
