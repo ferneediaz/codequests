@@ -825,13 +825,8 @@ export class BattlesService {
                     data: { mmrChange },
                 });
 
-                // Update user MMR and win/loss counters (only for non-team, Pro/trial users)
-                const hasProAccess =
-                    participant.user.subscriptionTier === 'PRO' ||
-                    (participant.user.trialEndsAt && new Date(participant.user.trialEndsAt) > new Date());
-
-                // MMR: Pro / active trial only. Wins & losses: all accounts (dashboard truth).
-                if (!isTeam && hasProAccess) {
+                // Ranked 1v1s always affect the user's visible MMR.
+                if (!isTeam) {
                     const newMmr = Math.max(MIN_MMR, participant.user.mmr + mmrChange);
                     await tx.user.update({
                         where: { id: participant.userId },
@@ -847,14 +842,6 @@ export class BattlesService {
                                           : undefined,
                                   }
                                 : {}),
-                        },
-                    });
-                } else if (!isTeam && !hasProAccess && winnerId) {
-                    await tx.user.update({
-                        where: { id: participant.userId },
-                        data: {
-                            wins: isWinner ? { increment: 1 } : undefined,
-                            losses: !isWinner ? { increment: 1 } : undefined,
                         },
                     });
                 }

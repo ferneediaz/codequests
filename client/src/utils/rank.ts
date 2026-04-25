@@ -30,14 +30,27 @@ export function getNextRankTier(mmr: number): RankTier | null {
     return RANK_TIERS[idx + 1];
 }
 
+/** MMR still needed to reach the next rank’s **minimum** (same as nextTier.minMmr − mmr, floored at 0). */
+export function getMmrToNextRankFloor(mmr: number): { next: RankTier; points: number } | null {
+    const next = getNextRankTier(mmr);
+    if (!next) return null;
+    return { next, points: Math.max(0, next.minMmr - Number(mmr)) };
+}
+
 /**
- * Returns a 0-100 percentage of MMR progress toward the next tier.
- * Returns 100 for the top tier.
+ * 0–100% progress from this rank's MMR floor to the next rank's MMR floor
+ * (e.g. Copy Paster 1000 → Stack Overflow 1200). At exactly the current floor
+ * this is 0% — that is not a data bug. Top tier: 100%.
  */
 export function getRankProgress(mmr: number): number {
-    const current = getRankTier(mmr);
+    const m = Number(mmr);
+    if (!Number.isFinite(m)) return 0;
+    const current = getRankTier(m);
     if (current.maxMmr == null) return 100;
-    const span = current.maxMmr - current.minMmr + 1;
-    const into = mmr - current.minMmr;
-    return Math.max(0, Math.min(100, Math.round((into / span) * 100)));
+    const next = getNextRankTier(m);
+    if (!next) return 100;
+    const span = next.minMmr - current.minMmr;
+    if (span <= 0) return 100;
+    const into = m - current.minMmr;
+    return Math.max(0, Math.min(100, Math.floor((into / span) * 100)));
 }

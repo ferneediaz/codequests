@@ -8,7 +8,11 @@ import { RankBadge } from '@/components/ui/RankBadge';
 import { CodeEditor } from '@/components/battle/CodeEditor';
 import { Loader2, ArrowLeft, Trophy } from 'lucide-react';
 import api from '@/services/api';
-import type { BattleResponse } from '@/types/api';
+import type { BattleResponse, BattleParticipant } from '@/types/api';
+
+function participantName(p: BattleParticipant) {
+    return p.username || p.user?.username || 'Player';
+}
 
 export default function Results() {
     const { id } = useParams<{ id: string }>();
@@ -80,8 +84,14 @@ export default function Results() {
                         >
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center justify-between">
-                                    <span className="flex items-center gap-2">
-                                        {player.username}
+                                    <span className="flex flex-wrap items-center gap-2">
+                                        {participantName(player)}
+                                        {player.user && (
+                                            <RankBadge
+                                                mmr={player.user.mmr}
+                                                className="text-xs"
+                                            />
+                                        )}
                                         {isMe && (
                                             <span className="text-xs text-muted-foreground">(you)</span>
                                         )}
@@ -142,10 +152,18 @@ export default function Results() {
                     if (!player) return null;
                     return (
                         <div key={player.userId}>
-                            <div className="mb-2 text-sm text-muted-foreground">
-                                {player.username}
-                                {player.userId === userId && ' (you)'}
-                                {player.language && ` — ${player.language}`}
+                            <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                                <span>
+                                    {participantName(player)}
+                                    {player.userId === userId && ' (you)'}
+                                    {player.language && ` — ${player.language}`}
+                                </span>
+                                {player.user && (
+                                    <RankBadge
+                                        mmr={player.user.mmr}
+                                        className="text-[11px]"
+                                    />
+                                )}
                             </div>
                             <div className="h-80 overflow-hidden rounded-lg border border-border">
                                 <CodeEditor

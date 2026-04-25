@@ -1686,7 +1686,7 @@ describe('BattlesService', () => {
             expect(subscriptionsService.canPlay).toHaveBeenCalledWith(mockUser1.id);
         });
 
-        it('should update W/L for free users but not MMR in completeBattle', async () => {
+        it('should update MMR and W/L for free users in completeBattle', async () => {
             const freeUser = { ...mockUser1, subscriptionTier: 'FREE' };
             const proUser = { ...mockUser2, subscriptionTier: 'PRO' };
 
@@ -1747,9 +1747,12 @@ describe('BattlesService', () => {
                 expect.objectContaining({ mmr: expect.any(Number) }),
             );
             expect(freeUserUpdate).toBeDefined();
-            expect(freeUserUpdate![0].data).toEqual({
-                wins: { increment: 1 },
-            });
+            expect(freeUserUpdate![0].data).toEqual(
+                expect.objectContaining({
+                    mmr: expect.any(Number),
+                    wins: { increment: 1 },
+                }),
+            );
         });
 
         it('should persist stats for pro users in completeBattle', async () => {

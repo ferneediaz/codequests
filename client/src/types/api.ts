@@ -164,6 +164,7 @@ export interface CompleteOnboardingPayload {
 export interface BattleParticipant {
     id: string;
     userId: string;
+    /** Flattened in some client paths; for API loads see `user`. */
     username: string;
     teamId?: string;
     code?: string;
@@ -174,6 +175,13 @@ export interface BattleParticipant {
     isReady: boolean;
     submittedAt?: string;
     mmrChange?: number;
+    /** Present on REST responses (includes MMR for rank display). */
+    user?: {
+        id: string;
+        username: string;
+        mmr: number;
+        avatarUrl?: string;
+    };
 }
 
 export interface BattleResponse {

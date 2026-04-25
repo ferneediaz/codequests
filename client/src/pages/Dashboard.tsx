@@ -44,7 +44,7 @@ import type {
     NewsItemSeverity,
     NewsItemType,
 } from '@/types/api';
-import { getRankTier, getNextRankTier, getRankProgress, getRankTiers } from '@/utils/rank';
+import { getRankTier, getRankProgress, getRankTiers, getMmrToNextRankFloor } from '@/utils/rank';
 import {
     computeStreak,
     computeWinRate,
@@ -292,12 +292,13 @@ export default function Dashboard() {
         return [...years].sort((a, b) => b - a);
     }, [githubActivity?.commitsByDate, history]);
 
-    const mmr = stats?.mmr ?? user?.mmr ?? 1000;
+    const mmr = typeof stats?.mmr === 'number' ? stats.mmr : (user?.mmr ?? 1000);
     const wins = stats?.wins ?? user?.wins ?? 0;
     const losses = stats?.losses ?? user?.losses ?? 0;
 
     const tier = getRankTier(mmr);
-    const nextTier = getNextRankTier(mmr);
+    const mmrToNextRank = getMmrToNextRankFloor(mmr);
+    const nextTier = mmrToNextRank?.next ?? null;
     const progress = getRankProgress(mmr);
     const rankTiers = getRankTiers();
     const currentRankIndex = rankTiers.findIndex((rank) => rank.name === tier.name);
@@ -437,21 +438,41 @@ export default function Dashboard() {
                                     </div>
 
                                     <span className="text-xs font-mono text-muted-foreground">
-                                        {nextTier ? `${nextTier.minMmr - mmr} MMR to rank up` : 'MAX'}
+                                        {mmrToNextRank != null
+                                            ? `${mmrToNextRank.points} MMR to next rank`
+                                            : 'MAX'}
                                     </span>
                                 </div>
 
-                                <div className="mt-3">
-                                    <div className="mb-2 flex items-end justify-between text-xs">
+                                <div
+                                    className="mt-3"
+                                    title={
+                                        nextTier
+                                            ? 'Fill is % from the start of this rank to the next rank. It is 0% when you are exactly at the bottom of your current rank, even though your MMR / next-rank MMR can look like a high ratio.'
+                                            : undefined
+                                    }
+                                >
+                                    <div className="mb-2 flex items-end justify-between gap-2 text-xs">
                                         <span className="text-muted-foreground">Rank-up progress</span>
-                                        <span className="font-mono text-muted-foreground">
-                                            {nextTier ? `${mmr} / ${nextTier.minMmr}` : 'MAX'}
-                                        </span>
+                                        {nextTier ? (
+                                            <div className="text-right">
+                                                <span className="font-mono text-sm font-semibold text-foreground">
+                                                    {progress}%
+                                                </span>
+                                                <div className="text-[11px] font-mono text-muted-foreground">
+                                                    {mmr} → {nextTier.minMmr} MMR
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <span className="font-mono text-muted-foreground">MAX</span>
+                                        )}
                                     </div>
                                     <div className="h-2.5 w-full overflow-hidden rounded-full border border-border/60 bg-background/60">
                                         <div
-                                            className="h-full rounded-full bg-gradient-to-r from-primary via-blue-400 to-violet-400 transition-all duration-700"
-                                            style={{ width: `${progress}%` }}
+                                            className="h-full min-h-px min-w-px rounded-full bg-gradient-to-r from-primary via-blue-400 to-violet-400 transition-all duration-700"
+                                            style={{
+                                                width: `${!nextTier ? 100 : progress}%`,
+                                            }}
                                         />
                                     </div>
                                 </div>
