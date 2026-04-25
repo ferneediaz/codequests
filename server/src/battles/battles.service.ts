@@ -1119,10 +1119,13 @@ export class BattlesService {
             throw new BadRequestException('You cannot use a skill on yourself');
         }
 
-        // Gate: caller must have passed at least one test case in this battle
-        if ((userParticipant.testsPassed ?? 0) < 1) {
+        // Gate: TIME_STEAL unlocks after passing at least one test case
+        if (
+            skillType === SkillType.TIME_STEAL &&
+            (userParticipant.testsPassed ?? 0) < 1
+        ) {
             throw new ForbiddenException(
-                'Skills unlock after you pass at least one test case',
+                'Time Steal unlocks after you pass at least one test case',
             );
         }
 

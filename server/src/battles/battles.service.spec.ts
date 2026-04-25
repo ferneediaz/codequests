@@ -1869,6 +1869,51 @@ describe('BattlesService', () => {
             ).rejects.toThrow(/cannot use a skill on yourself/);
         });
 
+        it('should allow non-TIME_STEAL skills before passing a test case', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...mockBattleWithSkills,
+                enabledSkills: [SkillType.FREEZE, SkillType.TIME_STEAL],
+                participants: mockBattleWithSkills.participants.map((p) =>
+                    p.userId === 'user-1' ? { ...p, testsPassed: 0 } : p,
+                ),
+            });
+
+            const mockSkillUse = {
+                id: 'su-pre-unlock-freeze',
+                battleId: 'battle-1',
+                userId: 'user-1',
+                targetUserId: 'user-2',
+                skillType: SkillType.FREEZE,
+                usedAt: new Date(),
+            };
+            prisma.battleSkillUse.create.mockResolvedValue(mockSkillUse);
+
+            await expect(
+                service.useSkill('battle-1', 'user-1', 'user-2', SkillType.FREEZE),
+            ).resolves.toEqual(mockSkillUse);
+        });
+
+        it('should block TIME_STEAL before passing a test case', async () => {
+            prisma.battle.findUnique.mockResolvedValue({
+                ...mockBattleWithSkills,
+                enabledSkills: [SkillType.FREEZE, SkillType.TIME_STEAL],
+                participants: mockBattleWithSkills.participants.map((p) =>
+                    p.userId === 'user-1' ? { ...p, testsPassed: 0 } : p,
+                ),
+            });
+
+            await expect(
+                service.useSkill(
+                    'battle-1',
+                    'user-1',
+                    'user-2',
+                    SkillType.TIME_STEAL,
+                ),
+            ).rejects.toThrow(
+                /Time Steal unlocks after you pass at least one test case/,
+            );
+        });
+
         it('should throw BadRequestException if skill already used by this user', async () => {
             prisma.battle.findUnique.mockResolvedValue({
                 ...mockBattleWithSkills,

@@ -14,6 +14,7 @@ import { ProblemPanel } from '@/components/battle/ProblemPanel';
 import { CodeEditor, type CodeEditorHandle } from '@/components/battle/CodeEditor';
 import { ConsolePanel } from '@/components/battle/ConsolePanel';
 import { PracticeHelpPanel } from '@/components/practice/PracticeHelpPanel';
+import { SubmissionFeedback } from '@/components/feedback/SubmissionFeedback';
 import { parseStarterCode } from '@/lib/starterCode';
 import { Button } from '@/components/ui/button';
 import {
@@ -84,6 +85,7 @@ export default function PracticeSolve() {
     const [submitResult, setSubmitResult] = useState<PracticeSubmitResponse | null>(
         null,
     );
+    const [submitFeedbackKey, setSubmitFeedbackKey] = useState(0);
     const [lastAction, setLastAction] = useState<'run' | 'submit' | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -154,6 +156,7 @@ export default function PracticeSolve() {
                 language,
             });
             setSubmitResult(result);
+            setSubmitFeedbackKey((prev) => prev + 1);
 
             if (result.allPassed) {
                 toast.success(
@@ -193,7 +196,7 @@ export default function PracticeSolve() {
     return (
         <div className="relative flex h-[calc(100vh-3.5rem)] flex-col">
             {/* Top bar */}
-            <div className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-2">
+            <div className="relative flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-2">
                 <div className="flex items-center gap-3">
                     <Button
                         variant="ghost"
@@ -256,6 +259,21 @@ export default function PracticeSolve() {
                     </button>
                 </div>
             )}
+
+            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                <SubmissionFeedback
+                    size="lg"
+                    className="bg-card/90 backdrop-blur-sm"
+                    triggerKey={submitFeedbackKey}
+                    status={
+                        submitResult
+                            ? submitResult.allPassed
+                                ? 'correct'
+                                : 'incorrect'
+                            : null
+                    }
+                />
+            </div>
 
             {/* Main content */}
             <div ref={hSplit.containerRef} className="flex flex-1 overflow-hidden">

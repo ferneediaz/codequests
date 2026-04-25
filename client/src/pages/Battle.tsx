@@ -11,6 +11,7 @@ import { SkillBar } from '@/components/battle/SkillBar';
 import { SkillEffectOverlay } from '@/components/battle/SkillEffectOverlay';
 import { BattleLobby } from '@/components/battle/BattleLobby';
 import { BattleChat } from '@/components/battle/BattleChat';
+import { SubmissionFeedback } from '@/components/feedback/SubmissionFeedback';
 import { Button } from '@/components/ui/button';
 import { Loader2, Play, Send } from 'lucide-react';
 import { parseStarterCode } from '@/lib/starterCode';
@@ -82,7 +83,8 @@ export default function Battle() {
     const [code, setCode] = useState('');
     const [codeInitialized, setCodeInitialized] = useState(false);
     const [lastAction, setLastAction] = useState<'run' | 'submit' | null>(null);
-    const [skillsEverUnlocked, setSkillsEverUnlocked] = useState(false);
+    const [submitFeedbackKey, setSubmitFeedbackKey] = useState(0);
+    const [timeStealUnlocked, setTimeStealUnlocked] = useState(false);
     const editorHandleRef = useRef<CodeEditorHandle>(null);
     const scrambledOnceRef = useRef(false);
 
@@ -111,18 +113,22 @@ export default function Battle() {
         (e) => e.skillType === 'FREEZE' && e.expiresAt > now,
     );
 
-    // Skills unlock after passing at least one test case (sticky for the battle).
+    // Time Steal unlocks after passing at least one test case (sticky for the battle).
     // Server payload uses testsPassed/totalTests, existing client type says passed/total — accept either.
     const sub = lastSubmissionResult as
         | (typeof lastSubmissionResult & { testsPassed?: number; totalTests?: number })
         | null;
-    const localTestsPassed = sub?.testsPassed ?? sub?.passed ?? 0;
+    const participantTestsPassed = selfParticipant?.testsPassed ?? 0;
+    const localTestsPassed = Math.max(
+        sub?.testsPassed ?? sub?.passed ?? 0,
+        participantTestsPassed,
+    );
     const localTotalTests = sub?.totalTests ?? sub?.total ?? 0;
     useEffect(() => {
-        if (!skillsEverUnlocked && localTestsPassed >= 1) {
-            setSkillsEverUnlocked(true);
+        if (!timeStealUnlocked && localTestsPassed >= 1) {
+            setTimeStealUnlocked(true);
         }
-    }, [localTestsPassed, skillsEverUnlocked]);
+    }, [localTestsPassed, timeStealUnlocked]);
 
     // Trigger scramble exactly once per SCRAMBLE effect reception
     useEffect(() => {
@@ -150,6 +156,7 @@ export default function Battle() {
         try {
             setLastAction('submit');
             await submitCode(code, language);
+            setSubmitFeedbackKey((prev) => prev + 1);
         } catch (error) {
             console.error('Submission failed:', error);
         }
@@ -196,7 +203,7 @@ export default function Battle() {
             <SkillEffectOverlay activeEffects={activeEffects} />
 
             {/* Top bar */}
-            <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
+            <div className="relative flex items-center justify-between border-b border-border bg-card px-4 py-2">
                 {/* Left: opponent progress */}
                 <div className="flex items-center gap-4">
                     {opponent && (
@@ -214,7 +221,7 @@ export default function Battle() {
                 </div>
 
                 {/* Center: timer */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                     {battle.startedAt && (
                         <Timer
                             startedAt={battle.startedAt}
@@ -245,7 +252,7 @@ export default function Battle() {
                             usedSkills={usedSkills}
                             opponentUserId={opponent.userId}
                             onUseSkill={useSkill}
-                            unlocked={skillsEverUnlocked}
+                            timeStealUnlocked={timeStealUnlocked}
                         />
                     )}
 
@@ -277,6 +284,21 @@ export default function Battle() {
                         </Button>
                     </div>
                 </div>
+            </div>
+
+            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                <SubmissionFeedback
+                    size="lg"
+                    className="bg-card/90 backdrop-blur-sm"
+                    triggerKey={submitFeedbackKey}
+                    status={
+                        lastAction === 'submit' && lastSubmissionResult
+                            ? lastSubmissionResult.allPassed
+                                ? 'correct'
+                                : 'incorrect'
+                            : null
+                    }
+                />
             </div>
 
             {/* Main content: horizontal split */}

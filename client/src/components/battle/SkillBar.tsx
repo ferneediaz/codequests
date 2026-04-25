@@ -32,7 +32,7 @@ interface SkillBarProps {
     usedSkills: SkillType[];
     opponentUserId: string;
     onUseSkill: (skillType: SkillType, targetUserId: string) => void;
-    unlocked: boolean;
+    timeStealUnlocked: boolean;
 }
 
 export function SkillBar({
@@ -40,7 +40,7 @@ export function SkillBar({
     usedSkills,
     opponentUserId,
     onUseSkill,
-    unlocked,
+    timeStealUnlocked,
 }: SkillBarProps) {
     if (enabledSkills.length === 0) return null;
 
@@ -51,7 +51,7 @@ export function SkillBar({
                 if (!config) return null; // BLIND and other deprecated skills
                 const Icon = config.icon;
                 const isUsed = usedSkills.includes(skillType);
-                const isLocked = !unlocked;
+                const isLocked = skillType === 'TIME_STEAL' && !timeStealUnlocked;
                 const disabled = isUsed || isLocked;
 
                 return (
