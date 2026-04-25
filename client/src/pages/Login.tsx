@@ -6,7 +6,7 @@ import { Swords } from 'lucide-react';
 import { consumePendingInvite, peekPendingInvite } from '@/lib/pendingInvite';
 
 export default function Login() {
-    const { isAuthenticated, isLoading, loginWithGithub, loginWithGoogle } = useAuth();
+    const { isAuthenticated, isLoading, loginWithGithub, loginWithGoogle, user } = useAuth();
 
     if (isLoading) {
         return (
@@ -18,7 +18,11 @@ export default function Login() {
 
     if (isAuthenticated) {
         const pendingInvite = consumePendingInvite();
-        const destination = pendingInvite ? `/invite/${pendingInvite}` : '/dashboard';
+        const destination = pendingInvite
+            ? `/invite/${pendingInvite}`
+            : user?.needsOnboarding
+                ? '/onboarding'
+                : '/dashboard';
         return <Navigate to={destination} replace />;
     }
 

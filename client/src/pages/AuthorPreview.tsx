@@ -21,6 +21,8 @@ interface AuthorProblemPayload {
     difficulty: 'EASY' | 'MEDIUM' | 'HARD';
     tags: string[];
     description: string;
+    /** Reference write-up from the YAML `solution` field (markdown). */
+    solution: string;
     signature: unknown;
     starter: Partial<Record<AuthoringLanguage, string>>;
     tests: Array<{ args: unknown[]; expected: unknown; hidden: boolean }>;
@@ -244,6 +246,13 @@ export default function AuthorPreview() {
                 <div className="overflow-y-auto border-r border-border bg-background p-4">
                     <h2 className="mb-2 text-sm font-semibold">Description</h2>
                     <MarkdownContent markdown={problem.description} />
+                    <div className="mt-6 border-t border-border pt-4">
+                        <h2 className="mb-2 text-sm font-semibold">Reference solution (YAML)</h2>
+                        <p className="mb-2 text-[11px] text-muted-foreground">
+                            Shipped solution text from the problem file; not executed here.
+                        </p>
+                        <MarkdownContent markdown={problem.solution} />
+                    </div>
                 </div>
 
                 <div className="flex flex-col overflow-hidden">

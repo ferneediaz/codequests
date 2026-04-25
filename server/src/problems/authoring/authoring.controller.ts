@@ -103,7 +103,9 @@ export class AuthoringController {
         }
 
         // Re-use the full v2 schema to validate the signature + tests shape.
-        // Synthesize dummy metadata so the schema accepts the partial doc.
+        // Synthesize dummy metadata (including hints/solution, which the
+        // schema requires but the dry-run flow never uses) so the schema
+        // accepts the partial doc.
         const doc = {
             id: 'dry-run',
             title: 'Dry Run',
@@ -117,6 +119,8 @@ export class AuthoringController {
                 expected: t.expected,
                 hidden: false,
             })),
+            hints: ['dry-run'],
+            solution: 'dry-run',
         };
         const parsed = ProblemYamlV2Schema.safeParse(doc);
         if (!parsed.success) {

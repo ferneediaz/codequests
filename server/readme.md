@@ -898,6 +898,54 @@ NODE_ENV=development
 
 ---
 
+## Supabase Storage (Avatars)
+
+User-uploaded profile pictures are stored in a public Supabase Storage
+bucket called `avatars`. The client uploads directly from the browser and
+then calls `PATCH /auth/avatar` with the resulting public URL. Provider
+avatars (GitHub/Google) are captured automatically during `POST /auth/sync`
+and do not require the bucket.
+
+One-time setup in the Supabase dashboard:
+
+1. **Storage → New bucket** → name `avatars`, Public bucket **on**.
+2. Add the RLS policies below so each user can manage only their own folder
+   (`<user-id>/...`):
+
+   ```sql
+   -- Anyone can read (bucket is public, but being explicit keeps RLS on):
+   create policy "avatars public read"
+     on storage.objects for select
+     using (bucket_id = 'avatars');
+
+   -- Authenticated users may upload only under their own folder:
+   create policy "avatars owner upload"
+     on storage.objects for insert to authenticated
+     with check (
+       bucket_id = 'avatars'
+       and (storage.foldername(name))[1] = auth.uid()::text
+     );
+
+   -- Same restriction for updates and deletes:
+   create policy "avatars owner modify"
+     on storage.objects for update to authenticated
+     using (
+       bucket_id = 'avatars'
+       and (storage.foldername(name))[1] = auth.uid()::text
+     );
+   create policy "avatars owner delete"
+     on storage.objects for delete to authenticated
+     using (
+       bucket_id = 'avatars'
+       and (storage.foldername(name))[1] = auth.uid()::text
+     );
+   ```
+
+The client helper [`client/src/services/avatar.ts`](../client/src/services/avatar.ts)
+enforces a 5MB cap and accepts PNG, JPEG, WEBP, and GIF.
+
+---
+
 ## Scripts
 
 ```bash

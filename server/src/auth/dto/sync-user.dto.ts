@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, MinLength, MaxLength, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsOptional, MinLength, MaxLength, Matches, IsUrl } from 'class-validator';
 
 export class SyncUserDto {
   @ApiProperty({
@@ -15,4 +15,14 @@ export class SyncUserDto {
     message: 'Username can only contain letters, numbers, and underscores',
   })
   username?: string;
+
+  /**
+   * OAuth provider avatar URL (e.g. `session.user.user_metadata.avatar_url`
+   * from Supabase GitHub/Google). Persisted as the initial avatar so new
+   * users land in the app with their provider picture already set.
+   */
+  @ApiPropertyOptional({ description: 'OAuth provider avatar URL' })
+  @IsOptional()
+  @IsUrl()
+  avatarUrl?: string;
 }

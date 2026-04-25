@@ -1,9 +1,18 @@
-import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, UseGuards, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { SyncUserDto } from './dto/sync-user.dto';
+import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
+import { MeResponseDto } from './dto/me-response.dto';
+import { UpdateAvatarDto } from './dto/update-avatar.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -29,7 +38,43 @@ export class AuthController {
       req.user.email,
       body.username,
       req.user.role,
+      body.avatarUrl,
     );
+  }
+
+  /**
+   * Complete the first-time profile wizard. Requires POST /auth/sync first.
+   * Idempotent: calling again after completion returns the current profile.
+   */
+  @Post('onboarding')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Complete onboarding profile' })
+  @ApiBody({ type: CompleteOnboardingDto })
+  @ApiResponse({ status: 200, description: 'Profile saved', type: MeResponseDto })
+  async completeOnboarding(
+    @Req() req: Request & { user: { id: string } },
+    @Body() body: CompleteOnboardingDto,
+  ) {
+    return this.authService.completeOnboarding(req.user.id, body);
+  }
+
+  /**
+   * Update the authenticated user's avatar URL. The client uploads the
+   * image to Supabase Storage and then calls this endpoint with the
+   * resulting public URL; the server just persists the reference.
+   */
+  @Patch('avatar')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update avatar URL' })
+  @ApiBody({ type: UpdateAvatarDto })
+  @ApiResponse({ status: 200, description: 'Avatar updated', type: MeResponseDto })
+  async updateAvatar(
+    @Req() req: Request & { user: { id: string } },
+    @Body() body: UpdateAvatarDto,
+  ) {
+    return this.authService.updateAvatar(req.user.id, body);
   }
 
   /**
@@ -39,8 +84,8 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get current user profile' })
-  @ApiResponse({ status: 200, description: 'Returns current user' })
+  @ApiResponse({ status: 200, description: 'Returns current user', type: MeResponseDto })
   async getMe(@Req() req: Request & { user: { id: string } }) {
-    return this.authService.getUser(req.user.id);
+    return this.authService.getMe(req.user.id);
   }
 }

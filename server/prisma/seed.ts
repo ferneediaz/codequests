@@ -1,5 +1,5 @@
 import '../src/load-server-env';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UserSegment, CodingExperience, PrimaryGoal, HowHeard, AvatarSource } from '@prisma/client';
 import { loadAllProblems, toImportTestCases, toStarterCodeMap } from '../src/problems/authoring/problem-loader';
 import { serializeStarterCode } from '../src/code-execution/starter-code';
 
@@ -26,6 +26,12 @@ async function main() {
             username: 'admin',
             role: 'admin',
             avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
+            onboardingCompletedAt: new Date(),
+            userSegment: UserSegment.PROFESSIONAL,
+            codingExperience: CodingExperience.ADVANCED,
+            primaryGoal: PrimaryGoal.SKILL_UP,
+            howHeard: HowHeard.OTHER,
+            avatarSource: AvatarSource.URL,
         },
     });
 
@@ -44,6 +50,10 @@ async function main() {
                 wins: 15,
                 losses: 10,
                 avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alice',
+                onboardingCompletedAt: new Date(),
+                userSegment: UserSegment.STUDENT,
+                primaryGoal: PrimaryGoal.CLASSROOM,
+                howHeard: HowHeard.SCHOOL,
             },
         }),
         prisma.user.upsert({
@@ -58,6 +68,9 @@ async function main() {
                 wins: 25,
                 losses: 15,
                 avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=bob',
+                onboardingCompletedAt: new Date(),
+                userSegment: UserSegment.HOBBYIST,
+                primaryGoal: PrimaryGoal.FUN,
             },
         }),
     ]);

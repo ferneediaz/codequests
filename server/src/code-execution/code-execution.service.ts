@@ -345,9 +345,8 @@ function tryParseJson(s: string): { ok: true; value: unknown } | { ok: false } {
 
 /**
  * Stable stringify. Sorts object keys so `{"a":1,"b":2}` and `{"b":2,"a":1}`
- * compare equal. Array order is preserved — problem semantics decide
- * whether [1,2] and [2,1] should match (usually they shouldn't, e.g.
- * Two Sum cares about index order).
+ * compare equal. Array order is preserved — the problem statement may
+ * require a canonical form (e.g. two-sum: indices in ascending order).
  */
 function canonicalize(value: unknown): string {
     return JSON.stringify(sortKeys(value));

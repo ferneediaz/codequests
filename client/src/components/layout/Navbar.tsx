@@ -1,5 +1,9 @@
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppDispatch } from '@/store/hooks';
+import { setUser } from '@/store/slices/authSlice';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,12 +22,53 @@ import {
     Crown,
     Shield,
     Users,
+    ImagePlus,
+    Loader2,
 } from 'lucide-react';
 import { SubscriptionBadge } from './SubscriptionBadge';
 import { NotificationBell } from './NotificationBell';
+import {
+    ALLOWED_AVATAR_MIME,
+    AvatarUploadError,
+    uploadAvatar,
+} from '@/services/avatar';
 
 export function Navbar() {
     const { user, isAuthenticated, logout } = useAuth();
+    const dispatch = useAppDispatch();
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const [uploading, setUploading] = useState(false);
+
+    const handlePickAvatar = () => {
+        if (uploading) return;
+        fileInputRef.current?.click();
+    };
+
+    const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = ''; // allow re-selecting the same file later
+        if (!file || !user) return;
+        try {
+            setUploading(true);
+            const updated = await uploadAvatar(user.id, file);
+            dispatch(setUser(updated));
+            toast.success('Avatar updated');
+        } catch (err) {
+            if (err instanceof AvatarUploadError) {
+                toast.error(err.message);
+            } else {
+                const anyErr = err as {
+                    response?: { data?: { message?: string | string[] } };
+                    message?: string;
+                };
+                const raw = anyErr?.response?.data?.message;
+                const msg = Array.isArray(raw) ? raw.join(', ') : raw;
+                toast.error(msg ?? anyErr?.message ?? 'Could not upload avatar');
+            }
+        } finally {
+            setUploading(false);
+        }
+    };
 
     return (
         <nav className="border-b border-border bg-card">
@@ -76,10 +121,19 @@ export function Navbar() {
                             <NotificationBell />
                             <RankBadge mmr={user.mmr} showMmr />
 
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept={ALLOWED_AVATAR_MIME.join(',')}
+                                className="hidden"
+                                onChange={handleAvatarFile}
+                            />
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" className="flex items-center gap-2">
-                                        {user.avatarUrl ? (
+                                        {uploading ? (
+                                            <Loader2 className="h-5 w-5 animate-spin" />
+                                        ) : user.avatarUrl ? (
                                             <img
                                                 src={user.avatarUrl}
                                                 alt={user.username}
@@ -96,6 +150,16 @@ export function Navbar() {
                                         {user.wins}W / {user.losses}L
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onSelect={(e) => {
+                                            e.preventDefault();
+                                            handlePickAvatar();
+                                        }}
+                                        disabled={uploading}
+                                    >
+                                        <ImagePlus className="mr-2 h-4 w-4" />
+                                        {uploading ? 'Uploading…' : 'Change avatar'}
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem asChild>
                                         <Link to="/pricing" className="flex items-center no-underline">
                                             <Crown className="mr-2 h-4 w-4" />

@@ -10,6 +10,44 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserSegment {
+  STUDENT
+  PROFESSIONAL
+  HOBBYIST
+  PREFER_NOT_TO_SAY
+}
+
+enum CodingExperience {
+  NEVER
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum PrimaryGoal {
+  INTERVIEWS
+  FUN
+  CLASSROOM
+  COMPETE
+  SKILL_UP
+  PREFER_NOT_TO_SAY
+}
+
+enum HowHeard {
+  FRIEND
+  SOCIAL
+  SEARCH
+  SCHOOL
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum AvatarSource {
+  OAUTH
+  URL
+  DEFAULT
+}
+
 // ============================================
 // USER & AUTH
 // ============================================
@@ -20,6 +58,14 @@ model User {
   username  String   @unique
   avatarUrl String?
   role      String   @default("user") // "user" or "admin"
+
+  // Onboarding & profile survey (null until user completes POST /auth/onboarding)
+  onboardingCompletedAt DateTime?
+  userSegment           UserSegment?
+  codingExperience      CodingExperience?
+  primaryGoal           PrimaryGoal?
+  howHeard              HowHeard?
+  avatarSource          AvatarSource?
 
   // Stats
   mmr    Int @default(1000)

@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException, ConflictException } from '@nestjs/common';
+import { UserSegment, PrimaryGoal } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createMockPrismaService, MockPrismaService } from '../__mocks__/prisma.service';
@@ -226,6 +228,165 @@ describe('AuthService', () => {
                 where: { id: 'nonexistent' },
                 include: { clan: true },
             });
+        });
+    });
+
+    const baseUserRow = {
+        avatarUrl: null as string | null,
+        mmr: 1000,
+        wins: 0,
+        losses: 0,
+        subscriptionTier: 'FREE' as const,
+        stripeCustomerId: null as string | null,
+        gamesPlayedToday: 0,
+        lastGameResetAt: new Date(),
+        trialEndsAt: null as Date | null,
+        hasUsedTrial: false,
+        onboardingCompletedAt: null as Date | null,
+        userSegment: null,
+        codingExperience: null,
+        primaryGoal: null,
+        howHeard: null,
+        avatarSource: null,
+    };
+
+    describe('getMe', () => {
+        it('should return needsOnboarding when onboarding not complete', async () => {
+            const userId = 'u1';
+            const user = {
+                id: userId,
+                email: 'a@b.com',
+                username: 'ab',
+                role: 'user',
+                clanId: null,
+                clan: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                ...baseUserRow,
+            };
+            prisma.user.findUnique.mockResolvedValue(user as any);
+
+            const me = await service.getMe(userId);
+            expect(me).not.toBeNull();
+            expect(me!.needsOnboarding).toBe(true);
+        });
+
+        it('should return needsOnboarding false when completed', async () => {
+            const userId = 'u2';
+            const completed = new Date();
+            const user = {
+                id: userId,
+                email: 'c@d.com',
+                username: 'cd',
+                role: 'user',
+                clanId: null,
+                clan: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                ...baseUserRow,
+                onboardingCompletedAt: completed,
+                userSegment: UserSegment.PROFESSIONAL,
+            };
+            prisma.user.findUnique.mockResolvedValue(user as any);
+
+            const me = await service.getMe(userId);
+            expect(me!.needsOnboarding).toBe(false);
+        });
+    });
+
+    describe('completeOnboarding', () => {
+        const dto = {
+            username: 'new_name',
+            userSegment: UserSegment.STUDENT,
+            primaryGoal: PrimaryGoal.FUN,
+        };
+
+        it('should throw if user row does not exist', async () => {
+            prisma.user.findUnique.mockResolvedValue(null);
+            await expect(
+                service.completeOnboarding('missing', dto as any),
+            ).rejects.toThrow(BadRequestException);
+        });
+
+        it('should complete onboarding and set completion timestamp', async () => {
+            const userId = 'u-ob';
+            const before = {
+                id: userId,
+                email: 'e@f.com',
+                username: 'old',
+                role: 'user',
+                clanId: null,
+                clan: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                ...baseUserRow,
+            };
+            const after = {
+                ...before,
+                username: dto.username,
+                userSegment: dto.userSegment,
+                primaryGoal: dto.primaryGoal,
+                onboardingCompletedAt: new Date('2025-01-01T00:00:00.000Z'),
+            };
+            prisma.user.findUnique
+                .mockResolvedValueOnce(before as any)
+                .mockResolvedValueOnce(null);
+            prisma.user.update.mockResolvedValue(after as any);
+
+            const result = await service.completeOnboarding(userId, dto);
+            expect(result.needsOnboarding).toBe(false);
+            expect(result.username).toBe(dto.username);
+            expect(prisma.user.update).toHaveBeenCalled();
+        });
+
+        it('should be idempotent when already completed', async () => {
+            const userId = 'u-idem';
+            const user = {
+                id: userId,
+                email: 'g@h.com',
+                username: 'gh',
+                role: 'user',
+                clanId: null,
+                clan: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                ...baseUserRow,
+                onboardingCompletedAt: new Date(),
+                userSegment: UserSegment.HOBBYIST,
+            };
+            prisma.user.findUnique.mockResolvedValue(user as any);
+
+            const result = await service.completeOnboarding(userId, {
+                ...dto,
+                username: 'gh',
+            });
+            expect(prisma.user.update).not.toHaveBeenCalled();
+            expect(result.needsOnboarding).toBe(false);
+        });
+
+        it('should conflict when username is taken by another user', async () => {
+            const userId = 'u-me';
+            const otherId = 'u-other';
+            const before = {
+                id: userId,
+                email: 'i@j.com',
+                username: 'me',
+                role: 'user',
+                clanId: null,
+                clan: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                ...baseUserRow,
+            };
+            prisma.user.findUnique.mockResolvedValueOnce(before as any);
+            prisma.user.findUnique.mockResolvedValue({
+                id: otherId,
+                username: 'taken',
+            } as any);
+
+            await expect(
+                service.completeOnboarding(userId, { ...dto, username: 'taken' }),
+            ).rejects.toThrow(ConflictException);
         });
     });
 });
