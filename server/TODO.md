@@ -1205,6 +1205,101 @@ Track daily activity for GitHub-style heatmap on profiles.
 
 ---
 
+## 🧹 NestJS Consistency Refactors
+
+These are codified in `.cursor/rules/server.mdc` — fix the existing offenders so the
+codebase actually matches the rules. Keep each refactor as its own focused PR.
+
+### 1. Standardize on `req.user.id` (drop `req.user.sub`)
+
+`JwtStrategy.validate` aliases both, but only `id` matches the Prisma `User.id` column.
+Replace every `req.user.sub` access **and** the inline `{ user: { sub: string } }` types.
+
+- [ ] `server/src/battles/battles.controller.ts` (~15 sites — also defines `AuthRequest` with `sub`)
+- [ ] `server/src/matchmaking/matchmaking.controller.ts` (~3 sites — `AuthRequest` with `sub`)
+- [ ] `server/src/subscriptions/subscriptions.controller.ts` (~4 sites — uses `req.user.sub || req.user.id` fallback)
+- [ ] After all call sites are migrated, drop the `sub` alias from `JwtStrategy.validate` in `server/src/auth/strategies/jwt.strategy.ts`
+
+### 2. Remove `as any` from production code
+
+Tighten the source types instead of escaping them. Strict mode is on; these are real bugs waiting to happen.
+
+- [ ] `server/src/battles/battles.controller.ts` — `(battle as any).currentRound` in `getStandings`
+- [ ] `server/src/auth/strategies/jwt.strategy.ts` — `done(null, publicKey as any)` in `secretOrKeyProvider`
+- [ ] `server/src/clans/clan-challenges.service.ts`
+- [ ] `server/src/seasons/seasons.controller.ts`
+
+(`*.spec.ts` files also use `as any` — acceptable for now, but worth fixing if it's cheap.)
+
+### 3. Reduce `forwardRef(() => …)` usage
+
+~37 occurrences. For each one, prefer extracting shared types/services into a third
+module that both sides import. Only keep `forwardRef` when both alternatives have been
+ruled out, with a one-line comment explaining the cycle.
+
+- [ ] `server/src/battles/battles.module.ts` ↔ `server/src/websockets/websockets.module.ts` (Battles ↔ Gateway)
+- [ ] `server/src/battles/battles.service.ts` ↔ `server/src/battles/battle-royale.service.ts` ↔ `server/src/battles/clan-wars.service.ts` (intra-feature cycle — likely fixable by extracting an `EloService` or `BattleCoreService`)
+- [ ] `server/src/clans/clans.module.ts` ↔ `server/src/battles/battles.module.ts` ↔ `server/src/websockets/websockets.module.ts`
+- [ ] `server/src/clans/clan-challenges.service.ts`
+- [ ] `server/src/lobby/lobby.module.ts` + `server/src/lobby/lobby.service.ts` ↔ websockets/battles
+- [ ] `server/src/friends/friends.module.ts` + `server/src/friends/friends.service.ts` ↔ websockets
+- [ ] `server/src/seasons/seasons.module.ts` + `server/src/seasons/seasons.service.ts` ↔ websockets
+- [ ] `server/src/chat/chat.module.ts` ↔ websockets
+
+### 4. Replace manual `parseInt(query, 10)` with `ParseIntPipe`
+
+Use `@Query('limit', new ParseIntPipe({ optional: true })) limit?: number` so validation
+runs in the pipe, not the handler.
+
+- [ ] `server/src/users/users.controller.ts` (`limit`, `offset`, history `limit`, news `limit`)
+- [ ] `server/src/practice/practice.controller.ts` (`page`, `limit`)
+- [ ] `server/src/battles/battles.controller.ts` (`page`, `limit`, round `n`)
+- [ ] `server/src/chat/chat.controller.ts`
+- [ ] `server/src/clans/clans.controller.ts` (`limit`, `offset`)
+- [ ] `server/src/problems/problems.controller.ts`
+- [ ] `server/src/seasons/seasons.controller.ts`
+
+### 5. Shared `AuthedRequest` type (kill the inline copy-paste)
+
+Create `server/src/common/types/authed-request.ts` exporting `AuthedRequest` (and a richer variant if needed) and replace every local `AuthRequest`/`AuthedRequest`/`Request & { user: ... }` declaration with an import.
+
+- [ ] **Create** `server/src/common/types/authed-request.ts`
+- [ ] `server/src/auth/auth.controller.ts` (4 inline declarations)
+- [ ] `server/src/users/users.controller.ts` (2)
+- [ ] `server/src/clans/clans.controller.ts` (12)
+- [ ] `server/src/friends/friends.controller.ts` (6)
+- [ ] `server/src/chat/chat.controller.ts` (3)
+- [ ] `server/src/practice/practice.controller.ts` (local `AuthedRequest` alias)
+- [ ] `server/src/lobby/lobby.controller.ts` (local `AuthRequest` interface)
+- [ ] `server/src/subscriptions/subscriptions.controller.ts` (local `AuthRequest`)
+- [ ] `server/src/battles/battles.controller.ts` (local `AuthRequest`)
+- [ ] `server/src/matchmaking/matchmaking.controller.ts` (local `AuthRequest`)
+- [ ] `server/src/problems/problems.controller.ts`
+
+### 6. Response DTO honesty audit
+
+Every `@ApiResponse({ type: SomeDto })` should match what the service actually returns —
+either project to the DTO (like `auth.service.toMeResponse`) or drop the `type:`.
+Audit each controller and fix the mismatches:
+
+- [ ] `server/src/auth/auth.controller.ts`
+- [ ] `server/src/users/users.controller.ts` (returns Prisma row + `tier`, claims `UserResponseDto`)
+- [ ] `server/src/clans/clans.controller.ts`
+- [ ] `server/src/battles/battles.controller.ts`
+- [ ] `server/src/friends/friends.controller.ts`
+- [ ] `server/src/practice/practice.controller.ts`
+- [ ] `server/src/subscriptions/subscriptions.controller.ts`
+- [ ] `server/src/lobby/lobby.controller.ts`
+
+### 7. Preserve route-ordering when editing `BattlesController`
+
+Static routes (`/foo/bar`) must stay declared **above** parameterized routes (`/foo/:id`).
+The current `// MUST come before :id routes to avoid conflicts` comments in
+`server/src/battles/battles.controller.ts` are load-bearing — **don't reshuffle them**
+during the refactors above. (No new TODO; just a guard rail when touching that file.)
+
+---
+
 ## 📝 Documentation TODOs
 
 - [x] Implementation status document (DONE - IMPLEMENTATION_STATUS.md)
