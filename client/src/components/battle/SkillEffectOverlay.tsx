@@ -46,12 +46,12 @@ const EFFECT_CONFIG: Partial<Record<SkillType, OverlayConfig>> = {
 };
 
 export function SkillEffectOverlay({ activeEffects }: SkillEffectOverlayProps) {
-    const [, setTick] = useState(0);
+    const [now, setNow] = useState(() => Date.now());
 
     // Re-render every second to update countdowns
     useEffect(() => {
         if (activeEffects.length === 0) return;
-        const interval = setInterval(() => setTick((t) => t + 1), 1000);
+        const interval = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(interval);
     }, [activeEffects.length]);
 
@@ -65,7 +65,7 @@ export function SkillEffectOverlay({ activeEffects }: SkillEffectOverlayProps) {
                 const Icon = config.icon;
                 const secondsLeft = Math.max(
                     0,
-                    Math.ceil((effect.expiresAt - Date.now()) / 1000),
+                    Math.ceil((effect.expiresAt - now) / 1000),
                 );
                 const isFog = effect.skillType === 'FOG_OF_WAR';
                 const isFreeze = effect.skillType === 'FREEZE';

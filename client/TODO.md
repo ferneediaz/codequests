@@ -913,6 +913,96 @@ client/
 
 ---
 
+## 🧹 Refactor Backlog
+
+Living checklist of client-side cleanup. Order is roughly by impact. Tick items off as they ship.
+
+**Paused (May 2026):** Refactor rollout stopped mid-P1/P2 — see unchecked items below. Next session: finish P1 shells, then execute P2 data layer moves.
+
+### P0 — Lint baseline ✅ (done)
+
+- [x] `npm run lint` reaches zero errors / warnings
+- [x] Fix `react-hooks/set-state-in-effect`:
+  - [x] `components/battle/BattleChat.tsx`
+  - [x] `hooks/useLobbyPresence.ts`
+  - [x] `pages/author/AuthorPreview.tsx`
+  - [x] `pages/battle/Battle.tsx` (code seeding + scramble effect handling)
+  - [x] `pages/battle/Play.tsx` (BR/CW presets via TanStack Query, not synchronous effect setState)
+  - [x] `pages/clan/Clan.tsx`
+  - [x] `pages/practice/PracticeSolve.tsx`
+- [x] Fix `react-hooks/purity` (`Date.now` in render):
+  - [x] `components/battle/SkillEffectOverlay.tsx`
+  - [x] `pages/battle/Battle.tsx`
+- [x] Fix `react-hooks/refs` — shared `hooks/useResizable.ts` exposes `fraction` + `containerProps` / `dragHandleProps`; used in Battle + PracticeSolve
+- [x] Fix `react-refresh/only-export-components`:
+  - [x] `components/ui/badgeVariants.ts` + slim `badge.tsx`
+  - [x] `components/ui/buttonVariants.ts` + slim `button.tsx`
+- [x] Replace `(p as any).user` in `components/battle/BattleLobby.tsx` with typed `p.user?.username`
+- [x] Misc: `prefer-const` in `utils/stats.ts`
+
+### P1 — Split mega page components (partial)
+
+- [x] `pages/battle/Play.tsx` — extracted to **`pages/battle/play/`**: `usePlayConfig.ts`, `constants.ts`, `utils.ts`, and `components/{ModeSelector,RulesPanel,SkillsPicker,BattleRoyalePanel,ClanWarPanel,InvitePanel,...}.tsx`; shell **`Play.tsx`** is now thin (~110 lines).
+  - [ ] **Deferred to P2:** move clan-wars / invite **`api.post`** from `InvitePanel` into **`services/battles.ts`** (currently still direct `api` calls in the panel).
+- [ ] **`pages/author/AuthorNew.tsx`** (~1452 lines) — **not started**
+  - [ ] `pages/author/new/useAuthorForm.ts`
+  - [ ] `pages/author/new/utils.ts` (validation + YAML serialization)
+  - [ ] `pages/author/new/components/{MetaSection,StarterSection,TestsSection,HintsSection,SolutionSection}.tsx`
+- [ ] **`pages/dashboard/Dashboard.tsx`** (~780 lines after partial split; target <~400 lines)
+  - [x] Extracted: `Heatmap`, `MatchRow`, `NewsRow`, `StatTile`, `StatCard`, `QuickAction`, `ModeBreakdown` → `pages/dashboard/components/`
+  - [x] Extracted: `constants.ts`, `utils.ts` (dashboard-specific helpers/constants)
+  - [ ] Thin **`Dashboard.tsx`** further so the shell is <~400 lines (move remaining inline layout/helpers if any)
+  - [ ] Move `HARD_CODED_NEWS_PREVIEW` to **`pages/dashboard/mockNewsPreview.ts`** (or remove) — if still inlined, extract when trimming shell
+  - [ ] **P2 overlap:** GitHub contributions + `services/github.ts` + **`useGithubActivity`**
+  - [ ] **P2 overlap:** replace inline **`api.get`** (`/users/...`) with **`services/users.ts`**
+
+### P2 — Data layer consistency
+
+- [ ] Add `services/battles.ts` and `services/users.ts` so pages never call `axios`/`api` directly
+- [ ] Centralize TanStack query keys in `lib/queryKeys.ts`:
+  ```ts
+  export const queryKeys = {
+    userStats: (userId: string) => ['userStats', userId] as const,
+    matchHistory: (userId: string, limit = 20) => ['matchHistory', userId, limit] as const,
+    practice: {
+      problems: () => ['practice', 'problems'] as const,
+      stats: () => ['practice', 'stats'] as const,
+      problem: (id: string) => ['practice', 'problem', id] as const,
+    },
+    newsFeed: (userId: string) => ['newsFeed', userId] as const,
+    githubActivity: (userId: string, year: string) =>
+      ['githubActivity', userId, year] as const,
+  };
+  ```
+- [ ] Migrate `pages/dashboard/Dashboard.tsx`, `pages/practice/*`, and `hooks/useBattle.ts` to use `queryKeys`
+- [ ] Audit `store/slices/battleSlice.ts`: server-shaped fields (`battle`, `problem`) should live in TanStack Query; keep only UI flags (`isSubmitting`, `isRunning`, `usedSkills`, `activeEffects`) in Redux
+
+### P3 — Hooks & components
+
+- [ ] Split `hooks/useBattle.ts` (305 lines) into:
+  - [ ] `useBattleData` (TanStack Query for battle + problem)
+  - [ ] `useBattleSocket` (socket subscriptions only)
+  - [ ] `useBattleActions` (submit/run/skills/ready)
+- [ ] Extract reusable layout pieces:
+  - [ ] `PageHero` (gradient hero used across Dashboard/Practice)
+  - [ ] `DataState` (loading + empty + error wrapper)
+  - [ ] `StatTileGrid`
+- [ ] Co-locate page-only components under `pages/<feature>/components/`
+
+### P4 — Routing & types
+
+- [ ] Modularize `router.tsx`: split per feature into `routes/{auth,battle,practice,author,...}.tsx` and compose
+- [ ] Split `types/api.ts` (~337 lines) per domain (`battle.ts`, `user.ts`, `news.ts`, `clan.ts`)
+- [ ] Reconcile duplicated socket payload types between `types/socket.ts` and `types/api.ts`
+
+### P5 — Docs / DX
+
+- [ ] Update root `readme.md` Project Structure section: it says `stores/` (Zustand) but actual is `store/` with Redux Toolkit
+- [ ] Add a short `client/ARCHITECTURE.md` (Redux vs TanStack split, socket flow, paywall flow) once P1/P2 settle
+- [ ] After P0, audit for any silently kept `eslint-disable` comments
+
+---
+
 ## 💡 Notes
 
 - MVP first: Phase 1 is the bare minimum to test core gameplay loop

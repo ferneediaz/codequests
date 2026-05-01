@@ -1,6 +1,5 @@
 import {
     useCallback,
-    useEffect,
     useMemo,
     useRef,
     useState,
@@ -10,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '@/services/api';
 import { practiceApi } from '@/services/practice';
+import { useResizable } from '@/hooks/useResizable';
 import { ProblemPanel } from '@/components/battle/ProblemPanel';
 import { CodeEditor, type CodeEditorHandle } from '@/components/battle/CodeEditor';
 import { ConsolePanel } from '@/components/battle/ConsolePanel';
@@ -32,55 +32,16 @@ import type {
     PracticeSubmitResponse,
 } from '@/types/practice';
 
-function useResizable(initialFraction: number, direction: 'horizontal' | 'vertical') {
-    const [fraction, setFraction] = useState(initialFraction);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const dragging = useRef(false);
-
-    const onMouseDown = useCallback(
-        (e: React.MouseEvent) => {
-            e.preventDefault();
-            dragging.current = true;
-
-            const onMouseMove = (ev: MouseEvent) => {
-                if (!dragging.current || !containerRef.current) return;
-                const rect = containerRef.current.getBoundingClientRect();
-                const newFraction =
-                    direction === 'horizontal'
-                        ? (ev.clientX - rect.left) / rect.width
-                        : (ev.clientY - rect.top) / rect.height;
-                setFraction(Math.min(0.8, Math.max(0.2, newFraction)));
-            };
-
-            const onMouseUp = () => {
-                dragging.current = false;
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
-            };
-
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-            document.body.style.cursor =
-                direction === 'horizontal' ? 'col-resize' : 'row-resize';
-            document.body.style.userSelect = 'none';
-        },
-        [direction],
-    );
-
-    return { fraction, containerRef, onMouseDown };
-}
-
 export default function PracticeSolve() {
     const { problemId } = useParams<{ problemId: string }>();
     const navigate = useNavigate();
 
     const [language, setLanguage] = useState<PracticeLanguage>('javascript');
     const [code, setCode] = useState('');
-    const [codeInitializedForLang, setCodeInitializedForLang] = useState<
-        string | null
-    >(null);
+    // Identifies the (problemId, language) pair the editor was last seeded
+    // for. Updated during render via the recommended "adjust state during
+    // render" pattern (avoids `react-hooks/set-state-in-effect`).
+    const [seedKey, setSeedKey] = useState<string | null>(null);
     const [runResult, setRunResult] = useState<SubmissionResult | null>(null);
     const [submitResult, setSubmitResult] = useState<PracticeSubmitResponse | null>(
         null,
@@ -110,13 +71,13 @@ export default function PracticeSolve() {
         [problem?.starterCode],
     );
 
-    useEffect(() => {
-        if (!problem) return;
-        if (codeInitializedForLang === language) return;
-        const starter = starterCodeMap[language]?.body ?? '';
-        setCode(starter);
-        setCodeInitializedForLang(language);
-    }, [problem, language, starterCodeMap, codeInitializedForLang]);
+    if (problem) {
+        const nextKey = `${problem.id}:${language}`;
+        if (seedKey !== nextKey) {
+            setSeedKey(nextKey);
+            setCode(starterCodeMap[language]?.body ?? '');
+        }
+    }
 
     const handleLanguageChange = (nextLang: string) => {
         if (nextLang !== 'javascript' && nextLang !== 'python') {
@@ -124,7 +85,6 @@ export default function PracticeSolve() {
             return;
         }
         setLanguage(nextLang as PracticeLanguage);
-        setCodeInitializedForLang(null);
     };
 
     const handleRun = useCallback(async () => {
@@ -276,7 +236,7 @@ export default function PracticeSolve() {
             </div>
 
             {/* Main content */}
-            <div ref={hSplit.containerRef} className="flex flex-1 overflow-hidden">
+            <div {...hSplit.containerProps} className="flex flex-1 overflow-hidden">
                 <div
                     className="overflow-y-auto border-r border-border"
                     style={{ width: `${hSplit.fraction * 100}%` }}
@@ -289,12 +249,12 @@ export default function PracticeSolve() {
                 </div>
 
                 <div
-                    onMouseDown={hSplit.onMouseDown}
+                    {...hSplit.dragHandleProps}
                     className="w-1 cursor-col-resize bg-border transition-colors hover:bg-primary/50 active:bg-primary"
                 />
 
                 <div
-                    ref={vSplit.containerRef}
+                    {...vSplit.containerProps}
                     className="flex flex-1 flex-col overflow-hidden"
                 >
                     <div
@@ -312,7 +272,7 @@ export default function PracticeSolve() {
                     </div>
 
                     <div
-                        onMouseDown={vSplit.onMouseDown}
+                        {...vSplit.dragHandleProps}
                         className="h-1 cursor-row-resize bg-border transition-colors hover:bg-primary/50 active:bg-primary"
                     />
 

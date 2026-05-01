@@ -94,7 +94,7 @@ export function BattleLobby({ battle, currentUserId, onReady, onUnready }: Battl
                             Players ({battle.participants.length})
                         </h3>
                         {battle.participants.map((p) => {
-                            const username = p.username || (p as any).user?.username || 'Unknown';
+                            const username = p.username || p.user?.username || 'Unknown';
                             return (
                             <div
                                 key={p.userId}

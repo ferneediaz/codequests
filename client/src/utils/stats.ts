@@ -83,7 +83,7 @@ export function computeAverageTestsPassed(
     history: MatchHistoryEntry[],
     userId: string,
 ): number {
-    let ratios: number[] = [];
+    const ratios: number[] = [];
     for (const m of history) {
         const me = m.participants?.find((p) => p.userId === userId);
         if (me && me.totalTests > 0) {

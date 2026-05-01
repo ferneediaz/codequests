@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { toast } from 'sonner';
@@ -59,66 +59,82 @@ export default function AuthorPreview() {
 
     const [problem, setProblem] = useState<AuthorProblemPayload | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
-    const [language, setLanguage] = useState<AuthoringLanguage>('javascript');
+    // The user's selected language; the *effective* language used everywhere
+    // is `language` below, derived during render so it stays valid even if
+    // the problem doesn't have a starter for the user's pick.
+    const [userLanguage, setUserLanguage] = useState<AuthoringLanguage>('javascript');
     const [body, setBody] = useState('');
     const [rows, setRows] = useState<TestRow[]>([newRow()]);
     const [isRunning, setIsRunning] = useState(false);
     const [result, setResult] = useState<SubmissionResult | null>(null);
-    const initializedRef = useRef(false);
 
     const availableLangs = useMemo(() => {
         if (!problem) return LANGUAGES;
         return LANGUAGES.filter((l) => problem.starter[l] != null);
     }, [problem]);
 
+    // Effective language: prefer user's selection, fall back to the first
+    // language that has a starter when the problem loads. Computing this
+    // during render avoids the previous "mirror prop into state via effect"
+    // pattern.
+    const language = useMemo<AuthoringLanguage>(() => {
+        if (!problem) return userLanguage;
+        if (problem.starter[userLanguage]) return userLanguage;
+        return availableLangs[0] ?? userLanguage;
+    }, [problem, userLanguage, availableLangs]);
+
     useEffect(() => {
         if (!slug) return;
         let cancelled = false;
-        setLoadError(null);
-        api.get<AuthorProblemPayload>(`/author/problems/${slug}`)
-            .then(({ data }) => {
+        (async () => {
+            try {
+                const { data } = await api.get<AuthorProblemPayload>(
+                    `/author/problems/${slug}`,
+                );
                 if (cancelled) return;
                 setProblem(data);
-                initializedRef.current = false;
-            })
-            .catch((err) => {
+                setLoadError(null);
+                // Seed body + tests once per problem load. Subsequent
+                // language switches update body in the onChange handler.
+                const initialLang =
+                    (LANGUAGES.find((l) => data.starter[l] != null) as
+                        | AuthoringLanguage
+                        | undefined) ?? 'javascript';
+                setBody(data.starter[initialLang] ?? '');
+                setRows(
+                    data.tests.length > 0
+                        ? data.tests.map((t) => newRow(t.args, t.expected))
+                        : [newRow()],
+                );
+            } catch (err: unknown) {
                 if (cancelled) return;
-                const status = err?.response?.status;
+                const e = err as {
+                    response?: { status?: number };
+                    message?: string;
+                };
+                const status = e?.response?.status;
                 setLoadError(
                     status === 404
                         ? 'Problem not found or author tools are disabled (set ENABLE_AUTHOR_TOOLS=true on the server).'
-                        : err?.message ?? 'Failed to load problem',
+                        : e?.message ?? 'Failed to load problem',
                 );
-            });
+            }
+        })();
         return () => {
             cancelled = true;
         };
     }, [slug]);
 
-    // Seed default language to first with a starter entry
-    useEffect(() => {
-        if (!problem) return;
-        if (!problem.starter[language] && availableLangs.length > 0) {
-            setLanguage(availableLangs[0]!);
-        }
-    }, [problem, language, availableLangs]);
-
-    // Seed body + test rows from the YAML the first time the problem loads
-    // or when the author switches language (body only).
-    useEffect(() => {
-        if (!problem) return;
-        const fnBody = problem.starter[language];
-        if (fnBody == null) return;
-        setBody(fnBody);
-        if (!initializedRef.current) {
-            setRows(
-                problem.tests.length > 0
-                    ? problem.tests.map((t) => newRow(t.args, t.expected))
-                    : [newRow()],
-            );
-            initializedRef.current = true;
-        }
-    }, [problem, language]);
+    // Switch language + reset body to that language's starter in one go,
+    // keeping the setState calls inside the event handler (not an effect).
+    const handleLanguageChange = useCallback(
+        (next: AuthoringLanguage) => {
+            setUserLanguage(next);
+            const fnBody = problem?.starter[next];
+            if (fnBody != null) setBody(fnBody);
+        },
+        [problem],
+    );
 
     const currentHarness = useMemo<LanguageStarter | null>(() => {
         if (!problem) return null;
@@ -222,7 +238,9 @@ export default function AuthorPreview() {
                 <div className="flex items-center gap-2">
                     <select
                         value={language}
-                        onChange={(e) => setLanguage(e.target.value as AuthoringLanguage)}
+                        onChange={(e) =>
+                            handleLanguageChange(e.target.value as AuthoringLanguage)
+                        }
                         className="rounded border border-border bg-background px-2 py-1 text-xs"
                     >
                         {availableLangs.map((lang) => (

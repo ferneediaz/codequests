@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Users, Plus, LogIn, Shield, Crown, DoorOpen } from 'lucide-react';
@@ -27,8 +27,9 @@ export default function ClanPage() {
     const [joinTag, setJoinTag] = useState('');
     const [busy, setBusy] = useState(false);
 
-    const loadClans = async () => {
-        setLoading(true);
+    // Manual reload triggered by user actions (create/join/leave). State
+    // is only written after the async boundary, which the lint rule allows.
+    const loadClans = useCallback(async () => {
         try {
             const data = await listClans();
             setClans(data);
@@ -37,10 +38,25 @@ export default function ClanPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
-        void loadClans();
+        let cancelled = false;
+        (async () => {
+            try {
+                const data = await listClans();
+                if (cancelled) return;
+                setClans(data);
+            } catch {
+                if (cancelled) return;
+                toast.error('Failed to load clans.');
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     const myClan = useMemo(

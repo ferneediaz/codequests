@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAppSelector } from '@/store/hooks';
 import { useBattle } from '@/hooks/useBattle';
+import { useResizable } from '@/hooks/useResizable';
 import { ProblemPanel } from '@/components/battle/ProblemPanel';
 import { CodeEditor, type CodeEditorHandle } from '@/components/battle/CodeEditor';
 import { ConsolePanel } from '@/components/battle/ConsolePanel';
@@ -15,48 +16,6 @@ import { SubmissionFeedback } from '@/components/feedback/SubmissionFeedback';
 import { Button } from '@/components/ui/button';
 import { Loader2, Play, Send } from 'lucide-react';
 import { parseStarterCode } from '@/lib/starterCode';
-
-function useResizable(initialFraction: number, direction: 'horizontal' | 'vertical') {
-    const [fraction, setFraction] = useState(initialFraction);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const dragging = useRef(false);
-
-    const onMouseDown = useCallback(
-        (e: React.MouseEvent) => {
-            e.preventDefault();
-            dragging.current = true;
-
-            const onMouseMove = (ev: MouseEvent) => {
-                if (!dragging.current || !containerRef.current) return;
-                const rect = containerRef.current.getBoundingClientRect();
-                let newFraction: number;
-                if (direction === 'horizontal') {
-                    newFraction = (ev.clientX - rect.left) / rect.width;
-                } else {
-                    newFraction = (ev.clientY - rect.top) / rect.height;
-                }
-                setFraction(Math.min(0.8, Math.max(0.2, newFraction)));
-            };
-
-            const onMouseUp = () => {
-                dragging.current = false;
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
-            };
-
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-            document.body.style.cursor =
-                direction === 'horizontal' ? 'col-resize' : 'row-resize';
-            document.body.style.userSelect = 'none';
-        },
-        [direction],
-    );
-
-    return { fraction, containerRef, onMouseDown };
-}
 
 export default function Battle() {
     const { id } = useParams<{ id: string }>();
@@ -81,14 +40,19 @@ export default function Battle() {
 
     const [language, setLanguage] = useState('javascript');
     const [code, setCode] = useState('');
-    const [codeInitialized, setCodeInitialized] = useState(false);
+    // We track which (problemId, language) pair the editor was last seeded
+    // for so we can re-seed during render when either changes — using the
+    // React-recommended "adjust state during render" pattern instead of
+    // mirroring props in an effect.
+    const [seedKey, setSeedKey] = useState<string | null>(null);
     const [lastAction, setLastAction] = useState<'run' | 'submit' | null>(null);
     const [submitFeedbackKey, setSubmitFeedbackKey] = useState(0);
-    const [timeStealUnlocked, setTimeStealUnlocked] = useState(false);
+    // Re-renders every second so countdown comparisons against
+    // `effect.expiresAt` stay accurate without calling Date.now() in render.
+    const [now, setNow] = useState(() => Date.now());
     const editorHandleRef = useRef<CodeEditorHandle>(null);
     const scrambledOnceRef = useRef(false);
 
-    // Resizable panels
     const hSplit = useResizable(0.4, 'horizontal');
     const vSplit = useResizable(0.65, 'vertical');
 
@@ -97,23 +61,30 @@ export default function Battle() {
         [problem?.starterCode],
     );
 
-    useEffect(() => {
-        if (problem && !codeInitialized && starterCodeMap[language]) {
+    // Seed code once per (problem, language) — happens during render the
+    // first time we see a new pair.
+    if (problem) {
+        const nextKey = `${problem.id}:${language}`;
+        if (seedKey !== nextKey && starterCodeMap[language]) {
+            setSeedKey(nextKey);
             setCode(starterCodeMap[language].body);
-            setCodeInitialized(true);
         }
-    }, [problem, codeInitialized, starterCodeMap, language]);
+    }
+
+    useEffect(() => {
+        if (activeEffects.length === 0) return;
+        const interval = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(interval);
+    }, [activeEffects.length]);
 
     const opponent = battle?.participants.find((p) => p.userId !== userId);
     const selfParticipant = battle?.participants.find((p) => p.userId === userId);
 
-    // Derived skill-effect flags
-    const now = Date.now();
     const isFrozen = activeEffects.some(
         (e) => e.skillType === 'FREEZE' && e.expiresAt > now,
     );
 
-    // Time Steal unlocks after passing at least one test case (sticky for the battle).
+    // Time Steal unlocks after passing at least one test case.
     // Server payload uses testsPassed/totalTests, existing client type says passed/total — accept either.
     const sub = lastSubmissionResult as
         | (typeof lastSubmissionResult & { testsPassed?: number; totalTests?: number })
@@ -124,11 +95,7 @@ export default function Battle() {
         participantTestsPassed,
     );
     const localTotalTests = sub?.totalTests ?? sub?.total ?? 0;
-    useEffect(() => {
-        if (!timeStealUnlocked && localTestsPassed >= 1) {
-            setTimeStealUnlocked(true);
-        }
-    }, [localTestsPassed, timeStealUnlocked]);
+    const timeStealUnlocked = localTestsPassed >= 1;
 
     // Trigger scramble exactly once per SCRAMBLE effect reception
     useEffect(() => {
@@ -303,7 +270,7 @@ export default function Battle() {
 
             {/* Main content: horizontal split */}
             <div
-                ref={hSplit.containerRef}
+                {...hSplit.containerProps}
                 className="flex flex-1 overflow-hidden"
             >
                 {/* Left panel: Problem */}
@@ -316,13 +283,13 @@ export default function Battle() {
 
                 {/* Horizontal resize handle */}
                 <div
-                    onMouseDown={hSplit.onMouseDown}
+                    {...hSplit.dragHandleProps}
                     className="w-1 cursor-col-resize bg-border transition-colors hover:bg-primary/50 active:bg-primary"
                 />
 
                 {/* Right panel: editor + console (vertical split) */}
                 <div
-                    ref={vSplit.containerRef}
+                    {...vSplit.containerProps}
                     className="flex flex-1 flex-col overflow-hidden"
                 >
                     {/* Code editor */}
@@ -343,7 +310,7 @@ export default function Battle() {
 
                     {/* Vertical resize handle */}
                     <div
-                        onMouseDown={vSplit.onMouseDown}
+                        {...vSplit.dragHandleProps}
                         className="h-1 cursor-row-resize bg-border transition-colors hover:bg-primary/50 active:bg-primary"
                     />
 

@@ -31,12 +31,13 @@ export function useLobbyPresence(): UseLobbyPresenceResult {
     const [error, setError] = useState<string | null>(null);
     const subscribedRef = useRef(false);
 
+    // Manual refresh handler. The setState calls happen *after* the async
+    // boundary, which the lint rule allows.
     const refresh = useCallback(async () => {
-        setLoading(true);
-        setError(null);
         try {
             const data = await getLobbySnapshot();
             setSnapshot(data);
+            setError(null);
         } catch (err: unknown) {
             const message =
                 (err as { response?: { data?: { message?: string } } })?.response
@@ -63,8 +64,27 @@ export function useLobbyPresence(): UseLobbyPresenceResult {
     );
 
     useEffect(() => {
-        void refresh();
-    }, [refresh]);
+        let cancelled = false;
+        (async () => {
+            try {
+                const data = await getLobbySnapshot();
+                if (cancelled) return;
+                setSnapshot(data);
+                setError(null);
+            } catch (err: unknown) {
+                if (cancelled) return;
+                const message =
+                    (err as { response?: { data?: { message?: string } } })
+                        ?.response?.data?.message ?? 'Failed to load lobby.';
+                setError(message);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         const socket = getSocket();

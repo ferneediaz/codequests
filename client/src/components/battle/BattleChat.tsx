@@ -27,9 +27,12 @@ export function BattleChat({ battleId, currentUserId }: BattleChatProps) {
     const { messages, sendMessage } = useBattleChat(battleId);
     const [open, setOpen] = useState(false);
     const [input, setInput] = useState('');
-    const [unread, setUnread] = useState(0);
+    // While chat is open, every incoming message is implicitly "read", so we
+    // track the message count at the moment the chat was last closed and
+    // derive `unread` from that. State only changes via the toggle handler,
+    // never inside an effect.
+    const [lastSeenLen, setLastSeenLen] = useState(0);
     const listRef = useRef<HTMLDivElement>(null);
-    const lastSeenLenRef = useRef(0);
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -38,15 +41,21 @@ export function BattleChat({ battleId, currentUserId }: BattleChatProps) {
         }
     }, [messages, open]);
 
-    // Track unread count when closed
-    useEffect(() => {
-        if (open) {
-            lastSeenLenRef.current = messages.length;
-            setUnread(0);
-        } else {
-            setUnread(messages.length - lastSeenLenRef.current);
-        }
-    }, [messages.length, open]);
+    const unread = open ? 0 : Math.max(0, messages.length - lastSeenLen);
+
+    const handleToggleOpen = () => {
+        setOpen((prev) => {
+            if (prev) {
+                // Closing → anchor unread baseline at the current count so
+                // future messages start counting from 0.
+                setLastSeenLen(messages.length);
+            } else {
+                // Opening → reset baseline so unread shows 0 immediately.
+                setLastSeenLen(messages.length);
+            }
+            return !prev;
+        });
+    };
 
     const handleSend = () => {
         if (!input.trim()) return;
@@ -68,7 +77,7 @@ export function BattleChat({ battleId, currentUserId }: BattleChatProps) {
                             <span>Trash Talk</span>
                         </div>
                         <button
-                            onClick={() => setOpen(false)}
+                            onClick={handleToggleOpen}
                             className="text-muted-foreground hover:text-foreground"
                         >
                             <X className="h-4 w-4" />
@@ -172,7 +181,7 @@ export function BattleChat({ battleId, currentUserId }: BattleChatProps) {
             )}
 
             <button
-                onClick={() => setOpen((o) => !o)}
+                onClick={handleToggleOpen}
                 className="relative flex items-center gap-2 rounded-full border border-border bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg hover:brightness-110"
             >
                 <MessageCircle className="h-4 w-4" />
