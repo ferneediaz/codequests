@@ -1,5 +1,13 @@
-import { Controller, Post, Get, Patch, Body, UseGuards, Req } from '@nestjs/common';
-import { Request } from 'express';
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Body,
+  UseGuards,
+  Req,
+  BadRequestException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
@@ -13,6 +21,7 @@ import { SyncUserDto } from './dto/sync-user.dto';
 import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
 import { MeResponseDto } from './dto/me-response.dto';
 import { UpdateAvatarDto } from './dto/update-avatar.dto';
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -30,9 +39,12 @@ export class AuthController {
   @ApiResponse({ status: 201, description: 'User synced successfully' })
   @ApiBody({ type: SyncUserDto })
   async syncUser(
-    @Req() req: Request & { user: { id: string; email: string; role?: string } },
+    @Req() req: AuthedRequest,
     @Body() body: SyncUserDto,
   ) {
+    if (!req.user.email) {
+      throw new BadRequestException('JWT is missing the `email` claim');
+    }
     return this.authService.syncUser(
       req.user.id,
       req.user.email,
@@ -53,7 +65,7 @@ export class AuthController {
   @ApiBody({ type: CompleteOnboardingDto })
   @ApiResponse({ status: 200, description: 'Profile saved', type: MeResponseDto })
   async completeOnboarding(
-    @Req() req: Request & { user: { id: string } },
+    @Req() req: AuthedRequest,
     @Body() body: CompleteOnboardingDto,
   ) {
     return this.authService.completeOnboarding(req.user.id, body);
@@ -71,7 +83,7 @@ export class AuthController {
   @ApiBody({ type: UpdateAvatarDto })
   @ApiResponse({ status: 200, description: 'Avatar updated', type: MeResponseDto })
   async updateAvatar(
-    @Req() req: Request & { user: { id: string } },
+    @Req() req: AuthedRequest,
     @Body() body: UpdateAvatarDto,
   ) {
     return this.authService.updateAvatar(req.user.id, body);
@@ -85,7 +97,7 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'Returns current user', type: MeResponseDto })
-  async getMe(@Req() req: Request & { user: { id: string } }) {
+  async getMe(@Req() req: AuthedRequest) {
     return this.authService.getMe(req.user.id);
   }
 }

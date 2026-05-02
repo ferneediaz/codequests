@@ -8,7 +8,6 @@ import {
     UseGuards,
     Req,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
     ApiTags,
@@ -19,6 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { FriendsService } from './friends.service';
 import { SendRequestDto, FriendResponseDto, FriendshipResponseDto } from './dto';
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('friends')
 @Controller('friends')
@@ -37,7 +37,7 @@ export class FriendsController {
     @ApiResponse({ status: 409, description: 'Already friends or request pending' })
     sendRequest(
         @Body() dto: SendRequestDto,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         return this.friendsService.sendRequest(req.user.id, dto.username);
     }
@@ -54,7 +54,7 @@ export class FriendsController {
     @ApiResponse({ status: 404, description: 'Request not found' })
     acceptRequest(
         @Param('id') id: string,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         return this.friendsService.acceptRequest(req.user.id, id);
     }
@@ -71,7 +71,7 @@ export class FriendsController {
     @ApiResponse({ status: 404, description: 'Request not found' })
     declineRequest(
         @Param('id') id: string,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         return this.friendsService.declineRequest(req.user.id, id);
     }
@@ -88,7 +88,7 @@ export class FriendsController {
     @ApiResponse({ status: 404, description: 'Friendship not found' })
     removeFriend(
         @Param('id') id: string,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         return this.friendsService.removeFriend(req.user.id, id);
     }
@@ -101,7 +101,7 @@ export class FriendsController {
     @ApiBearerAuth('access-token')
     @ApiOperation({ summary: 'Get friends list with online status' })
     @ApiResponse({ status: 200, description: 'List of friends', type: [FriendResponseDto] })
-    getFriends(@Req() req: Request & { user: { id: string } }) {
+    getFriends(@Req() req: AuthedRequest) {
         return this.friendsService.getFriends(req.user.id);
     }
 
@@ -113,7 +113,7 @@ export class FriendsController {
     @ApiBearerAuth('access-token')
     @ApiOperation({ summary: 'Get pending friend requests' })
     @ApiResponse({ status: 200, description: 'List of pending requests', type: [FriendshipResponseDto] })
-    getPendingRequests(@Req() req: Request & { user: { id: string } }) {
+    getPendingRequests(@Req() req: AuthedRequest) {
         return this.friendsService.getPendingRequests(req.user.id);
     }
 }

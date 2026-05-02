@@ -10,7 +10,6 @@ import {
     Query,
     Req,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
     ApiTags,
@@ -29,6 +28,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Difficulty } from '@prisma/client';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('problems')
 @Controller('problems')
@@ -137,7 +137,7 @@ export class ProblemsController {
     @ApiResponse({ status: 404, description: 'Problem not found' })
     findOne(
         @Param('id') id: string,
-        @Req() req: Request & { user: { role?: string } },
+        @Req() req: AuthedRequest,
     ) {
         const includeHidden = req.user.role === 'admin';
         return this.problemsService.findOne(id, includeHidden);

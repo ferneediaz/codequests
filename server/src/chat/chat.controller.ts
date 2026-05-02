@@ -8,7 +8,6 @@ import {
     UseGuards,
     Req,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
     ApiTags,
@@ -21,6 +20,7 @@ import {
 import { ChatService } from './chat.service';
 import { CreateConversationDto, MessageResponseDto, ConversationResponseDto } from './dto';
 import { ChatRoomType } from '@prisma/client';
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('chat')
 @Controller('chat')
@@ -35,7 +35,7 @@ export class ChatController {
     @ApiBearerAuth('access-token')
     @ApiOperation({ summary: 'Get user\'s DM conversations' })
     @ApiResponse({ status: 200, description: 'List of conversations', type: [ConversationResponseDto] })
-    getConversations(@Req() req: Request & { user: { id: string } }) {
+    getConversations(@Req() req: AuthedRequest) {
         return this.chatService.getConversations(req.user.id);
     }
 
@@ -51,7 +51,7 @@ export class ChatController {
     @ApiResponse({ status: 404, description: 'User not found' })
     createConversation(
         @Body() dto: CreateConversationDto,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         return this.chatService.createConversation(req.user.id, dto.targetUserId);
     }
@@ -72,7 +72,7 @@ export class ChatController {
     async getMessages(
         @Param('roomType') roomType: ChatRoomType,
         @Param('roomId') roomId: string,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
         @Query('cursor') cursor?: string,
         @Query('limit') limit?: string,
     ) {

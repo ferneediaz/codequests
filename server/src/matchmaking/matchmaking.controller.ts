@@ -7,7 +7,6 @@ import {
     UseGuards,
     Req,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
     ApiTags,
@@ -17,14 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { MatchmakingService } from './matchmaking.service';
 import { JoinQueueDto, QueueStatusResponseDto } from './dto';
-
-interface AuthRequest extends Request {
-    user: {
-        sub: string;
-        email: string;
-        role?: string;
-    };
-}
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('matchmaking')
 @Controller('matchmaking')
@@ -41,18 +33,18 @@ export class MatchmakingController {
     })
     @ApiResponse({ status: 400, description: 'Already in queue or in active battle' })
     async joinQueue(
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
         @Body() dto: JoinQueueDto,
     ) {
-        return this.matchmakingService.joinQueue(req.user.sub, dto);
+        return this.matchmakingService.joinQueue(req.user.id, dto);
     }
 
     @Delete('queue')
     @ApiOperation({ summary: 'Leave the matchmaking queue' })
     @ApiResponse({ status: 200, description: 'Left queue successfully' })
     @ApiResponse({ status: 400, description: 'Not currently in queue' })
-    async leaveQueue(@Req() req: AuthRequest) {
-        return this.matchmakingService.leaveQueue(req.user.sub);
+    async leaveQueue(@Req() req: AuthedRequest) {
+        return this.matchmakingService.leaveQueue(req.user.id);
     }
 
     @Get('status')
@@ -62,7 +54,7 @@ export class MatchmakingController {
         description: 'Current queue status',
         type: QueueStatusResponseDto,
     })
-    async getStatus(@Req() req: AuthRequest) {
-        return this.matchmakingService.getQueueStatus(req.user.sub);
+    async getStatus(@Req() req: AuthedRequest) {
+        return this.matchmakingService.getQueueStatus(req.user.id);
     }
 }

@@ -8,7 +8,6 @@ import {
     Req,
     UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
     ApiBearerAuth,
@@ -23,8 +22,7 @@ import { SubmitAttemptDto } from './dto/submit-attempt.dto';
 import { AttemptResultDto } from './dto/attempt-response.dto';
 import { PracticeStatsDto } from './dto/practice-stats.dto';
 import { PracticeProblemDetailDto } from './dto/practice-problem.dto';
-
-type AuthedRequest = Request & { user: { id: string } };
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('practice')
 @Controller('practice')

@@ -7,7 +7,6 @@ import {
     UseGuards,
     Req,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
     ApiTags,
@@ -18,6 +17,7 @@ import {
     ApiParam,
 } from '@nestjs/swagger';
 import { SeasonsService } from './seasons.service';
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('seasons')
 @Controller('seasons')
@@ -87,10 +87,10 @@ export class UserSeasonsController {
     @ApiParam({ name: 'seasonId', description: 'Season ID' })
     @ApiResponse({ status: 200, description: 'Season record display toggled' })
     toggleDisplaySeason(
-        @Req() req: Request,
+        @Req() req: AuthedRequest,
         @Param('seasonId') seasonId: string,
     ) {
-        const userId = (req as any).user?.id;
+        const userId = req.user.id;
         return this.seasonsService.toggleDisplaySeason(userId, seasonId);
     }
 }

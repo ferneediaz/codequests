@@ -1208,95 +1208,116 @@ Track daily activity for GitHub-style heatmap on profiles.
 ## 🧹 NestJS Consistency Refactors
 
 These are codified in `.cursor/rules/server.mdc` — fix the existing offenders so the
-codebase actually matches the rules. Keep each refactor as its own focused PR.
+codebase actually matches the rules. Each refactor lands as its own focused PR,
+ordered from cheap and mechanical to structural.
 
-### 1. Standardize on `req.user.id` (drop `req.user.sub`)
+### Sequencing (13 PRs)
 
-`JwtStrategy.validate` aliases both, but only `id` matches the Prisma `User.id` column.
-Replace every `req.user.sub` access **and** the inline `{ user: { sub: string } }` types.
+```
+PR1 ──► PR2 ──┐
+   └──► PR3 ──┴──► PR4 ──► PR5 ──► PR6..PR13 (per-controller DTO audit)
+```
 
-- [ ] `server/src/battles/battles.controller.ts` (~15 sites — also defines `AuthRequest` with `sub`)
-- [ ] `server/src/matchmaking/matchmaking.controller.ts` (~3 sites — `AuthRequest` with `sub`)
-- [ ] `server/src/subscriptions/subscriptions.controller.ts` (~4 sites — uses `req.user.sub || req.user.id` fallback)
-- [ ] After all call sites are migrated, drop the `sub` alias from `JwtStrategy.validate` in `server/src/auth/strategies/jwt.strategy.ts`
+PR 1 (shared `AuthedRequest` + standardize on `req.user.id`) is being executed
+now under a separate plan; PRs 2–13 below are queued.
 
-### 2. Remove `as any` from production code
+### PR 2 — `ParseIntPipe` migration
 
-Tighten the source types instead of escaping them. Strict mode is on; these are real bugs waiting to happen.
+Replace hand-rolled `parseInt(x, 10)` with `@Query('x', new ParseIntPipe({ optional: true })) x?: number`.
 
-- [ ] `server/src/battles/battles.controller.ts` — `(battle as any).currentRound` in `getStandings`
-- [ ] `server/src/auth/strategies/jwt.strategy.ts` — `done(null, publicKey as any)` in `secretOrKeyProvider`
-- [ ] `server/src/clans/clan-challenges.service.ts`
-- [ ] `server/src/seasons/seasons.controller.ts`
+- [ ] `server/src/users/users.controller.ts` lines 49-50, 114, 170
+- [ ] `server/src/practice/practice.controller.ts` lines 74-75
+- [ ] `server/src/battles/battles.controller.ts` lines 279-280, **and** line 439 (`@Param('n')` → `ParseIntPipe`); after migration delete the manual `Number.isInteger` guard since the pipe handles it.
+- [ ] `server/src/chat/chat.controller.ts` line 82
+- [ ] `server/src/clans/clans.controller.ts` lines 54-55
+- [ ] `server/src/problems/problems.controller.ts` lines 96-97
+- [ ] `server/src/seasons/seasons.controller.ts` lines 63-64
+
+Update each handler's service signature to accept `number | undefined` directly so the pipe transform isn't undone downstream.
+
+### PR 3 — Remove `as any` from production code
+
+Four sites; each gets a real type instead of an escape:
+
+- [ ] `server/src/battles/battles.controller.ts` line 467 — widen `BattlesService.getBattleDetails`'s return type to include `currentRound: number` (it already exists on the Prisma `Battle` row), then drop the cast in `getStandings`.
+- [ ] `server/src/auth/strategies/jwt.strategy.ts` line 41 — `done`'s second arg type is `string | Buffer`; convert via `publicKey.export({ type: 'spki', format: 'pem' })` and pass the resulting string.
+- [ ] `server/src/clans/clan-challenges.service.ts` line 268 (`enabledSkills as any`) and line 260 (`rawRounds as any[]`) — declare the actual JSON shape via a typed `interface` and parse with a narrowing check.
+- [ ] `server/src/seasons/seasons.controller.ts` line 93 (`(req as any).user?.id`) — already covered if PR 1 lands first, but verify after merge.
 
 (`*.spec.ts` files also use `as any` — acceptable for now, but worth fixing if it's cheap.)
 
-### 3. Reduce `forwardRef(() => …)` usage
+### PR 4 — Extract shared submission types out of `battles.service.ts`
 
-~37 occurrences. For each one, prefer extracting shared types/services into a third
-module that both sides import. Only keep `forwardRef` when both alternatives have been
-ruled out, with a one-line comment explaining the cycle.
+Today `server/src/battles/battle-royale.service.ts` and `server/src/battles/clan-wars.service.ts` import `SubmissionResult` from `./battles.service`, while `battles.service.ts` imports both back — a circular **TypeScript** import (separate from the Nest provider cycle).
 
-- [ ] `server/src/battles/battles.module.ts` ↔ `server/src/websockets/websockets.module.ts` (Battles ↔ Gateway)
-- [ ] `server/src/battles/battles.service.ts` ↔ `server/src/battles/battle-royale.service.ts` ↔ `server/src/battles/clan-wars.service.ts` (intra-feature cycle — likely fixable by extracting an `EloService` or `BattleCoreService`)
-- [ ] `server/src/clans/clans.module.ts` ↔ `server/src/battles/battles.module.ts` ↔ `server/src/websockets/websockets.module.ts`
-- [ ] `server/src/clans/clan-challenges.service.ts`
-- [ ] `server/src/lobby/lobby.module.ts` + `server/src/lobby/lobby.service.ts` ↔ websockets/battles
-- [ ] `server/src/friends/friends.module.ts` + `server/src/friends/friends.service.ts` ↔ websockets
-- [ ] `server/src/seasons/seasons.module.ts` + `server/src/seasons/seasons.service.ts` ↔ websockets
-- [ ] `server/src/chat/chat.module.ts` ↔ websockets
+- [ ] Create `server/src/battles/types/battle-submission.types.ts` with `SubmissionResult` and any other shapes shared across `battles.service.ts` ↔ `battle-royale.service.ts` ↔ `clan-wars.service.ts`.
+- [ ] Update all three to import from the new file.
+- [ ] This is a pure structural-types move; no runtime change.
 
-### 4. Replace manual `parseInt(query, 10)` with `ParseIntPipe`
+### PR 5 — `BattleEventsEmitter` port + `forwardRef` purge
 
-Use `@Query('limit', new ParseIntPipe({ optional: true })) limit?: number` so validation
-runs in the pipe, not the handler.
+This is the structural fix for **~20+ `forwardRef`s**. Today every domain service that wants to emit a WebSocket event injects the concrete `BattlesGateway` via `forwardRef`, which forces both `Battles ↔ Websockets` and `Friends ↔ Websockets` symmetric module cycles plus knock-on `forwardRef`s in `Lobby`, `Seasons`, `BR`, `CW`, `Friends`, and `ClansController`.
 
-- [ ] `server/src/users/users.controller.ts` (`limit`, `offset`, history `limit`, news `limit`)
-- [ ] `server/src/practice/practice.controller.ts` (`page`, `limit`)
-- [ ] `server/src/battles/battles.controller.ts` (`page`, `limit`, round `n`)
-- [ ] `server/src/chat/chat.controller.ts`
-- [ ] `server/src/clans/clans.controller.ts` (`limit`, `offset`)
-- [ ] `server/src/problems/problems.controller.ts`
-- [ ] `server/src/seasons/seasons.controller.ts`
+Plan:
 
-### 5. Shared `AuthedRequest` type (kill the inline copy-paste)
+1. **Define a port module.** Create `server/src/realtime/` with:
+    - [ ] `realtime.module.ts` (exports the port tokens; lives separately from `WebsocketsModule`).
+    - [ ] `ports/battle-events.port.ts` — `interface BattleEventsPort { emitBattleSubmission(...); emitBattleCompleted(...); emitRoyaleRoundEnded(...); ... }` plus tokens like `BATTLE_EVENTS_PORT`.
+    - [ ] `ports/friend-events.port.ts` — `emitFriendRequestReceived/Accepted/Declined`.
+    - [ ] `ports/clan-events.port.ts` — `emitToClanMembers` for `ClansController`.
+    - [ ] `ports/season-events.port.ts` — `emitSeasonEnded`.
+    - [ ] `ports/presence.port.ts` — `isOnline`, `getSocketByUserId`, `getConnectedClients` (used by `LobbyService`).
+2. **Implement the ports in `WebsocketsModule`.** Each port gets a thin adapter that delegates to `BattlesGateway`. `WebsocketsModule` provides the adapter classes under their `*_PORT` tokens. Domain services consume the **token**, not the gateway.
+3. **Refactor consumers:**
+    - [ ] `server/src/friends/friends.service.ts` — swap `BattlesGateway` for `FriendEventsPort`; drop `forwardRef` (lines 7, 20).
+    - [ ] `server/src/seasons/seasons.service.ts` — swap for `SeasonEventsPort`; drop `forwardRef` (lines 7, 20).
+    - [ ] `server/src/lobby/lobby.service.ts` — swap for `PresencePort`; drop `forwardRef` (line 34).
+    - [ ] `server/src/battles/battle-royale.service.ts` — swap for `BattleEventsPort`; drop `forwardRef` (line 85).
+    - [ ] `server/src/battles/clan-wars.service.ts` — same as above (line 111).
+    - [ ] `server/src/battles/battles.service.ts` — swap `BattlesGateway` for `BattleEventsPort` (lines 77-82). The remaining `forwardRef`s on `BattleRoyaleService`/`ClanWarsService` are addressed in step 5.
+    - [ ] `server/src/clans/clans.controller.ts` — swap `BattlesGateway` injection for `ClanEventsPort`.
+4. **Delete `forwardRef` from module imports** that are no longer needed:
+    - [ ] `server/src/battles/battles.module.ts` — remove `forwardRef(() => WebsocketsModule)`; import `RealtimeModule` instead.
+    - [ ] `server/src/websockets/websockets.module.ts` — keep `BattlesService` injection only where the gateway needs to read battle state; if mutual provider cycle remains, keep one `forwardRef` and add a one-line comment per the rule.
+    - [ ] `server/src/friends/friends.module.ts`, `server/src/seasons/seasons.module.ts`, `server/src/lobby/lobby.module.ts`, `server/src/clans/clans.module.ts`, `server/src/chat/chat.module.ts` — drop the matching `forwardRef`s.
+5. **One-way `forwardRef` cleanup.** `server/src/clans/clan-challenges.service.ts` line 33 injects `ClanWarsService` one-way; once `ClansModule` no longer needs `forwardRef(() => BattlesModule)` it can drop the `forwardRef` on the constructor too. Verify and remove.
+6. **Remaining `forwardRef`s.** A small residual cycle (`BattlesGateway` ↔ `BattlesService` for command handlers like `useSkill`, `readyUp`) likely remains. Keep it with a one-line comment — that satisfies the rule.
 
-Create `server/src/common/types/authed-request.ts` exporting `AuthedRequest` (and a richer variant if needed) and replace every local `AuthRequest`/`AuthedRequest`/`Request & { user: ... }` declaration with an import.
+Acceptance: `rg "forwardRef" server/src` should drop from ~37 hits to a single-digit number, each with a comment.
 
-- [ ] **Create** `server/src/common/types/authed-request.ts`
-- [ ] `server/src/auth/auth.controller.ts` (4 inline declarations)
-- [ ] `server/src/users/users.controller.ts` (2)
-- [ ] `server/src/clans/clans.controller.ts` (12)
-- [ ] `server/src/friends/friends.controller.ts` (6)
-- [ ] `server/src/chat/chat.controller.ts` (3)
-- [ ] `server/src/practice/practice.controller.ts` (local `AuthedRequest` alias)
-- [ ] `server/src/lobby/lobby.controller.ts` (local `AuthRequest` interface)
-- [ ] `server/src/subscriptions/subscriptions.controller.ts` (local `AuthRequest`)
-- [ ] `server/src/battles/battles.controller.ts` (local `AuthRequest`)
-- [ ] `server/src/matchmaking/matchmaking.controller.ts` (local `AuthRequest`)
-- [ ] `server/src/problems/problems.controller.ts`
+### PRs 6–13 — Response DTO honesty audit (one PR per controller)
 
-### 6. Response DTO honesty audit
+Per the rule: every `@ApiResponse({ type: SomeDto })` must match the service's actual return shape, or drop the `type:`. One PR per controller for safer review.
 
-Every `@ApiResponse({ type: SomeDto })` should match what the service actually returns —
-either project to the DTO (like `auth.service.toMeResponse`) or drop the `type:`.
-Audit each controller and fix the mismatches:
+For each controller, the PR should:
+1. Read every `@ApiResponse` claim.
+2. Read the service method it delegates to.
+3. Either (a) project the result to the DTO via a `toXResponse()` helper modelled on `auth.service.toMeResponse`, or (b) drop the `type:` and keep just `description:`.
+4. Audit Prisma `select` lists for leaks (e.g. `stripeCustomerId`, internal flags).
 
-- [ ] `server/src/auth/auth.controller.ts`
-- [ ] `server/src/users/users.controller.ts` (returns Prisma row + `tier`, claims `UserResponseDto`)
-- [ ] `server/src/clans/clans.controller.ts`
-- [ ] `server/src/battles/battles.controller.ts`
-- [ ] `server/src/friends/friends.controller.ts`
-- [ ] `server/src/practice/practice.controller.ts`
-- [ ] `server/src/subscriptions/subscriptions.controller.ts`
-- [ ] `server/src/lobby/lobby.controller.ts`
+Controllers to cover (one PR each):
 
-### 7. Preserve route-ordering when editing `BattlesController`
+- [ ] **PR 6** — `server/src/auth/auth.controller.ts`
+- [ ] **PR 7** — `server/src/users/users.controller.ts` — **known offender:** `findOne` claims `UserResponseDto` but the service returns the raw Prisma row plus a derived `tier` field. Add `select`/projection or drop `type:`.
+- [ ] **PR 8** — `server/src/clans/clans.controller.ts`
+- [ ] **PR 9** — `server/src/battles/battles.controller.ts`
+- [ ] **PR 10** — `server/src/friends/friends.controller.ts`
+- [ ] **PR 11** — `server/src/practice/practice.controller.ts`
+- [ ] **PR 12** — `server/src/subscriptions/subscriptions.controller.ts` — watch for `stripeCustomerId` leaks.
+- [ ] **PR 13** — `server/src/lobby/lobby.controller.ts`
 
-Static routes (`/foo/bar`) must stay declared **above** parameterized routes (`/foo/:id`).
-The current `// MUST come before :id routes to avoid conflicts` comments in
-`server/src/battles/battles.controller.ts` are load-bearing — **don't reshuffle them**
-during the refactors above. (No new TODO; just a guard rail when touching that file.)
+### Guard rails (apply across all PRs)
+
+- **Route ordering in `BattlesController`:** static routes (`/royale/presets`, `/clan-wars/presets`, `/history`) **must stay declared above** parameterized routes (`/:id`). The `// MUST come before :id routes` comments on lines 60 and 75 of `server/src/battles/battles.controller.ts` are load-bearing — **do not reorder them** during PR 2, PR 3, or PR 9.
+- **Tests:** every PR runs the existing `*.spec.ts` suite (must stay green).
+- **No new comments narrating code** — only document non-obvious intent (e.g. the one-line comment next to any surviving `forwardRef`).
+- **PrismaModule stays `@Global`** — none of these PRs should re-import it from a feature module.
+
+### Out of scope
+
+- `*.spec.ts` `as any` cleanup (acceptable for now).
+- Any client-side changes; this is server-only.
+- Phase 4–7 work below (push notifications, achievements, etc.).
 
 ---
 

@@ -10,7 +10,6 @@ import {
     Req,
     Delete,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
     ApiTags,
@@ -35,15 +34,7 @@ import {
     ClanWarsPresetDto,
     ClanWarsStandingsResponseDto,
 } from './dto';
-
-// Extend Express Request to include user
-interface AuthRequest extends Request {
-    user: {
-        sub: string;
-        email: string;
-        role?: string;
-    };
-}
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('battles')
 @Controller('battles')
@@ -98,10 +89,10 @@ export class BattlesController {
         type: BattleResponseDto,
     })
     async createClanWars(
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
         @Body() dto: CreateClanWarsBattleDto,
     ) {
-        return this.clanWarsService.createClanWarsBattle(req.user.sub, dto);
+        return this.clanWarsService.createClanWarsBattle(req.user.id, dto);
     }
 
     @Post('clan-wars/invite/:code/join')
@@ -119,7 +110,7 @@ export class BattlesController {
     @ApiResponse({ status: 400, description: 'Cannot join battle' })
     @ApiResponse({ status: 404, description: 'Invalid invite code' })
     async joinClanWarsByInviteCode(
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
         @Param('code') code: string,
         @Query('team') teamParam?: string,
         @Body() body?: {
@@ -128,7 +119,7 @@ export class BattlesController {
     ) {
         const battle = await this.battlesService.getByInviteCode(code);
         const team = this.parseTeam(teamParam);
-        return this.clanWarsService.joinClanWarsBattle(req.user.sub, battle.id, {
+        return this.clanWarsService.joinClanWarsBattle(req.user.id, battle.id, {
             team,
             viaInvite: true,
             teamMeta: body?.teamMeta,
@@ -150,7 +141,7 @@ export class BattlesController {
     @ApiResponse({ status: 400, description: 'Cannot join battle' })
     @ApiResponse({ status: 404, description: 'Battle not found' })
     async joinClanWarsById(
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
         @Param('id') id: string,
         @Query('team') teamParam?: string,
         @Body() body?: {
@@ -158,7 +149,7 @@ export class BattlesController {
         },
     ) {
         const team = this.parseTeam(teamParam);
-        return this.clanWarsService.joinClanWarsBattle(req.user.sub, id, {
+        return this.clanWarsService.joinClanWarsBattle(req.user.id, id, {
             team,
             viaInvite: false,
             teamMeta: body?.teamMeta,
@@ -176,13 +167,13 @@ export class BattlesController {
     @ApiResponse({ status: 403, description: 'Not a participant' })
     @ApiResponse({ status: 404, description: 'Battle not found' })
     async submitClanWars(
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
         @Param('id') id: string,
         @Body() submitDto: SubmitSolutionDto,
     ) {
         return this.clanWarsService.submitClanWarsRound(
             id,
-            req.user.sub,
+            req.user.id,
             submitDto.code,
             submitDto.language,
             submitDto.problemId,
@@ -233,10 +224,10 @@ export class BattlesController {
     })
     @ApiResponse({ status: 404, description: 'Problem not found' })
     async create(
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
         @Body() createBattleDto: CreateBattleDto,
     ) {
-        return this.battlesService.createBattle(req.user.sub, createBattleDto);
+        return this.battlesService.createBattle(req.user.id, createBattleDto);
     }
 
     @Get('available')
@@ -246,8 +237,8 @@ export class BattlesController {
         description: 'Returns list of available battles',
         type: [BattleResponseDto],
     })
-    async getAvailable(@Req() req: AuthRequest) {
-        return this.battlesService.getAvailableBattles(req.user.sub);
+    async getAvailable(@Req() req: AuthedRequest) {
+        return this.battlesService.getAvailableBattles(req.user.id);
     }
 
     @Get('history')
@@ -270,12 +261,12 @@ export class BattlesController {
         type: BattleHistoryResponseDto,
     })
     async getHistory(
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
     ) {
         return this.battlesService.getBattleHistory(
-            req.user.sub,
+            req.user.id,
             page ? parseInt(page, 10) : 1,
             limit ? parseInt(limit, 10) : 20,
         );
@@ -290,10 +281,10 @@ export class BattlesController {
         type: BattleResponseDto,
     })
     async createWithInvite(
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
         @Body() createBattleDto: CreateBattleDto,
     ) {
-        return this.battlesService.createBattle(req.user.sub, {
+        return this.battlesService.createBattle(req.user.id, {
             ...createBattleDto,
             withInviteCode: true,
         });
@@ -316,10 +307,10 @@ export class BattlesController {
     @ApiResponse({ status: 400, description: 'Cannot join battle' })
     @ApiResponse({ status: 404, description: 'Invalid invite code' })
     async joinByInviteCode(
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
         @Param('code') code: string,
     ) {
-        return this.battlesService.joinByInviteCode(req.user.sub, code);
+        return this.battlesService.joinByInviteCode(req.user.id, code);
     }
 
     @Get(':id')
@@ -345,8 +336,8 @@ export class BattlesController {
     })
     @ApiResponse({ status: 400, description: 'Cannot join battle' })
     @ApiResponse({ status: 404, description: 'Battle not found' })
-    async joinBattle(@Req() req: AuthRequest, @Param('id') id: string) {
-        return this.battlesService.joinBattle(req.user.sub, id);
+    async joinBattle(@Req() req: AuthedRequest, @Param('id') id: string) {
+        return this.battlesService.joinBattle(req.user.id, id);
     }
 
     @Post(':id/submit')
@@ -360,13 +351,13 @@ export class BattlesController {
     @ApiResponse({ status: 403, description: 'Not a participant' })
     @ApiResponse({ status: 404, description: 'Battle not found' })
     async submitSolution(
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
         @Param('id') id: string,
         @Body() submitDto: SubmitSolutionDto,
     ) {
         return this.battlesService.submitSolution(
             id,
-            req.user.sub,
+            req.user.id,
             submitDto.code,
             submitDto.language,
             submitDto.problemId,
@@ -393,8 +384,8 @@ export class BattlesController {
     @ApiResponse({ status: 200, description: 'Ready status updated' })
     @ApiResponse({ status: 400, description: 'Cannot ready up' })
     @ApiResponse({ status: 403, description: 'Not a participant' })
-    async readyUp(@Req() req: AuthRequest, @Param('id') id: string) {
-        return this.battlesService.readyUp(id, req.user.sub);
+    async readyUp(@Req() req: AuthedRequest, @Param('id') id: string) {
+        return this.battlesService.readyUp(id, req.user.id);
     }
 
     @Delete(':id/ready')
@@ -403,8 +394,8 @@ export class BattlesController {
     @ApiResponse({ status: 200, description: 'Unready successful' })
     @ApiResponse({ status: 400, description: 'Not currently ready' })
     @ApiResponse({ status: 403, description: 'Not a participant' })
-    async unready(@Req() req: AuthRequest, @Param('id') id: string) {
-        return this.battlesService.unready(id, req.user.sub);
+    async unready(@Req() req: AuthedRequest, @Param('id') id: string) {
+        return this.battlesService.unready(id, req.user.id);
     }
 
     @Get(':id/rounds')
@@ -434,7 +425,7 @@ export class BattlesController {
     async getRoundDetails(
         @Param('id') id: string,
         @Param('n') n: string,
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
     ) {
         const roundNumber = parseInt(n, 10);
         if (!Number.isInteger(roundNumber) || roundNumber < 1) {
@@ -445,7 +436,7 @@ export class BattlesController {
         return this.battleRoyaleService.getRoundDetails(
             id,
             roundNumber,
-            req.user.sub,
+            req.user.id,
         );
     }
 
@@ -476,10 +467,10 @@ export class BattlesController {
     @ApiResponse({ status: 404, description: 'Battle or user not found' })
     @ApiResponse({ status: 403, description: 'Not a participant' })
     async inviteUser(
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
         @Param('id') id: string,
         @Body('username') username: string,
     ) {
-        return this.battlesService.inviteUserToBattle(id, req.user.sub, username);
+        return this.battlesService.inviteUserToBattle(id, req.user.id, username);
     }
 }

@@ -9,7 +9,6 @@ import {
   Req,
   ForbiddenException,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { 
   ApiTags, 
@@ -24,6 +23,7 @@ import { NewsService, NewsFilter } from './news.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { NewsResponseDto } from './dto/news-response.dto';
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('users')
 @Controller('users')
@@ -89,7 +89,7 @@ export class UsersController {
   update(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
-    @Req() req: Request & { user: { id: string } },
+    @Req() req: AuthedRequest,
   ) {
     // Users can only update their own profile
     if (req.user.id !== id) {
@@ -156,7 +156,7 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   getNews(
     @Param('id') id: string,
-    @Req() req: Request & { user: { id: string } },
+    @Req() req: AuthedRequest,
     @Query('limit') limit?: string,
     @Query('before') before?: string,
     @Query('filter') filter?: string,

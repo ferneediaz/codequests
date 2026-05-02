@@ -6,7 +6,6 @@ import {
     UseGuards,
     Req,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
     ApiTags,
@@ -20,10 +19,7 @@ import {
     ChallengeUserDto,
     LobbyFriendRequestDto,
 } from './dto';
-
-interface AuthRequest extends Request {
-    user: { id: string; sub?: string };
-}
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('lobby')
 @Controller('lobby')
@@ -46,7 +42,7 @@ export class LobbyController {
         description: 'Lobby snapshot',
         type: LobbySnapshotDto,
     })
-    getSnapshot(@Req() req: AuthRequest) {
+    getSnapshot(@Req() req: AuthedRequest) {
         return this.lobbyService.getSnapshot(req.user.id);
     }
 
@@ -59,7 +55,7 @@ export class LobbyController {
     @ApiResponse({ status: 201, description: 'Friend request sent' })
     sendFriendRequest(
         @Body() dto: LobbyFriendRequestDto,
-        @Req() req: AuthRequest,
+        @Req() req: AuthedRequest,
     ) {
         return this.lobbyService.sendFriendRequestById(
             req.user.id,
@@ -77,7 +73,7 @@ export class LobbyController {
         summary: 'Challenge another online user to a 1v1 battle',
     })
     @ApiResponse({ status: 201, description: 'Challenge sent' })
-    challenge(@Body() dto: ChallengeUserDto, @Req() req: AuthRequest) {
+    challenge(@Body() dto: ChallengeUserDto, @Req() req: AuthedRequest) {
         return this.lobbyService.challengeUser(
             req.user.id,
             dto.targetUserId,

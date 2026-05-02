@@ -22,10 +22,7 @@ import { SubscriptionsService } from './subscriptions.service';
 import { StripeService } from './stripe.service';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { SubscriptionStatusResponseDto } from './dto/subscription-status-response.dto';
-
-interface AuthRequest extends Request {
-  user: { id: string; sub?: string };
-}
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('subscriptions')
 @Controller('subscriptions')
@@ -40,8 +37,8 @@ export class SubscriptionsController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get current subscription status' })
   @ApiResponse({ status: 200, type: SubscriptionStatusResponseDto })
-  async getStatus(@Req() req: AuthRequest): Promise<SubscriptionStatusResponseDto> {
-    const userId = req.user.sub || req.user.id;
+  async getStatus(@Req() req: AuthedRequest): Promise<SubscriptionStatusResponseDto> {
+    const userId = req.user.id;
     return this.subscriptionsService.getSubscriptionStatus(userId);
   }
 
@@ -52,10 +49,10 @@ export class SubscriptionsController {
   @ApiResponse({ status: 201, description: 'Returns checkout session URL' })
   @ApiBody({ type: CreateCheckoutDto })
   async createCheckout(
-    @Req() req: AuthRequest,
+    @Req() req: AuthedRequest,
     @Body() dto: CreateCheckoutDto,
   ): Promise<{ sessionUrl: string }> {
-    const userId = req.user.sub || req.user.id;
+    const userId = req.user.id;
     const sessionUrl = await this.subscriptionsService.createCheckoutSession(
       userId,
       dto.plan,
@@ -68,8 +65,8 @@ export class SubscriptionsController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Create Stripe customer portal session' })
   @ApiResponse({ status: 201, description: 'Returns portal session URL' })
-  async createPortal(@Req() req: AuthRequest): Promise<{ portalUrl: string }> {
-    const userId = req.user.sub || req.user.id;
+  async createPortal(@Req() req: AuthedRequest): Promise<{ portalUrl: string }> {
+    const userId = req.user.id;
     const portalUrl = await this.subscriptionsService.createPortalSession(userId);
     return { portalUrl };
   }
@@ -79,8 +76,8 @@ export class SubscriptionsController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Start a 7-day free trial' })
   @ApiResponse({ status: 201, description: 'Trial activated' })
-  async startTrial(@Req() req: AuthRequest): Promise<{ trialEndsAt: Date }> {
-    const userId = req.user.sub || req.user.id;
+  async startTrial(@Req() req: AuthedRequest): Promise<{ trialEndsAt: Date }> {
+    const userId = req.user.id;
     return this.subscriptionsService.startTrial(userId);
   }
 

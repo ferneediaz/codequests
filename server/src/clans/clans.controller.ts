@@ -10,7 +10,6 @@ import {
     UseGuards,
     Req,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
     ApiTags,
@@ -31,6 +30,7 @@ import {
     CounterChallengeDto,
     ChallengeResponseDto,
 } from './dto';
+import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('clans')
 @Controller('clans')
@@ -74,7 +74,7 @@ export class ClansController {
     @ApiResponse({ status: 409, description: 'Active challenge already exists' })
     async sendChallenge(
         @Body() dto: SendChallengeDto,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         const challenge = await this.clanChallengeService.sendChallenge(req.user.id, dto);
 
@@ -111,7 +111,7 @@ export class ClansController {
     @ApiResponse({ status: 404, description: 'Challenge not found' })
     async acceptChallenge(
         @Param('id') id: string,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         const challenge = await this.clanChallengeService.acceptChallenge(req.user.id, id);
 
@@ -144,7 +144,7 @@ export class ClansController {
     @ApiResponse({ status: 404, description: 'Challenge not found' })
     async declineChallenge(
         @Param('id') id: string,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         const challenge = await this.clanChallengeService.declineChallenge(req.user.id, id);
 
@@ -188,7 +188,7 @@ export class ClansController {
     async counterChallenge(
         @Param('id') id: string,
         @Body() dto: CounterChallengeDto,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         const challenge = await this.clanChallengeService.counterChallenge(
             req.user.id,
@@ -245,7 +245,7 @@ export class ClansController {
     getChallenges(
         @Param('id') id: string,
         @Query('pending') pending: string,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         if (pending === 'true') {
             return this.clanChallengeService.getPendingChallenges(id, req.user.id);
@@ -276,7 +276,7 @@ export class ClansController {
     @ApiResponse({ status: 400, description: 'Already in a clan or name/tag taken' })
     create(
         @Body() createClanDto: CreateClanDto,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         return this.clansService.create(req.user.id, createClanDto);
     }
@@ -295,7 +295,7 @@ export class ClansController {
     update(
         @Param('id') id: string,
         @Body() updateClanDto: UpdateClanDto,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         return this.clansService.update(id, req.user.id, updateClanDto);
     }
@@ -311,7 +311,7 @@ export class ClansController {
     @ApiResponse({ status: 200, description: 'Joined clan', type: ClanResponseDto })
     @ApiResponse({ status: 400, description: 'Already in a clan' })
     @ApiResponse({ status: 404, description: 'Clan not found' })
-    join(@Param('id') id: string, @Req() req: Request & { user: { id: string } }) {
+    join(@Param('id') id: string, @Req() req: AuthedRequest) {
         return this.clansService.join(id, req.user.id);
     }
 
@@ -324,7 +324,7 @@ export class ClansController {
     @ApiOperation({ summary: 'Leave current clan' })
     @ApiResponse({ status: 200, description: 'Left clan successfully' })
     @ApiResponse({ status: 400, description: 'Not in a clan' })
-    leave(@Req() req: Request & { user: { id: string } }) {
+    leave(@Req() req: AuthedRequest) {
         return this.clansService.leave(req.user.id);
     }
 
@@ -343,7 +343,7 @@ export class ClansController {
     kick(
         @Param('id') id: string,
         @Param('memberId') memberId: string,
-        @Req() req: Request & { user: { id: string } },
+        @Req() req: AuthedRequest,
     ) {
         return this.clansService.kick(id, req.user.id, memberId);
     }
@@ -359,7 +359,7 @@ export class ClansController {
     @ApiResponse({ status: 200, description: 'Clan deleted' })
     @ApiResponse({ status: 403, description: 'Not the clan owner' })
     @ApiResponse({ status: 404, description: 'Clan not found' })
-    delete(@Param('id') id: string, @Req() req: Request & { user: { id: string } }) {
+    delete(@Param('id') id: string, @Req() req: AuthedRequest) {
         return this.clansService.delete(id, req.user.id);
     }
 }
