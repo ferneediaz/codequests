@@ -6,6 +6,28 @@ import { getRankTier } from '../common/utils/rank-tiers';
 import { PracticeService } from '../practice/practice.service';
 
 /**
+ * Public-facing User columns. Excludes Stripe billing identifiers
+ * (`stripeCustomerId`), free-tier usage counters (`gamesPlayedToday`,
+ * `lastGameResetAt`, `trialEndsAt`, `hasUsedTrial`), and the onboarding
+ * survey (`onboardingCompletedAt`, `userSegment`, etc.) — those are only
+ * exposed via `/auth/me` to the user themselves.
+ */
+const PUBLIC_USER_SELECT = {
+  id: true,
+  email: true,
+  username: true,
+  avatarUrl: true,
+  role: true,
+  mmr: true,
+  wins: true,
+  losses: true,
+  clanId: true,
+  subscriptionTier: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+/**
  * Win/loss from completed battles (source of truth for the dashboard). Matches
  * the same rules as the client's Recent Match rows — unlike User.wins, which
  * is not updated for team modes and may be stale for older 1v1s.
@@ -60,17 +82,20 @@ export class UsersService {
   }
 
   /**
-   * Get user by ID with full details
+   * Get user by ID with full details. Selects an explicit public column
+   * set so internal billing/usage fields (`stripeCustomerId`,
+   * `gamesPlayedToday`, ...) never leak through this public endpoint.
    */
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: {
+      select: {
+        ...PUBLIC_USER_SELECT,
         clan: true,
         battles: {
           take: 10,
           orderBy: { battle: { createdAt: 'desc' } },
-          include: {
+          select: {
             battle: {
               select: {
                 id: true,
@@ -84,7 +109,17 @@ export class UsersService {
         },
         seasonRecords: {
           where: { isDisplayed: true },
-          include: {
+          select: {
+            id: true,
+            seasonId: true,
+            peakMmr: true,
+            peakRankTier: true,
+            finalMmr: true,
+            finalRankTier: true,
+            wins: true,
+            losses: true,
+            winRate: true,
+            createdAt: true,
             season: {
               select: { number: true, name: true },
             },
@@ -105,12 +140,16 @@ export class UsersService {
   }
 
   /**
-   * Get user by username
+   * Get user by username. Same public-column projection as `findOne` so
+   * the unauthenticated lookup can't leak Stripe IDs or daily-usage flags.
    */
   async findByUsername(username: string) {
     const user = await this.prisma.user.findUnique({
       where: { username },
-      include: { clan: true },
+      select: {
+        ...PUBLIC_USER_SELECT,
+        clan: true,
+      },
     });
 
     if (!user) {

@@ -132,7 +132,7 @@ export class ClansService {
         }
 
         // Create clan and add creator as owner/member
-        return this.prisma.clan.create({
+        const created = await this.prisma.clan.create({
             data: {
                 name: createClanDto.name,
                 tag: createClanDto.tag.toUpperCase(),
@@ -152,6 +152,7 @@ export class ClansService {
                 },
             },
         });
+        return this.withTier(created);
     }
 
     /**
@@ -191,7 +192,7 @@ export class ClansService {
             }
         }
 
-        return this.prisma.clan.update({
+        const updated = await this.prisma.clan.update({
             where: { id },
             data: {
                 ...(updateClanDto.name && { name: updateClanDto.name }),
@@ -208,6 +209,7 @@ export class ClansService {
                 },
             },
         });
+        return this.withTier(updated);
     }
 
     /**

@@ -22,7 +22,6 @@ import {
 import { UsersService } from './users.service';
 import { NewsService, NewsFilter } from './news.service';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { UserResponseDto } from './dto/user-response.dto';
 import { NewsResponseDto } from './dto/news-response.dto';
 import { AuthedRequest } from '../common/types/authed-request';
 
@@ -55,7 +54,11 @@ export class UsersController {
   @Get(':id')
   @ApiOperation({ summary: 'Get user by ID' })
   @ApiParam({ name: 'id', description: 'User ID' })
-  @ApiResponse({ status: 200, description: 'User found', type: UserResponseDto })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Public user profile with rank tier, clan, last 10 battles, and displayed season records. Internal billing fields (stripeCustomerId, daily-usage counters) are stripped.',
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);

@@ -130,12 +130,24 @@ describe('UsersService', () => {
 
             expect(prisma.user.findUnique).toHaveBeenCalledWith({
                 where: { id: 'user-123' },
-                include: {
+                select: {
+                    id: true,
+                    email: true,
+                    username: true,
+                    avatarUrl: true,
+                    role: true,
+                    mmr: true,
+                    wins: true,
+                    losses: true,
+                    clanId: true,
+                    subscriptionTier: true,
+                    createdAt: true,
+                    updatedAt: true,
                     clan: true,
                     battles: {
                         take: 10,
                         orderBy: { battle: { createdAt: 'desc' } },
-                        include: {
+                        select: {
                             battle: {
                                 select: {
                                     id: true,
@@ -149,7 +161,17 @@ describe('UsersService', () => {
                     },
                     seasonRecords: {
                         where: { isDisplayed: true },
-                        include: {
+                        select: {
+                            id: true,
+                            seasonId: true,
+                            peakMmr: true,
+                            peakRankTier: true,
+                            finalMmr: true,
+                            finalRankTier: true,
+                            wins: true,
+                            losses: true,
+                            winRate: true,
+                            createdAt: true,
                             season: {
                                 select: { number: true, name: true },
                             },
@@ -193,7 +215,21 @@ describe('UsersService', () => {
 
             expect(prisma.user.findUnique).toHaveBeenCalledWith({
                 where: { username: 'testuser' },
-                include: { clan: true },
+                select: {
+                    id: true,
+                    email: true,
+                    username: true,
+                    avatarUrl: true,
+                    role: true,
+                    mmr: true,
+                    wins: true,
+                    losses: true,
+                    clanId: true,
+                    subscriptionTier: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    clan: true,
+                },
             });
             expect(result).toEqual(user);
         });

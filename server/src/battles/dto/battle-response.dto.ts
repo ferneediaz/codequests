@@ -2,6 +2,14 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BattleMode, BattleStatus, SkillType } from '@prisma/client';
 import { RankTierDto } from '../../common/dto/rank-tier.dto';
 
+export class ParticipantClanRefDto {
+    @ApiPropertyOptional()
+    tag?: string;
+
+    @ApiPropertyOptional()
+    name?: string;
+}
+
 export class ParticipantUserDto {
     @ApiProperty()
     id: string;
@@ -9,11 +17,18 @@ export class ParticipantUserDto {
     @ApiProperty()
     username: string;
 
-    @ApiPropertyOptional()
-    avatarUrl?: string;
+    @ApiPropertyOptional({ nullable: true })
+    avatarUrl?: string | null;
 
     @ApiPropertyOptional()
     mmr?: number;
+
+    @ApiPropertyOptional({
+        type: () => ParticipantClanRefDto,
+        nullable: true,
+        description: 'Clan tag/name when the user belongs to a clan.',
+    })
+    clan?: ParticipantClanRefDto | null;
 
     @ApiPropertyOptional({ type: RankTierDto, description: 'Rank tier based on MMR' })
     tier?: RankTierDto;
@@ -26,8 +41,12 @@ export class BattleParticipantResponseDto {
     @ApiProperty()
     userId: string;
 
-    @ApiProperty()
-    username: string;
+    @ApiPropertyOptional({
+        type: () => ParticipantUserDto,
+        description:
+            'Nested user profile (id, username, avatarUrl, mmr, clan, tier). Populated by GET endpoints; omitted in matchmaking-internal payloads.',
+    })
+    user?: ParticipantUserDto;
 
     @ApiPropertyOptional({ description: 'Team ID for team battles' })
     teamId?: string;
