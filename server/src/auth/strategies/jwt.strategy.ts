@@ -35,10 +35,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           }
           
           const jwk = JSON.parse(jwkString);
-          // Convert JWK to Node.js KeyObject (which passport-jwt understands)
+          // passport-jwt's secretOrKey only accepts string | Buffer, so we
+          // export the JWK to SPKI/PEM rather than handing it the KeyObject.
           const publicKey = createPublicKey({ key: jwk, format: 'jwk' });
-          
-          done(null, publicKey as any);
+          const pem = publicKey.export({ type: 'spki', format: 'pem' });
+          done(null, pem);
         } catch (error) {
           done(error);
         }

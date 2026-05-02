@@ -8,7 +8,12 @@ import {
     forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { BattleMode, ClanChallengeStatus } from '@prisma/client';
+import {
+    BattleMode,
+    ClanChallengeStatus,
+    ClanWarsFormat,
+    SkillType,
+} from '@prisma/client';
 import { SendChallengeDto } from './dto/send-challenge.dto';
 import { CounterChallengeDto } from './dto/counter-challenge.dto';
 import { ClanWarsService } from '../battles/clan-wars.service';
@@ -16,6 +21,33 @@ import { CreateClanWarsBattleDto } from '../battles/dto/create-clan-wars-battle.
 import { RoundConfigDto } from '../battles/dto/round-config.dto';
 
 const CHALLENGE_EXPIRY_HOURS = 24;
+
+// JSON shape persisted in `ClanChallenge.rounds` / `counterRounds`. Stored as
+// Prisma `Json`, so we re-validate on read instead of trusting the column.
+interface RawRoundJson {
+    timeLimitSeconds: number | string;
+}
+
+function isRawRoundJson(value: unknown): value is RawRoundJson {
+    if (typeof value !== 'object' || value === null) return false;
+    const t = (value as Record<string, unknown>).timeLimitSeconds;
+    return typeof t === 'number' || typeof t === 'string';
+}
+
+const KNOWN_SKILL_TYPES = new Set<string>(Object.values(SkillType));
+
+// `ClanChallenge.enabledSkills` is `string[]` in Prisma so we re-narrow it
+// to the live `SkillType` enum, dropping any value the catalog no longer
+// recognises (e.g. a skill removed since the challenge was issued).
+function asSkillTypes(values: string[]): SkillType[] {
+    return values.filter((v): v is SkillType => KNOWN_SKILL_TYPES.has(v));
+}
+
+const KNOWN_CLAN_WARS_FORMATS = new Set<string>(Object.values(ClanWarsFormat));
+
+function isClanWarsFormat(value: unknown): value is ClanWarsFormat {
+    return typeof value === 'string' && KNOWN_CLAN_WARS_FORMATS.has(value);
+}
 
 const challengeInclude = {
     challengerClan: {
@@ -206,10 +238,10 @@ export class ClanChallengeService {
             counterEnabledSkills: string[];
             preferredTopic: string | null;
             counterPreferredTopic: string | null;
-            clanWarsFormat: any;
-            counterClanWarsFormat: any;
-            rounds: any;
-            counterRounds: any;
+            clanWarsFormat: unknown;
+            counterClanWarsFormat: unknown;
+            rounds: unknown;
+            counterRounds: unknown;
         },
         wasCountered: boolean,
     ): Promise<string | null> {
@@ -248,16 +280,21 @@ export class ClanChallengeService {
             ? (challenge.counterRounds ?? challenge.rounds)
             : challenge.rounds;
 
-        if (!clanWarsFormat) {
+        if (!isClanWarsFormat(clanWarsFormat)) {
             throw new BadRequestException(
-                'Challenge is missing clanWarsFormat',
+                'Challenge is missing or has invalid clanWarsFormat',
             );
         }
-        if (!rawRounds || !Array.isArray(rawRounds) || rawRounds.length === 0) {
+        if (!Array.isArray(rawRounds) || rawRounds.length === 0) {
             throw new BadRequestException('Challenge is missing rounds config');
         }
+        if (!rawRounds.every(isRawRoundJson)) {
+            throw new BadRequestException(
+                'Challenge has malformed rounds config',
+            );
+        }
 
-        const rounds: RoundConfigDto[] = (rawRounds as any[]).map((r) => ({
+        const rounds: RoundConfigDto[] = rawRounds.map((r) => ({
             timeLimitSeconds: Number(r.timeLimitSeconds),
         }));
 
@@ -265,7 +302,7 @@ export class ClanChallengeService {
             clanWarsFormat,
             teamSize,
             rounds,
-            enabledSkills: enabledSkills as any,
+            enabledSkills: asSkillTypes(enabledSkills),
             preferredTopic: preferredTopic ?? undefined,
             teamOne: {
                 name: challengerClan.name,

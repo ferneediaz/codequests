@@ -443,11 +443,10 @@ export class BattlesController {
     @ApiResponse({ status: 404, description: 'Battle not found' })
     async getStandings(@Param('id') id: string) {
         const standings = await this.battleRoyaleService.getStandings(id);
-        // Pull currentRound for convenience on the client.
         const battle = await this.battlesService.getBattleDetails(id);
         return {
             battleId: id,
-            currentRound: (battle as any).currentRound ?? 0,
+            currentRound: battle.currentRound ?? 0,
             standings,
         };
     }
