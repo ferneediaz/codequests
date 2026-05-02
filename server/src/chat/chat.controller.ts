@@ -3,6 +3,7 @@ import {
     Get,
     Post,
     Param,
+    ParseIntPipe,
     Query,
     Body,
     UseGuards,
@@ -74,17 +75,10 @@ export class ChatController {
         @Param('roomId') roomId: string,
         @Req() req: AuthedRequest,
         @Query('cursor') cursor?: string,
-        @Query('limit') limit?: string,
+        @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     ) {
-        // Validate the user has access to this room
         await this.chatService.validateRoomAccess(req.user.id, roomType, roomId);
 
-        const parsedLimit = Math.min(parseInt(limit ?? '50', 10) || 50, 100);
-        return this.chatService.getMessages(
-            roomType,
-            roomId,
-            cursor,
-            parsedLimit,
-        );
+        return this.chatService.getMessages(roomType, roomId, cursor, limit);
     }
 }

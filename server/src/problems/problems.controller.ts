@@ -5,6 +5,7 @@ import {
     Body,
     Patch,
     Param,
+    ParseIntPipe,
     Delete,
     UseGuards,
     Query,
@@ -86,17 +87,12 @@ export class ProblemsController {
     })
     findAll(
         @Query('difficulty') difficulty?: Difficulty,
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
+        @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+        @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
         @Query('tags') tags?: string,
     ) {
         const parsedTags = tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined;
-        return this.problemsService.findAll(
-            difficulty,
-            page ? parseInt(page) : 1,
-            limit ? parseInt(limit) : 20,
-            parsedTags,
-        );
+        return this.problemsService.findAll(difficulty, page, limit, parsedTags);
     }
 
     @Get('random')

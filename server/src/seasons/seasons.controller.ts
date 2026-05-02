@@ -3,6 +3,7 @@ import {
     Get,
     Post,
     Param,
+    ParseIntPipe,
     Query,
     UseGuards,
     Req,
@@ -55,13 +56,13 @@ export class SeasonsController {
     @ApiResponse({ status: 200, description: 'Returns season leaderboard' })
     getSeasonLeaderboard(
         @Param('id') id: string,
-        @Query('limit') limit?: string,
-        @Query('offset') offset?: string,
+        @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+        @Query('offset', new ParseIntPipe({ optional: true })) offset?: number,
         @Query('sortBy') sortBy?: 'peakMmr' | 'finalMmr',
     ) {
         return this.seasonsService.getSeasonLeaderboard(id, {
-            limit: limit ? parseInt(limit) : undefined,
-            offset: offset ? parseInt(offset) : undefined,
+            limit,
+            offset,
             sortBy,
         });
     }

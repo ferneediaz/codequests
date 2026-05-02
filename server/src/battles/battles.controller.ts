@@ -5,6 +5,7 @@ import {
     Post,
     Body,
     Param,
+    ParseIntPipe,
     UseGuards,
     Query,
     Req,
@@ -262,14 +263,10 @@ export class BattlesController {
     })
     async getHistory(
         @Req() req: AuthedRequest,
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
+        @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+        @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     ) {
-        return this.battlesService.getBattleHistory(
-            req.user.id,
-            page ? parseInt(page, 10) : 1,
-            limit ? parseInt(limit, 10) : 20,
-        );
+        return this.battlesService.getBattleHistory(req.user.id, page, limit);
     }
 
     // Invite routes MUST come before :id routes to avoid route conflicts
@@ -424,20 +421,15 @@ export class BattlesController {
     @ApiResponse({ status: 404, description: 'Battle or round not found' })
     async getRoundDetails(
         @Param('id') id: string,
-        @Param('n') n: string,
+        @Param('n', ParseIntPipe) n: number,
         @Req() req: AuthedRequest,
     ) {
-        const roundNumber = parseInt(n, 10);
-        if (!Number.isInteger(roundNumber) || roundNumber < 1) {
+        if (n < 1) {
             throw new BadRequestException(
                 'Round number must be a positive integer',
             );
         }
-        return this.battleRoyaleService.getRoundDetails(
-            id,
-            roundNumber,
-            req.user.id,
-        );
+        return this.battleRoyaleService.getRoundDetails(id, n, req.user.id);
     }
 
     @Get(':id/standings')

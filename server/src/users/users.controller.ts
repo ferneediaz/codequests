@@ -1,13 +1,14 @@
-import { 
-  Controller, 
-  Get, 
-  Patch, 
-  Param, 
-  Body, 
+import {
+  Controller,
+  Get,
+  Patch,
+  Param,
+  Body,
   Query,
   UseGuards,
   Req,
   ForbiddenException,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { 
@@ -42,13 +43,10 @@ export class UsersController {
   @ApiQuery({ name: 'offset', required: false, type: Number, example: 0 })
   @ApiResponse({ status: 200, description: 'List of users' })
   findAll(
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('offset', new ParseIntPipe({ optional: true })) offset?: number,
   ) {
-    return this.usersService.findAll({
-      limit: limit ? parseInt(limit, 10) : undefined,
-      offset: offset ? parseInt(offset, 10) : undefined,
-    });
+    return this.usersService.findAll({ limit, offset });
   }
 
   /**
@@ -109,9 +107,9 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   getHistory(
     @Param('id') id: string,
-    @Query('limit') limit?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
-    return this.usersService.getMatchHistory(id, limit ? parseInt(limit, 10) : undefined);
+    return this.usersService.getMatchHistory(id, limit);
   }
 
   /**
@@ -157,7 +155,7 @@ export class UsersController {
   getNews(
     @Param('id') id: string,
     @Req() req: AuthedRequest,
-    @Query('limit') limit?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     @Query('before') before?: string,
     @Query('filter') filter?: string,
   ) {
@@ -167,7 +165,7 @@ export class UsersController {
       );
     }
     return this.newsService.getNews(id, {
-      limit: limit ? parseInt(limit, 10) : undefined,
+      limit,
       before,
       filter: sanitizeFilter(filter),
     });

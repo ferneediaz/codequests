@@ -5,6 +5,7 @@ import {
     Patch,
     Delete,
     Param,
+    ParseIntPipe,
     Body,
     Query,
     UseGuards,
@@ -49,11 +50,11 @@ export class ClansController {
     @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
     @ApiQuery({ name: 'offset', required: false, type: Number, example: 0 })
     @ApiResponse({ status: 200, description: 'List of clans', type: [ClanResponseDto] })
-    findAll(@Query('limit') limit?: string, @Query('offset') offset?: string) {
-        return this.clansService.findAll({
-            limit: limit ? parseInt(limit, 10) : undefined,
-            offset: offset ? parseInt(offset, 10) : undefined,
-        });
+    findAll(
+        @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+        @Query('offset', new ParseIntPipe({ optional: true })) offset?: number,
+    ) {
+        return this.clansService.findAll({ limit, offset });
     }
 
     // ============================================

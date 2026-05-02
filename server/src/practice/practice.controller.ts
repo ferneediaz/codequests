@@ -3,6 +3,7 @@ import {
     Controller,
     Get,
     Param,
+    ParseIntPipe,
     Post,
     Query,
     Req,
@@ -64,13 +65,13 @@ export class PracticeController {
     getMyAttempts(
         @Req() req: AuthedRequest,
         @Query('problemId') problemId?: string,
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
+        @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+        @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     ) {
         return this.practice.getMyAttempts(req.user.id, {
             problemId,
-            page: page ? parseInt(page, 10) : undefined,
-            limit: limit ? parseInt(limit, 10) : undefined,
+            page,
+            limit,
         });
     }
 
