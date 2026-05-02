@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { LobbyService } from './lobby.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { BattlesGateway } from '../websockets/battles.gateway';
+import { PRESENCE_PORT } from '../realtime/ports/presence.port';
 import { BattlesService } from '../battles/battles.service';
 import { FriendsService } from '../friends/friends.service';
 import {
@@ -11,29 +11,13 @@ import {
 } from '../__mocks__/prisma.service';
 import { BattleMode } from '@prisma/client';
 
-// Lightweight mock of a Socket.IO socket used by the gateway's connectedClients
-// map. Only the fields LobbyService actually reads are populated.
-type MockSocket = {
-    id: string;
-    data: { user: { id: string; username: string } };
-    emit: jest.Mock;
-};
-
-function makeSocket(userId: string, username = userId): MockSocket {
-    return {
-        id: `sock-${userId}`,
-        data: { user: { id: userId, username } },
-        emit: jest.fn(),
-    };
-}
-
 describe('LobbyService', () => {
     let service: LobbyService;
     let prisma: MockPrismaService;
-    let battlesGateway: {
-        getConnectedClients: jest.Mock;
+    let presence: {
+        getOnlineUserIds: jest.Mock;
         isOnline: jest.Mock;
-        getSocketByUserId: jest.Mock;
+        emitToUser: jest.Mock;
     };
     let battlesService: {
         createBattle: jest.Mock;
@@ -44,10 +28,10 @@ describe('LobbyService', () => {
     beforeEach(async () => {
         const mockPrisma = createMockPrismaService();
 
-        battlesGateway = {
-            getConnectedClients: jest.fn(() => new Map<string, MockSocket>()),
+        presence = {
+            getOnlineUserIds: jest.fn(() => []),
             isOnline: jest.fn(),
-            getSocketByUserId: jest.fn(),
+            emitToUser: jest.fn(),
         };
         battlesService = {
             createBattle: jest.fn(),
@@ -61,7 +45,7 @@ describe('LobbyService', () => {
             providers: [
                 LobbyService,
                 { provide: PrismaService, useValue: mockPrisma },
-                { provide: BattlesGateway, useValue: battlesGateway },
+                { provide: PRESENCE_PORT, useValue: presence },
                 { provide: BattlesService, useValue: battlesService },
                 { provide: FriendsService, useValue: friendsService },
             ],
@@ -73,9 +57,7 @@ describe('LobbyService', () => {
 
     describe('getSnapshot', () => {
         it('returns empty snapshot when no one is online', async () => {
-            battlesGateway.getConnectedClients.mockReturnValue(
-                new Map<string, MockSocket>(),
-            );
+            presence.getOnlineUserIds.mockReturnValue([]);
 
             const result = await service.getSnapshot('user-1');
 
@@ -84,11 +66,11 @@ describe('LobbyService', () => {
         });
 
         it('returns online users (excluding self) with friendship hints and clans', async () => {
-            const connections = new Map<string, MockSocket>();
-            connections.set('s-1', makeSocket('user-1', 'alice'));
-            connections.set('s-2', makeSocket('user-2', 'bob'));
-            connections.set('s-3', makeSocket('user-3', 'charlie'));
-            battlesGateway.getConnectedClients.mockReturnValue(connections);
+            presence.getOnlineUserIds.mockReturnValue([
+                'user-1',
+                'user-2',
+                'user-3',
+            ]);
 
             prisma.user.findMany.mockResolvedValueOnce([
                 {
@@ -161,10 +143,7 @@ describe('LobbyService', () => {
         });
 
         it('marks PENDING_OUT when self is the requester', async () => {
-            const connections = new Map<string, MockSocket>();
-            connections.set('s-1', makeSocket('user-1'));
-            connections.set('s-2', makeSocket('user-2'));
-            battlesGateway.getConnectedClients.mockReturnValue(connections);
+            presence.getOnlineUserIds.mockReturnValue(['user-1', 'user-2']);
 
             prisma.user.findMany.mockResolvedValueOnce([
                 {
@@ -247,7 +226,7 @@ describe('LobbyService', () => {
                 id: 'user-2',
                 username: 'bob',
             });
-            battlesGateway.isOnline.mockReturnValueOnce(false);
+            presence.isOnline.mockReturnValueOnce(false);
 
             await expect(
                 service.challengeUser('user-1', 'user-2'),
@@ -259,7 +238,7 @@ describe('LobbyService', () => {
                 id: 'user-2',
                 username: 'bob',
             });
-            battlesGateway.isOnline.mockReturnValueOnce(true);
+            presence.isOnline.mockReturnValueOnce(true);
             battlesService.createBattle.mockResolvedValueOnce({
                 id: 'battle-1',
                 inviteCode: 'ABC123',
@@ -272,8 +251,7 @@ describe('LobbyService', () => {
                 battleMode: BattleMode.ONE_V_ONE,
                 inviteCode: 'ABC123',
             });
-            const targetSocket = makeSocket('user-2', 'bob');
-            battlesGateway.getSocketByUserId.mockReturnValueOnce(targetSocket);
+            presence.emitToUser.mockReturnValueOnce(true);
 
             const result = await service.challengeUser('user-1', 'user-2', 10);
 
@@ -287,7 +265,8 @@ describe('LobbyService', () => {
                 'user-1',
                 'bob',
             );
-            expect(targetSocket.emit).toHaveBeenCalledWith(
+            expect(presence.emitToUser).toHaveBeenCalledWith(
+                'user-2',
                 'battle.invite_received',
                 expect.objectContaining({
                     battleId: 'battle-1',
@@ -307,7 +286,7 @@ describe('LobbyService', () => {
                 id: 'user-2',
                 username: 'bob',
             });
-            battlesGateway.isOnline.mockReturnValueOnce(true);
+            presence.isOnline.mockReturnValueOnce(true);
             battlesService.createBattle.mockResolvedValueOnce({
                 id: 'battle-1',
                 inviteCode: 'ABC123',
@@ -320,7 +299,7 @@ describe('LobbyService', () => {
                 battleMode: BattleMode.ONE_V_ONE,
                 inviteCode: 'ABC123',
             });
-            battlesGateway.getSocketByUserId.mockReturnValueOnce(undefined);
+            presence.emitToUser.mockReturnValueOnce(false);
 
             const result = await service.challengeUser('user-1', 'user-2');
             expect(result.delivered).toBe(false);

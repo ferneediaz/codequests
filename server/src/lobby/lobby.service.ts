@@ -3,10 +3,9 @@ import {
     NotFoundException,
     BadRequestException,
     Inject,
-    forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { BattlesGateway } from '../websockets/battles.gateway';
+import { PRESENCE_PORT, PresencePort } from '../realtime/ports/presence.port';
 import { BattlesService } from '../battles/battles.service';
 import { FriendsService } from '../friends/friends.service';
 import { BattleMode, FriendshipStatus } from '@prisma/client';
@@ -22,17 +21,18 @@ import type {
  * who else is online, discover clans, and launch social actions (friend
  * request, DM, challenge) without being inside an active battle.
  *
- * Presence is sourced from `BattlesGateway.userSocketMap`, which is the
- * canonical "is this user connected right now" state. Clan and friendship
- * metadata is enriched from Prisma so the UI can render the correct CTA per
- * row (Add Friend vs Accept Request vs Challenge).
+ * Presence is sourced from `PresencePort`, whose gateway-backed adapter
+ * reads `BattlesGateway.userSocketMap` — the canonical "is this user
+ * connected right now" state. Clan and friendship metadata is enriched
+ * from Prisma so the UI can render the correct CTA per row (Add Friend vs
+ * Accept Request vs Challenge).
  */
 @Injectable()
 export class LobbyService {
     constructor(
         private readonly prisma: PrismaService,
-        @Inject(forwardRef(() => BattlesGateway))
-        private readonly battlesGateway: BattlesGateway,
+        @Inject(PRESENCE_PORT)
+        private readonly presence: PresencePort,
         private readonly battlesService: BattlesService,
         private readonly friendsService: FriendsService,
     ) {}
@@ -169,7 +169,7 @@ export class LobbyService {
             throw new NotFoundException('Target user not found');
         }
 
-        if (!this.battlesGateway.isOnline(target.id)) {
+        if (!this.presence.isOnline(target.id)) {
             throw new BadRequestException(
                 'That user is offline. Try sending a friend request instead.',
             );
@@ -192,39 +192,32 @@ export class LobbyService {
             target.username,
         );
 
-        const targetSocket = this.battlesGateway.getSocketByUserId(
+        const delivered = this.presence.emitToUser(
             inviteData.targetUserId,
-        );
-        if (targetSocket) {
-            targetSocket.emit('battle.invite_received', {
+            'battle.invite_received',
+            {
                 battleId: inviteData.battleId,
                 inviterUsername: inviteData.inviterUsername,
                 inviterAvatarUrl: inviteData.inviterAvatarUrl,
                 battleMode: inviteData.battleMode,
                 inviteCode: inviteData.inviteCode,
-            });
-        }
+            },
+        );
 
         return {
             battleId: battle.id,
             inviteCode: battle.inviteCode,
-            delivered: !!targetSocket,
+            delivered,
         };
     }
 
     /**
-     * Peek into the gateway's user->socket map. We can't access it directly,
-     * so we iterate connected sockets and collect userIds from their auth
-     * payload. This is O(N) in current connection count, which matches the
-     * gateway's own presence implementation.
+     * Snapshot the currently-online userIds via the presence port. The
+     * adapter walks the gateway's socket map; we get a fresh array per
+     * call (cheap relative to the rest of the snapshot query).
      */
     private getOnlineUserIdSet(): Set<string> {
-        const ids = new Set<string>();
-        for (const socket of this.battlesGateway.getConnectedClients().values()) {
-            const uid = socket.data?.user?.id;
-            if (uid) ids.add(uid);
-        }
-        return ids;
+        return new Set(this.presence.getOnlineUserIds());
     }
 
     /**

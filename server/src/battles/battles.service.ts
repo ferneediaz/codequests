@@ -5,7 +5,6 @@ import {
     ForbiddenException,
     Inject,
     Logger,
-    forwardRef,
 } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,7 +18,10 @@ import { getRankTier } from '../common/utils/rank-tiers';
 import { randomBytes } from 'crypto';
 import { BattleRoyaleService } from './battle-royale.service';
 import { ClanWarsService } from './clan-wars.service';
-import { BattlesGateway } from '../websockets/battles.gateway';
+import {
+    BATTLE_EVENTS_PORT,
+    BattleEventsPort,
+} from '../realtime/ports/battle-events.port';
 import { SubmissionResult } from './types/battle-submission.types';
 
 // K-factor for Elo calculation (higher = more volatile ratings)
@@ -60,12 +62,13 @@ export class BattlesService {
         private subscriptionsService: SubscriptionsService,
         private seasonsService: SeasonsService,
         private problemsService: ProblemsService,
-        @Inject(forwardRef(() => BattleRoyaleService))
+        // BR/CW are same-module providers (BattlesModule); no forwardRef
+        // needed because there's no TS-side cycle between them and us
+        // anymore — all three only share types via `types/battle-submission`.
         private battleRoyaleService: BattleRoyaleService,
-        @Inject(forwardRef(() => ClanWarsService))
         private clanWarsService: ClanWarsService,
-        @Inject(forwardRef(() => BattlesGateway))
-        private gateway: BattlesGateway,
+        @Inject(BATTLE_EVENTS_PORT)
+        private gateway: BattleEventsPort,
     ) { }
 
     /**

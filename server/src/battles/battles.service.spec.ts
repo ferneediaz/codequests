@@ -7,7 +7,7 @@ import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SeasonsService } from '../seasons/seasons.service';
 import { ProblemsService } from '../problems/problems.service';
-import { BattlesGateway } from '../websockets/battles.gateway';
+import { BATTLE_EVENTS_PORT } from '../realtime/ports/battle-events.port';
 import {
     createMockPrismaService,
     MockPrismaService,
@@ -195,7 +195,7 @@ describe('BattlesService', () => {
                     },
                 },
                 {
-                    provide: BattlesGateway,
+                    provide: BATTLE_EVENTS_PORT,
                     useValue: {
                         emitBattleSubmission: jest.fn(),
                         emitBattleCompleted: jest.fn(),
@@ -210,7 +210,7 @@ describe('BattlesService', () => {
         codeExecutionService = module.get(CodeExecutionService);
         subscriptionsService = module.get(SubscriptionsService);
         battleRoyaleService = module.get(BattleRoyaleService) as any;
-        battlesGateway = module.get(BattlesGateway) as any;
+        battlesGateway = module.get(BATTLE_EVENTS_PORT) as any;
     });
 
     describe('createBattle', () => {

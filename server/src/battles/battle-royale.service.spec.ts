@@ -20,7 +20,7 @@ import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SeasonsService } from '../seasons/seasons.service';
 import { ProblemsService } from '../problems/problems.service';
-import { BattlesGateway } from '../websockets/battles.gateway';
+import { BATTLE_EVENTS_PORT } from '../realtime/ports/battle-events.port';
 import { CreateBattleDto } from './dto/create-battle.dto';
 import {
     createMockPrismaService,
@@ -141,7 +141,7 @@ describe('BattleRoyaleService', () => {
                 { provide: SeasonsService, useValue: mockSeasons },
                 { provide: ProblemsService, useValue: mockProblems },
                 { provide: SchedulerRegistry, useValue: scheduler },
-                { provide: BattlesGateway, useValue: gateway },
+                { provide: BATTLE_EVENTS_PORT, useValue: gateway },
             ],
         }).compile();
 

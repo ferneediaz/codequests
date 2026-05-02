@@ -1254,36 +1254,36 @@ Today `server/src/battles/battle-royale.service.ts` and `server/src/battles/clan
 - [ ] Update all three to import from the new file.
 - [ ] This is a pure structural-types move; no runtime change.
 
-### PR 5 — `BattleEventsEmitter` port + `forwardRef` purge
+### PR 5 — `BattleEventsEmitter` port + `forwardRef` purge ✅ DONE
 
 This is the structural fix for **~20+ `forwardRef`s**. Today every domain service that wants to emit a WebSocket event injects the concrete `BattlesGateway` via `forwardRef`, which forces both `Battles ↔ Websockets` and `Friends ↔ Websockets` symmetric module cycles plus knock-on `forwardRef`s in `Lobby`, `Seasons`, `BR`, `CW`, `Friends`, and `ClansController`.
 
 Plan:
 
 1. **Define a port module.** Create `server/src/realtime/` with:
-    - [ ] `realtime.module.ts` (exports the port tokens; lives separately from `WebsocketsModule`).
-    - [ ] `ports/battle-events.port.ts` — `interface BattleEventsPort { emitBattleSubmission(...); emitBattleCompleted(...); emitRoyaleRoundEnded(...); ... }` plus tokens like `BATTLE_EVENTS_PORT`.
-    - [ ] `ports/friend-events.port.ts` — `emitFriendRequestReceived/Accepted/Declined`.
-    - [ ] `ports/clan-events.port.ts` — `emitToClanMembers` for `ClansController`.
-    - [ ] `ports/season-events.port.ts` — `emitSeasonEnded`.
-    - [ ] `ports/presence.port.ts` — `isOnline`, `getSocketByUserId`, `getConnectedClients` (used by `LobbyService`).
-2. **Implement the ports in `WebsocketsModule`.** Each port gets a thin adapter that delegates to `BattlesGateway`. `WebsocketsModule` provides the adapter classes under their `*_PORT` tokens. Domain services consume the **token**, not the gateway.
+    - [x] `realtime.module.ts` (exports the port tokens; lives separately from `WebsocketsModule`).
+    - [x] `ports/battle-events.port.ts` — `interface BattleEventsPort { emitBattleSubmission(...); emitBattleCompleted(...); emitRoyaleRoundEnded(...); ... }` plus tokens like `BATTLE_EVENTS_PORT`.
+    - [x] `ports/friend-events.port.ts` — `emitFriendRequestReceived/Accepted/Declined`.
+    - [x] `ports/clan-events.port.ts` — `emitToClanMembers` for `ClansController`.
+    - [x] `ports/season-events.port.ts` — `emitSeasonEnded`.
+    - [x] `ports/presence.port.ts` — `isOnline`, `getOnlineUserIds`, `emitToUser` (presence is wrapped behind methods rather than leaking raw sockets).
+2. **Implement the ports in `WebsocketsModule`.** Each port gets a thin adapter that delegates to `BattlesGateway`. ✅ Done — adapters live under `realtime/adapters/` and `RealtimeModule` (not `WebsocketsModule`) provides them under the `*_PORT` tokens. Domain services consume the token.
 3. **Refactor consumers:**
-    - [ ] `server/src/friends/friends.service.ts` — swap `BattlesGateway` for `FriendEventsPort`; drop `forwardRef` (lines 7, 20).
-    - [ ] `server/src/seasons/seasons.service.ts` — swap for `SeasonEventsPort`; drop `forwardRef` (lines 7, 20).
-    - [ ] `server/src/lobby/lobby.service.ts` — swap for `PresencePort`; drop `forwardRef` (line 34).
-    - [ ] `server/src/battles/battle-royale.service.ts` — swap for `BattleEventsPort`; drop `forwardRef` (line 85).
-    - [ ] `server/src/battles/clan-wars.service.ts` — same as above (line 111).
-    - [ ] `server/src/battles/battles.service.ts` — swap `BattlesGateway` for `BattleEventsPort` (lines 77-82). The remaining `forwardRef`s on `BattleRoyaleService`/`ClanWarsService` are addressed in step 5.
-    - [ ] `server/src/clans/clans.controller.ts` — swap `BattlesGateway` injection for `ClanEventsPort`.
+    - [x] `server/src/friends/friends.service.ts` — `FriendEventsPort` injected; `forwardRef` removed.
+    - [x] `server/src/seasons/seasons.service.ts` — `SeasonEventsPort` injected; `forwardRef` removed.
+    - [x] `server/src/lobby/lobby.service.ts` — `PresencePort` injected; `forwardRef` removed; `getSocketByUserId().emit()` collapsed into `presence.emitToUser()`.
+    - [x] `server/src/battles/battle-royale.service.ts` — `BattleEventsPort` injected; `forwardRef` removed.
+    - [x] `server/src/battles/clan-wars.service.ts` — same.
+    - [x] `server/src/battles/battles.service.ts` — `BattleEventsPort` injected; spurious `forwardRef`s on `BattleRoyaleService`/`ClanWarsService` (same-module providers, no TS cycle) also removed.
+    - [x] `server/src/clans/clans.controller.ts` — `ClanEventsPort` injected via `@Inject(CLAN_EVENTS_PORT)`.
 4. **Delete `forwardRef` from module imports** that are no longer needed:
-    - [ ] `server/src/battles/battles.module.ts` — remove `forwardRef(() => WebsocketsModule)`; import `RealtimeModule` instead.
-    - [ ] `server/src/websockets/websockets.module.ts` — keep `BattlesService` injection only where the gateway needs to read battle state; if mutual provider cycle remains, keep one `forwardRef` and add a one-line comment per the rule.
-    - [ ] `server/src/friends/friends.module.ts`, `server/src/seasons/seasons.module.ts`, `server/src/lobby/lobby.module.ts`, `server/src/clans/clans.module.ts`, `server/src/chat/chat.module.ts` — drop the matching `forwardRef`s.
-5. **One-way `forwardRef` cleanup.** `server/src/clans/clan-challenges.service.ts` line 33 injects `ClanWarsService` one-way; once `ClansModule` no longer needs `forwardRef(() => BattlesModule)` it can drop the `forwardRef` on the constructor too. Verify and remove.
-6. **Remaining `forwardRef`s.** A small residual cycle (`BattlesGateway` ↔ `BattlesService` for command handlers like `useSkill`, `readyUp`) likely remains. Keep it with a one-line comment — that satisfies the rule.
+    - [x] `server/src/battles/battles.module.ts` — `forwardRef(() => WebsocketsModule)` replaced with `RealtimeModule`.
+    - [x] `server/src/websockets/websockets.module.ts` — kept `forwardRef(() => BattlesModule)` and `forwardRef(() => FriendsModule)`; both annotated explaining the residual cycle (gateway needs `BattlesService` for socket commands and `FriendsService` for presence pings).
+    - [x] `server/src/friends/friends.module.ts`, `server/src/seasons/seasons.module.ts`, `server/src/lobby/lobby.module.ts`, `server/src/clans/clans.module.ts`, `server/src/chat/chat.module.ts` — every matching `forwardRef` dropped.
+5. **One-way `forwardRef` cleanup.** [x] `server/src/clans/clan-challenges.service.ts` constructor `forwardRef(() => ClanWarsService)` removed (no TS-side cycle).
+6. **Remaining `forwardRef`s.** [x] Documented residual: 4 invocations across `WebsocketsModule.imports` and `BattlesGateway.constructor`, all annotated.
 
-Acceptance: `rg "forwardRef" server/src` should drop from ~37 hits to a single-digit number, each with a comment.
+Acceptance: `rg "forwardRef\(" server/src` returns **4** hits — all on the same documented residual cycle.
 
 ### PRs 6–13 — Response DTO honesty audit (one PR per controller)
 

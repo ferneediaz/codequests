@@ -4,11 +4,13 @@ import {
     BadRequestException,
     Logger,
     Inject,
-    forwardRef,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import { BattlesGateway } from '../websockets/battles.gateway';
+import {
+    SEASON_EVENTS_PORT,
+    SeasonEventsPort,
+} from '../realtime/ports/season-events.port';
 import { getRankTier } from '../common/utils/rank-tiers';
 
 @Injectable()
@@ -17,8 +19,8 @@ export class SeasonsService {
 
     constructor(
         private prisma: PrismaService,
-        @Inject(forwardRef(() => BattlesGateway))
-        private battlesGateway: BattlesGateway,
+        @Inject(SEASON_EVENTS_PORT)
+        private seasonEvents: SeasonEventsPort,
     ) {}
 
     /**
@@ -319,7 +321,7 @@ export class SeasonsService {
         const newSeason = await this.startSeason();
 
         // Notify all connected clients
-        this.battlesGateway.emitSeasonEnded({
+        this.seasonEvents.emitSeasonEnded({
             endedSeason: { id: activeSeason.id, name: activeSeason.name, number: activeSeason.number },
             newSeason: { id: newSeason.id, name: newSeason.name, number: newSeason.number },
         });

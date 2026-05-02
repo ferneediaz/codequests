@@ -4,8 +4,6 @@ import {
     BadRequestException,
     ForbiddenException,
     ConflictException,
-    Inject,
-    forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -62,7 +60,8 @@ const challengeInclude = {
 export class ClanChallengeService {
     constructor(
         private prisma: PrismaService,
-        @Inject(forwardRef(() => ClanWarsService))
+        // ClanWarsService lives in BattlesModule (ClansModule imports it
+        // straight). No TS-side cycle here, so no forwardRef needed.
         private clanWarsService: ClanWarsService,
     ) {}
 

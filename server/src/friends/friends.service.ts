@@ -4,21 +4,24 @@ import {
     BadRequestException,
     ConflictException,
     Inject,
-    forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { FriendshipStatus } from '@prisma/client';
-import { BattlesGateway } from '../websockets/battles.gateway';
+import {
+    FRIEND_EVENTS_PORT,
+    FriendEventsPort,
+} from '../realtime/ports/friend-events.port';
 
 @Injectable()
 export class FriendsService {
     constructor(
         private readonly prisma: PrismaService,
-        // forwardRef to break the FriendsModule <-> WebsocketsModule cycle.
-        // The gateway is only used for best-effort real-time delivery, so
-        // all paths tolerate it being unavailable (no throw).
-        @Inject(forwardRef(() => BattlesGateway))
-        private readonly battlesGateway: BattlesGateway,
+        // Realtime is best-effort delivery; all paths tolerate the port
+        // failing to deliver. The port replaces a previous direct gateway
+        // injection that caused the FriendsModule <-> WebsocketsModule
+        // cycle (now broken by RealtimeModule).
+        @Inject(FRIEND_EVENTS_PORT)
+        private readonly friendEvents: FriendEventsPort,
     ) {}
 
     /**
@@ -110,7 +113,7 @@ export class FriendsService {
                 select: { id: true, username: true, avatarUrl: true, mmr: true },
             });
             if (!requester) return;
-            this.battlesGateway.emitFriendRequestReceived(addresseeId, {
+            this.friendEvents.emitFriendRequestReceived(addresseeId, {
                 friendshipId,
                 requesterId: requester.id,
                 requesterUsername: requester.username,
@@ -159,7 +162,7 @@ export class FriendsService {
         // Let the original requester know in realtime that they now have
         // a new friend (socket-only; REST is unchanged).
         try {
-            this.battlesGateway.emitFriendRequestAccepted(updated.requesterId, {
+            this.friendEvents.emitFriendRequestAccepted(updated.requesterId, {
                 friendshipId: updated.id,
                 friendId: updated.addressee.id,
                 friendUsername: updated.addressee.username,
@@ -206,7 +209,7 @@ export class FriendsService {
         // Best-effort: quietly let the requester know their request was
         // declined. Client surfaces this as a subtle toast, not a badge.
         try {
-            this.battlesGateway.emitFriendRequestDeclined(updated.requesterId, {
+            this.friendEvents.emitFriendRequestDeclined(updated.requesterId, {
                 friendshipId: updated.id,
                 addresseeId: updated.addressee.id,
                 addresseeUsername: updated.addressee.username,

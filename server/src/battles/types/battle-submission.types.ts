@@ -1,7 +1,9 @@
 // Shared submission shapes used by `BattlesService`, `BattleRoyaleService`,
 // and `ClanWarsService`. Lives here to break the TypeScript-side import
-// cycle between the three (the Nest provider cycle is a separate concern,
-// still resolved via `forwardRef`).
+// cycle between the three. The Nest provider graph between them is now a
+// plain (non-cyclic) DAG — they're co-located in `BattlesModule` and only
+// the gateway-bound port (`BATTLE_EVENTS_PORT`) connects them to the
+// realtime layer.
 
 export interface SubmissionResult {
     testsPassed: number;

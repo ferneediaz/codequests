@@ -1,10 +1,10 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { FriendsService } from './friends.service';
 import { FriendsController } from './friends.controller';
-import { WebsocketsModule } from '../websockets/websockets.module';
+import { RealtimeModule } from '../realtime/realtime.module';
 
 @Module({
-    imports: [forwardRef(() => WebsocketsModule)],
+    imports: [RealtimeModule],
     controllers: [FriendsController],
     providers: [FriendsService],
     exports: [FriendsService],

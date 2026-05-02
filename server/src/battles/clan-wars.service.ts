@@ -4,7 +4,6 @@ import {
     BadRequestException,
     ForbiddenException,
     Inject,
-    forwardRef,
     Logger,
 } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
@@ -22,7 +21,10 @@ import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SeasonsService } from '../seasons/seasons.service';
 import { ProblemsService } from '../problems/problems.service';
-import { BattlesGateway } from '../websockets/battles.gateway';
+import {
+    BATTLE_EVENTS_PORT,
+    BattleEventsPort,
+} from '../realtime/ports/battle-events.port';
 import { CreateClanWarsBattleDto } from './dto/create-clan-wars-battle.dto';
 import { ClanWarsPresetDto } from './dto/clan-wars-preset.dto';
 import { SubmissionResult } from './types/battle-submission.types';
@@ -108,8 +110,8 @@ export class ClanWarsService {
         private seasonsService: SeasonsService,
         private problemsService: ProblemsService,
         private scheduler: SchedulerRegistry,
-        @Inject(forwardRef(() => BattlesGateway))
-        private gateway: BattlesGateway,
+        @Inject(BATTLE_EVENTS_PORT)
+        private gateway: BattleEventsPort,
     ) { }
 
     // ========================================

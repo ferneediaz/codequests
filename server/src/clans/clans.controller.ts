@@ -10,6 +10,7 @@ import {
     Query,
     UseGuards,
     Req,
+    Inject,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -22,7 +23,10 @@ import {
 } from '@nestjs/swagger';
 import { ClansService } from './clans.service';
 import { ClanChallengeService } from './clan-challenges.service';
-import { BattlesGateway } from '../websockets/battles.gateway';
+import {
+    CLAN_EVENTS_PORT,
+    ClanEventsPort,
+} from '../realtime/ports/clan-events.port';
 import {
     CreateClanDto,
     UpdateClanDto,
@@ -39,7 +43,8 @@ export class ClansController {
     constructor(
         private readonly clansService: ClansService,
         private readonly clanChallengeService: ClanChallengeService,
-        private readonly battlesGateway: BattlesGateway,
+        @Inject(CLAN_EVENTS_PORT)
+        private readonly clanEvents: ClanEventsPort,
     ) { }
 
     /**
@@ -83,7 +88,7 @@ export class ClansController {
         const memberIds = await this.clanChallengeService.getClanMemberIds(
             challenge.challengedClanId,
         );
-        this.battlesGateway.emitToClanMembers(memberIds, 'clan.challenge_received', {
+        this.clanEvents.emitToClanMembers(memberIds, 'clan.challenge_received', {
             challengeId: challenge.id,
             challengerClan: challenge.challengerClan,
             challengedClan: challenge.challengedClan,
@@ -122,7 +127,7 @@ export class ClansController {
             this.clanChallengeService.getClanMemberIds(challenge.challengedClanId),
         ]);
         const allMembers = [...challengerMembers, ...challengedMembers];
-        this.battlesGateway.emitToClanMembers(allMembers, 'clan.challenge_accepted', {
+        this.clanEvents.emitToClanMembers(allMembers, 'clan.challenge_accepted', {
             challengeId: challenge.id,
             challengerClan: challenge.challengerClan,
             challengedClan: challenge.challengedClan,
@@ -161,7 +166,7 @@ export class ClansController {
         const challengedMemberIds = await this.clanChallengeService.getClanMemberIds(
             challenge.challengedClanId,
         );
-        this.battlesGateway.emitToClanMembers(
+        this.clanEvents.emitToClanMembers(
             [...memberIds, ...challengedMemberIds],
             'clan.challenge_declined',
             {
@@ -201,7 +206,7 @@ export class ClansController {
         const memberIds = await this.clanChallengeService.getClanMemberIds(
             challenge.challengerClanId,
         );
-        this.battlesGateway.emitToClanMembers(memberIds, 'clan.challenge_countered', {
+        this.clanEvents.emitToClanMembers(memberIds, 'clan.challenge_countered', {
             challengeId: challenge.id,
             challengerClan: challenge.challengerClan,
             challengedClan: challenge.challengedClan,

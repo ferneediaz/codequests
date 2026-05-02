@@ -101,9 +101,15 @@ export class BattlesGateway
 
     constructor(
         private readonly prisma: PrismaService,
+        // Residual cycle: BattlesService now reaches the gateway via
+        // BattleEventsPort (RealtimeModule), but the gateway still calls
+        // back into BattlesService for socket commands (useSkill, readyUp,
+        // invites). Keep the forwardRef.
         @Inject(forwardRef(() => BattlesService))
         private readonly battlesService: BattlesService,
         private readonly jwtVerificationService: JwtVerificationService,
+        // Same residual cycle as above for FriendsService — used here for
+        // friend-presence broadcasts on (dis)connect.
         @Inject(forwardRef(() => FriendsService))
         private readonly friendsService: FriendsService,
     ) { }

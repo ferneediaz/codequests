@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FriendsService } from './friends.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { BattlesGateway } from '../websockets/battles.gateway';
+import { FRIEND_EVENTS_PORT } from '../realtime/ports/friend-events.port';
 import {
     createMockPrismaService,
     MockPrismaService,
@@ -59,7 +59,7 @@ describe('FriendsService', () => {
             providers: [
                 FriendsService,
                 { provide: PrismaService, useValue: mockPrisma },
-                { provide: BattlesGateway, useValue: mockBattlesGateway },
+                { provide: FRIEND_EVENTS_PORT, useValue: mockBattlesGateway },
             ],
         }).compile();
 

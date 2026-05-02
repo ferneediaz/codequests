@@ -1,15 +1,12 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ClansController } from './clans.controller';
 import { ClansService } from './clans.service';
 import { ClanChallengeService } from './clan-challenges.service';
-import { WebsocketsModule } from '../websockets/websockets.module';
+import { RealtimeModule } from '../realtime/realtime.module';
 import { BattlesModule } from '../battles/battles.module';
 
 @Module({
-    imports: [
-        forwardRef(() => WebsocketsModule),
-        forwardRef(() => BattlesModule),
-    ],
+    imports: [RealtimeModule, BattlesModule],
     controllers: [ClansController],
     providers: [ClansService, ClanChallengeService],
     exports: [ClansService, ClanChallengeService],

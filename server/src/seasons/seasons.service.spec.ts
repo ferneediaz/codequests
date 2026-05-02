@@ -1,7 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SeasonsService } from './seasons.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { BattlesGateway } from '../websockets/battles.gateway';
+import {
+    SEASON_EVENTS_PORT,
+    SeasonEventsPort,
+} from '../realtime/ports/season-events.port';
 import {
     createMockPrismaService,
     MockPrismaService,
@@ -11,7 +14,7 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 describe('SeasonsService', () => {
     let service: SeasonsService;
     let prisma: MockPrismaService;
-    let battlesGateway: jest.Mocked<BattlesGateway>;
+    let seasonEvents: jest.Mocked<SeasonEventsPort>;
 
     const mockSeason = {
         id: 'season-1',
@@ -46,7 +49,7 @@ describe('SeasonsService', () => {
                 SeasonsService,
                 { provide: PrismaService, useValue: prisma },
                 {
-                    provide: BattlesGateway,
+                    provide: SEASON_EVENTS_PORT,
                     useValue: {
                         emitSeasonEnded: jest.fn(),
                     },
@@ -55,7 +58,7 @@ describe('SeasonsService', () => {
         }).compile();
 
         service = module.get<SeasonsService>(SeasonsService);
-        battlesGateway = module.get(BattlesGateway);
+        seasonEvents = module.get(SEASON_EVENTS_PORT);
     });
 
     describe('getActiveSeason', () => {
@@ -501,7 +504,7 @@ describe('SeasonsService', () => {
 
             await service.processSeasonTransition();
 
-            expect(battlesGateway.emitSeasonEnded).toHaveBeenCalledWith({
+            expect(seasonEvents.emitSeasonEnded).toHaveBeenCalledWith({
                 endedSeason: {
                     id: expiredSeason.id,
                     name: expiredSeason.name,
