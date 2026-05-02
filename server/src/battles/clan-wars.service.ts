@@ -25,7 +25,7 @@ import { ProblemsService } from '../problems/problems.service';
 import { BattlesGateway } from '../websockets/battles.gateway';
 import { CreateClanWarsBattleDto } from './dto/create-clan-wars-battle.dto';
 import { ClanWarsPresetDto } from './dto/clan-wars-preset.dto';
-import { SubmissionResult } from './battles.service';
+import { SubmissionResult } from './types/battle-submission.types';
 import { getRankTier, RankTier } from '../common/utils/rank-tiers';
 
 // ============================================

@@ -25,7 +25,7 @@ import { BattlesGateway } from '../websockets/battles.gateway';
 import { CreateBattleDto } from './dto/create-battle.dto';
 import { RoundConfigDto } from './dto/round-config.dto';
 import { RoyalePresetDto } from './dto/royale-preset.dto';
-import { SubmissionResult } from './battles.service';
+import { SubmissionResult } from './types/battle-submission.types';
 import { getRankTier, RankTier } from '../common/utils/rank-tiers';
 
 // ============================================

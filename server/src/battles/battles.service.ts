@@ -20,6 +20,7 @@ import { randomBytes } from 'crypto';
 import { BattleRoyaleService } from './battle-royale.service';
 import { ClanWarsService } from './clan-wars.service';
 import { BattlesGateway } from '../websockets/battles.gateway';
+import { SubmissionResult } from './types/battle-submission.types';
 
 // K-factor for Elo calculation (higher = more volatile ratings)
 const ELO_K_FACTOR = 16;
@@ -48,21 +49,6 @@ const DIFFICULTY_POINTS: Record<Difficulty, number> = {
     MEDIUM: 5,
     HARD: 10,
 };
-
-export interface SubmissionResult {
-    testsPassed: number;
-    totalTests: number;
-    allPassed: boolean;
-    pointsAwarded: number;
-    results: Array<{
-        testCaseId: string;
-        passed: boolean;
-        input: string;
-        expectedOutput: string;
-        actualOutput: string | null;
-        error: string | null;
-    }>;
-}
 
 @Injectable()
 export class BattlesService {
