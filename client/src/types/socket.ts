@@ -1,4 +1,9 @@
-import type { BattleStatus, SkillType } from './api';
+import type {
+    BattleParticipant,
+    BattleStatus,
+    ProblemResponse,
+    SkillType,
+} from './battle';
 
 export interface MatchFoundPayload {
     battleId: string;
@@ -10,24 +15,8 @@ export interface BattleStartedPayload {
     battleId: string;
     status: BattleStatus;
     startedAt: string;
-    problem: {
-        id: string;
-        title: string;
-        description: string;
-        difficulty: string;
-        starterCode: string;
-        testCases?: {
-            id: string;
-            input: string;
-            expectedOutput: string;
-            isHidden: boolean;
-        }[];
-    };
-    participants: {
-        userId: string;
-        username: string;
-        isReady: boolean;
-    }[];
+    problem: ProblemResponse;
+    participants: Pick<BattleParticipant, 'userId' | 'username' | 'isReady'>[];
 }
 
 export interface BattleSubmissionPayload {
@@ -43,13 +32,12 @@ export interface BattleCompletedPayload {
     status: BattleStatus;
     winnerId: string;
     endedAt: string;
-    participants: {
-        userId: string;
-        username: string;
-        testsPassed: number;
-        totalTests: number;
-        mmrChange: number;
-    }[];
+    participants: Array<
+        Pick<
+            BattleParticipant,
+            'userId' | 'username' | 'testsPassed' | 'totalTests'
+        > & { mmrChange: number }
+    >;
 }
 
 export interface PlayerJoinedPayload {

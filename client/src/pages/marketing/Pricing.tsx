@@ -70,9 +70,7 @@ export default function Pricing() {
         const next = new URLSearchParams(searchParams);
         next.delete('checkout');
         setSearchParams(next, { replace: true });
-        // refresh / setSearchParams identity is stable enough here.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [checkoutReturn]);
+    }, [checkoutReturn, refresh, searchParams, setSearchParams]);
 
     const handleCheckout = async (plan: CheckoutPlan) => {
         setSubmitting(plan);

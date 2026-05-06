@@ -28,14 +28,19 @@ export function useSubscription() {
         (state) => state.subscription,
     );
     const inFlightRef = useRef<Promise<void> | null>(null);
+    const lastFetchedAtRef = useRef(lastFetchedAt);
+
+    useEffect(() => {
+        lastFetchedAtRef.current = lastFetchedAt;
+    }, [lastFetchedAt]);
 
     const fetchStatus = useCallback(
         async (force = false) => {
             if (!isAuthenticated) return;
             if (
                 !force &&
-                lastFetchedAt &&
-                Date.now() - lastFetchedAt < REFRESH_THROTTLE_MS
+                lastFetchedAtRef.current &&
+                Date.now() - lastFetchedAtRef.current < REFRESH_THROTTLE_MS
             ) {
                 return;
             }
@@ -59,7 +64,7 @@ export function useSubscription() {
             inFlightRef.current = promise;
             return promise;
         },
-        [dispatch, isAuthenticated, lastFetchedAt],
+        [dispatch, isAuthenticated],
     );
 
     // Fetch on sign-in; clear on sign-out. We intentionally key on
@@ -71,10 +76,7 @@ export function useSubscription() {
         } else if (!isAuthenticated) {
             dispatch(clearSubscription());
         }
-        // fetchStatus is intentionally omitted from deps to avoid the
-        // throttle-controlled identity changing this effect every render.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAuthenticated, user?.id, dispatch]);
+    }, [isAuthenticated, user?.id, dispatch, fetchStatus]);
 
     const derived = useMemo(() => {
         const tier = status?.tier ?? 'free';

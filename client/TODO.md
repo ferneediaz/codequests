@@ -994,14 +994,14 @@ Living checklist of client-side cleanup. Order is roughly by impact. Tick items 
 
 ### P4 — Routing & types
 
-- [ ] Modularize `router.tsx`: split per feature into `routes/{auth,battle,practice,author,...}.tsx` and compose
-- [ ] Split `types/api.ts` (~337 lines) per domain (`battle.ts`, `user.ts`, `news.ts`, `clan.ts`)
-- [ ] Reconcile duplicated socket payload types between `types/socket.ts` and `types/api.ts`
+- [x] Modularize `router.tsx`: split per feature into `routes/{auth,battle,practice,author,...}.tsx` and compose
+- [x] Split `types/api.ts` (~337 lines) per domain (`battle.ts`, `user.ts`, `news.ts`, `clan.ts`)
+- [x] Reconcile duplicated socket payload types between `types/socket.ts` and `types/api.ts`
 
 ### P5 — Docs / DX
 
-- [ ] Add a short `client/ARCHITECTURE.md` (Redux vs TanStack split, socket flow, paywall flow) once P1/P2 settle
-- [ ] After P0, audit for any silently kept `eslint-disable` comments
+- [x] Add a short `client/ARCHITECTURE.md` (Redux vs TanStack split, socket flow, paywall flow) once P1/P2 settle
+- [x] After P0, audit for any silently kept `eslint-disable` comments
 
 ---
 
