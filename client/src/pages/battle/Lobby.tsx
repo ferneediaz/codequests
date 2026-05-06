@@ -1,20 +1,13 @@
-import { useState } from 'react';
 import { Loader2, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AmbientBackground } from '@/components/layout/AmbientBackground';
 import { AnimateIn } from '@/components/layout/AnimateIn';
 import { useAppSelector } from '@/store/hooks';
 import { useLobbyPresence } from '@/hooks/useLobbyPresence';
+import { useSocialLayout } from '@/hooks/useSocialLayout';
 import { OnlineUsersPanel } from '@/components/lobby/OnlineUsersPanel';
 import { LobbyChatPanel } from '@/components/lobby/LobbyChatPanel';
 import { OnlineClansPanel } from '@/components/lobby/OnlineClansPanel';
-import { DmDrawer } from '@/components/lobby/DmDrawer';
-import type { LobbyUser } from '@/types/lobby';
-
-interface OpenDmState {
-    conversationId: string;
-    user: LobbyUser;
-}
 
 /**
  * Global lobby — pre-battle social hub. Three-column layout on desktop:
@@ -24,7 +17,7 @@ interface OpenDmState {
 export default function Lobby() {
     const user = useAppSelector((s) => s.auth.user);
     const { snapshot, loading, error, refresh, patchUser } = useLobbyPresence();
-    const [openDm, setOpenDm] = useState<OpenDmState | null>(null);
+    const { openDm } = useSocialLayout();
 
     return (
         <div className="relative min-h-[calc(100vh-4rem)]">
@@ -73,7 +66,7 @@ export default function Lobby() {
                                 onUserPatch={patchUser}
                                 onRefresh={() => void refresh()}
                                 onOpenDm={(conversationId, otherUser) =>
-                                    setOpenDm({ conversationId, user: otherUser })
+                                    openDm(conversationId, otherUser)
                                 }
                             />
                         </div>
@@ -86,15 +79,6 @@ export default function Lobby() {
                     </div>
                 )}
             </div>
-
-            {openDm && (
-                <DmDrawer
-                    conversationId={openDm.conversationId}
-                    otherUser={openDm.user}
-                    currentUserId={user?.id}
-                    onClose={() => setOpenDm(null)}
-                />
-            )}
         </div>
     );
 }

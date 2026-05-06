@@ -3,7 +3,7 @@ import { Popover } from 'radix-ui';
 import { Bell, Check, X, UserPlus, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RankBadge } from '@/components/ui/RankBadge';
-import { useFriendNotifications } from '@/hooks/useFriendNotifications';
+import { useFriends } from '@/hooks/useFriends';
 import type { PendingRequest } from '@/services/friends';
 
 /**
@@ -26,7 +26,7 @@ export function NotificationBell() {
         decline,
         markAllSeen,
         refresh,
-    } = useFriendNotifications();
+    } = useFriends();
     const [open, setOpen] = useState(false);
     const [busyId, setBusyId] = useState<string | null>(null);
     const seenOnOpenRef = useRef(false);

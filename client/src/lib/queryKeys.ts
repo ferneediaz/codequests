@@ -11,6 +11,10 @@ export const queryKeys = {
         royale: () => ['battles', 'royale', 'presets'] as const,
         clanWars: () => ['battles', 'clan-wars', 'presets'] as const,
     },
+    friends: {
+        list: () => ['friends', 'list'] as const,
+        incoming: () => ['friends', 'incoming'] as const,
+    },
     practice: {
         problems: () => ['practice', 'problems'] as const,
         stats: () => ['practice', 'stats'] as const,

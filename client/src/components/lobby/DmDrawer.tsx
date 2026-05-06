@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import api from '@/services/api';
 import { getChatSocket } from '@/services/socket';
 import type { ChatMessagePayload } from '@/types/socket';
-import type { LobbyUser } from '@/types/lobby';
+import type { DmTargetUser } from '@/context/socialLayoutContext';
 
 interface DmDrawerProps {
     conversationId: string;
-    otherUser: LobbyUser;
+    otherUser: DmTargetUser;
     currentUserId?: string;
     onClose: () => void;
 }

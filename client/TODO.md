@@ -423,20 +423,30 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 **Depends on backend:** Friends module, Chat module, Clan challenge module, Push notification module.
 
 ### 3.1 Friends System
-- [ ] Create `friendsSlice` (friends, pendingRequests, sentRequests)
-- [ ] Create `useFriends` hook (sendRequest, acceptRequest, declineRequest, removeFriend, getFriends)
-- [ ] Friends list component (sidebar or dedicated section):
-  - [ ] List friends with avatar, username, online status dot (green/gray)
-  - [ ] "Add Friend" button → username search input
-  - [ ] Right-click or action menu: invite to game, send message, remove friend
-- [ ] Pending requests section:
-  - [ ] Incoming requests with Accept/Decline buttons
-  - [ ] Sent requests with "Pending..." status
-- [ ] Online presence:
-  - [ ] Listen to `presence.online` / `presence.offline` WebSocket events
-  - [ ] Update friend status in real-time
-- [ ] Friends list accessible from navbar (icon with pending count badge)
-- [ ] **Success Criteria:** Can add friends, see online status, accept/decline requests ✅
+- [x] Use TanStack Query + `FriendNotificationsProvider` for friends, pendingRequests, and local sentRequests
+  - Chosen instead of `friendsSlice` to match the current client architecture:
+    server-list state lives in TanStack Query; Redux stays focused on UI/game
+    flags.
+- [x] Create `useFriends` hook (sendRequest, acceptRequest, declineRequest, removeFriend, getFriends)
+- [x] Friends list component (persistent right sidebar):
+  - [x] List friends with avatar, username, online status dot (green/gray)
+  - [x] "Add Friend" button → exact username input
+  - [x] Action menu: challenge to game, send message, remove friend
+- [x] Pending requests section:
+  - [x] Incoming requests with Accept/Decline buttons
+  - [x] Sent requests with "Pending..." status
+- [x] Online presence:
+  - [x] Listen to `presence.online` / `presence.offline` WebSocket events
+  - [x] Update friend status in real-time
+- [x] Friends list accessible from navbar (icon with pending count badge)
+- [x] **Success Criteria:** Can add friends, see online status, accept/decline requests ✅
+
+#### Follow-ups
+- [ ] Persist outgoing pending requests across reloads once the server exposes
+  a `GET /friends/sent` endpoint. Current client state can show outgoing
+  requests created in-session, but the backend has no sent-request list yet.
+- [ ] Replace exact-username add flow with autocomplete once the server exposes
+  a username search endpoint.
 
 ### 3.2 Chat System
 - [ ] Create `chatSlice` (activeRoom, messages, conversations)

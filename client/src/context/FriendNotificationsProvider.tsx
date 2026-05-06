@@ -6,15 +6,22 @@ import {
     useState,
     type ReactNode,
 } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getSocket } from '@/services/socket';
 import {
     acceptFriendRequest,
     declineFriendRequest,
+    listFriends,
     listPendingRequests,
+    removeFriend,
+    sendFriendRequestByUsername,
+    type FriendRecord,
     type PendingRequest,
 } from '@/services/friends';
 import { useAppSelector } from '@/store/hooks';
+import { queryKeys } from '@/lib/queryKeys';
+import type { LobbyUser } from '@/types/lobby';
 import type {
     FriendRequestAcceptedPayload,
     FriendRequestDeclinedPayload,
@@ -26,76 +33,108 @@ import {
 } from './friendNotificationsContext';
 
 /**
- * Hydrates the incoming friend request queue on sign-in and keeps it in
- * sync with server-side changes via the /battles socket. Exposed as a
- * context so the navbar bell and any popover panel share a single
- * source of truth — accepting from any surface immediately updates
- * both.
+ * Owns the client-side friends facade: accepted friends, incoming
+ * requests, local outgoing requests, notification counts, and friend
+ * presence. Server-backed lists live in TanStack Query; ephemeral UI
+ * state stays local to this provider.
  */
 export function FriendNotificationsProvider({ children }: { children: ReactNode }) {
     const { isAuthenticated, user } = useAppSelector((state) => state.auth);
-    const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+    const queryClient = useQueryClient();
     const [recentAccepted, setRecentAccepted] = useState<FriendRequestAcceptedPayload[]>(
         [],
     );
-    const [loading, setLoading] = useState(false);
+    const [outgoingRequests, setOutgoingRequests] = useState<
+        FriendNotificationsContextValue['outgoingRequests']
+    >([]);
+    const [onlineFriendIds, setOnlineFriendIds] = useState<Set<string>>(
+        () => new Set(),
+    );
     // Tracks how many notifications the user has not yet seen. Resets to
     // 0 when they open the notification panel via `markAllSeen`.
     const [unseenPending, setUnseenPending] = useState(0);
     const [unseenAccepted, setUnseenAccepted] = useState(0);
 
-    // Extracted so both the public `refresh` callback and the hydration
-    // effect can share the same fetch path without tripping React's
-    // "don't call setState directly in effects" rule.
-    const doFetch = async () => {
-        setLoading(true);
-        try {
-            const data = await listPendingRequests();
-            setPendingRequests(data);
-        } catch {
-            // Non-fatal; leave existing state.
-        } finally {
-            setLoading(false);
-        }
-    };
+    const friendsQuery = useQuery({
+        queryKey: queryKeys.friends.list(),
+        queryFn: listFriends,
+        enabled: isAuthenticated,
+    });
+
+    const incomingQuery = useQuery({
+        queryKey: queryKeys.friends.incoming(),
+        queryFn: listPendingRequests,
+        enabled: isAuthenticated,
+    });
+
+    const friends = useMemo(() => friendsQuery.data ?? [], [friendsQuery.data]);
+    const pendingRequests = useMemo(
+        () => incomingQuery.data ?? [],
+        [incomingQuery.data],
+    );
 
     const refresh = useCallback(async () => {
         if (!isAuthenticated) return;
-        await doFetch();
-    }, [isAuthenticated]);
+        await Promise.all([friendsQuery.refetch(), incomingQuery.refetch()]);
+    }, [friendsQuery, incomingQuery, isAuthenticated]);
 
-    // Hydrate once per signed-in session. We guard the sign-out branch
-    // behind a ref so we don't redundantly dispatch empty-state updates
-    // on every auth-adjacent render. The fetch and the sign-out reset
-    // are scheduled as microtasks so the effect body itself doesn't
-    // synchronously call setState — that keeps React's "don't call
-    // setState in effects" lint rule happy while preserving the intent.
+    const upsertIncomingRequest = useCallback(
+        (entry: PendingRequest) => {
+            queryClient.setQueryData<PendingRequest[]>(
+                queryKeys.friends.incoming(),
+                (prev = []) => {
+                    if (prev.some((r) => r.id === entry.id)) return prev;
+                    return [entry, ...prev];
+                },
+            );
+        },
+        [queryClient],
+    );
+
+    const removeIncomingRequest = useCallback(
+        (friendshipId: string) => {
+            queryClient.setQueryData<PendingRequest[]>(
+                queryKeys.friends.incoming(),
+                (prev = []) => prev.filter((r) => r.id !== friendshipId),
+            );
+        },
+        [queryClient],
+    );
+
+    const removeOutgoingRequest = useCallback((friendshipId: string) => {
+        setOutgoingRequests((prev) =>
+            prev.filter((r) => r.friendshipId !== friendshipId),
+        );
+    }, []);
+
     const wasAuthenticatedRef = useRef(false);
     useEffect(() => {
         let cancelled = false;
         if (isAuthenticated && user?.id) {
             wasAuthenticatedRef.current = true;
-            queueMicrotask(() => {
-                if (!cancelled) void doFetch();
-            });
         } else if (wasAuthenticatedRef.current) {
             wasAuthenticatedRef.current = false;
             queueMicrotask(() => {
                 if (cancelled) return;
-                setPendingRequests([]);
                 setRecentAccepted([]);
+                setOutgoingRequests([]);
+                setOnlineFriendIds(new Set());
                 setUnseenPending(0);
                 setUnseenAccepted(0);
+                queryClient.removeQueries({ queryKey: queryKeys.friends.list() });
+                queryClient.removeQueries({
+                    queryKey: queryKeys.friends.incoming(),
+                });
             });
         }
         return () => {
             cancelled = true;
         };
-    }, [isAuthenticated, user?.id]);
+    }, [isAuthenticated, queryClient, user?.id]);
 
     // Socket subscriptions. We attach once the socket is available after
     // sign-in. The /battles namespace is where the server pushes friend
-    // lifecycle events alongside presence.
+    // lifecycle events and per-friend presence updates.
     const socketBoundRef = useRef(false);
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -121,15 +160,16 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
                         mmr: data.requesterMmr,
                     },
                 };
-                setPendingRequests((prev) => {
-                    if (prev.some((r) => r.id === entry.id)) return prev;
-                    return [entry, ...prev];
-                });
+                upsertIncomingRequest(entry);
                 setUnseenPending((n) => n + 1);
                 toast.info(`${data.requesterUsername} sent you a friend request.`);
             };
 
             const handleAccepted = (data: FriendRequestAcceptedPayload) => {
+                removeOutgoingRequest(data.friendshipId);
+                void queryClient.invalidateQueries({
+                    queryKey: queryKeys.friends.list(),
+                });
                 setRecentAccepted((prev) => {
                     if (prev.some((a) => a.friendshipId === data.friendshipId)) {
                         return prev;
@@ -142,21 +182,50 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
             };
 
             const handleDeclined = (data: FriendRequestDeclinedPayload) => {
+                removeOutgoingRequest(data.friendshipId);
                 // Subtle acknowledgement for the requester. We don't surface
                 // declines in the persistent panel to avoid making them
                 // feel permanent; a one-off toast is enough.
                 toast.message(`${data.addresseeUsername} declined your friend request.`);
             };
 
+            const handlePresenceOnline = (data: { userId: string }) => {
+                setOnlineFriendIds((prev) => {
+                    if (prev.has(data.userId)) return prev;
+                    const next = new Set(prev);
+                    next.add(data.userId);
+                    return next;
+                });
+            };
+
+            const handlePresenceOffline = (data: { userId: string }) => {
+                setOnlineFriendIds((prev) => {
+                    if (!prev.has(data.userId)) return prev;
+                    const next = new Set(prev);
+                    next.delete(data.userId);
+                    return next;
+                });
+            };
+
+            const handleDisconnect = () => {
+                setOnlineFriendIds(new Set());
+            };
+
             socket.on('friend.request_received', handleReceived);
             socket.on('friend.request_accepted', handleAccepted);
             socket.on('friend.request_declined', handleDeclined);
+            socket.on('presence.online', handlePresenceOnline);
+            socket.on('presence.offline', handlePresenceOffline);
+            socket.on('disconnect', handleDisconnect);
             socketBoundRef.current = true;
 
             detach = () => {
                 socket.off('friend.request_received', handleReceived);
                 socket.off('friend.request_accepted', handleAccepted);
                 socket.off('friend.request_declined', handleDeclined);
+                socket.off('presence.online', handlePresenceOnline);
+                socket.off('presence.offline', handlePresenceOffline);
+                socket.off('disconnect', handleDisconnect);
                 socketBoundRef.current = false;
             };
         };
@@ -178,12 +247,41 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
             window.clearInterval(poll);
             if (detach) detach();
         };
-    }, [isAuthenticated, user?.id]);
+    }, [
+        isAuthenticated,
+        queryClient,
+        removeOutgoingRequest,
+        upsertIncomingRequest,
+        user?.id,
+    ]);
+
+    // Drop stale presence entries when a friend is removed or the accepted
+    // list refreshes after login.
+    useEffect(() => {
+        let cancelled = false;
+        const friendIds = new Set(friends.map((friend) => friend.id));
+        queueMicrotask(() => {
+            if (cancelled) return;
+            setOnlineFriendIds((prev) => {
+                const next = new Set(
+                    [...prev].filter((friendId) => friendIds.has(friendId)),
+                );
+                if (next.size === prev.size) return prev;
+                return next;
+            });
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [friends]);
 
     const accept = useCallback(async (friendshipId: string) => {
         try {
             await acceptFriendRequest(friendshipId);
-            setPendingRequests((prev) => prev.filter((r) => r.id !== friendshipId));
+            removeIncomingRequest(friendshipId);
+            await queryClient.invalidateQueries({
+                queryKey: queryKeys.friends.list(),
+            });
             setUnseenPending((n) => Math.max(0, n - 1));
             toast.success('Friend request accepted.');
         } catch (err: unknown) {
@@ -193,12 +291,12 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
             toast.error(message);
             throw err;
         }
-    }, []);
+    }, [queryClient, removeIncomingRequest]);
 
     const decline = useCallback(async (friendshipId: string) => {
         try {
             await declineFriendRequest(friendshipId);
-            setPendingRequests((prev) => prev.filter((r) => r.id !== friendshipId));
+            removeIncomingRequest(friendshipId);
             setUnseenPending((n) => Math.max(0, n - 1));
             toast.message('Friend request declined.');
         } catch (err: unknown) {
@@ -208,6 +306,82 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
             toast.error(message);
             throw err;
         }
+    }, [removeIncomingRequest]);
+
+    const remove = useCallback(
+        async (friendUserId: string) => {
+            try {
+                await removeFriend(friendUserId);
+                queryClient.setQueryData<FriendRecord[]>(
+                    queryKeys.friends.list(),
+                    (prev = []) =>
+                        prev.filter((friend) => friend.id !== friendUserId),
+                );
+                setOnlineFriendIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(friendUserId);
+                    return next;
+                });
+                toast.success('Friend removed.');
+            } catch (err: unknown) {
+                const message =
+                    (err as { response?: { data?: { message?: string } } })
+                        ?.response?.data?.message ?? 'Failed to remove friend.';
+                toast.error(message);
+                throw err;
+            }
+        },
+        [queryClient],
+    );
+
+    const sendRequestByUsername = useCallback(async (username: string) => {
+        const normalized = username.trim();
+        if (!normalized) return;
+        try {
+            const request = await sendFriendRequestByUsername(normalized);
+            setOutgoingRequests((prev) => {
+                if (prev.some((r) => r.friendshipId === request.id)) return prev;
+                return [
+                    {
+                        friendshipId: request.id,
+                        addresseeId: request.addressee.id,
+                        username: request.addressee.username,
+                        avatarUrl: request.addressee.avatarUrl ?? null,
+                        mmr: request.addressee.mmr,
+                        createdAt: request.createdAt,
+                    },
+                    ...prev,
+                ];
+            });
+            toast.success(`Friend request sent to ${request.addressee.username}.`);
+        } catch (err: unknown) {
+            const message =
+                (err as { response?: { data?: { message?: string } } })?.response
+                    ?.data?.message ?? 'Failed to send friend request.';
+            toast.error(message);
+            throw err;
+        }
+    }, []);
+
+    const seedOutgoingRequest = useCallback((target: LobbyUser) => {
+        const friendshipId = target.friendshipId;
+        if (!friendshipId) return;
+        setOutgoingRequests((prev) => {
+            if (prev.some((r) => r.friendshipId === friendshipId)) {
+                return prev;
+            }
+            return [
+                {
+                    friendshipId,
+                    addresseeId: target.id,
+                    username: target.username,
+                    avatarUrl: target.avatarUrl ?? null,
+                    mmr: target.mmr,
+                    createdAt: new Date().toISOString(),
+                },
+                ...prev,
+            ];
+        });
     }, []);
 
     const markAllSeen = useCallback(() => {
@@ -215,26 +389,46 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
         setUnseenAccepted(0);
     }, []);
 
+    const isFriendOnline = useCallback(
+        (friendUserId: string) => onlineFriendIds.has(friendUserId),
+        [onlineFriendIds],
+    );
+
     const value = useMemo<FriendNotificationsContextValue>(
         () => ({
+            friends,
+            onlineFriendIds,
             pendingRequests,
+            outgoingRequests,
             recentAccepted,
             unreadCount: unseenPending + unseenAccepted,
-            loading,
+            loading: friendsQuery.isLoading || incomingQuery.isLoading,
             refresh,
             accept,
             decline,
+            remove,
+            sendRequestByUsername,
+            seedOutgoingRequest,
+            isFriendOnline,
             markAllSeen,
         }),
         [
+            friends,
+            onlineFriendIds,
             pendingRequests,
+            outgoingRequests,
             recentAccepted,
             unseenPending,
             unseenAccepted,
-            loading,
+            friendsQuery.isLoading,
+            incomingQuery.isLoading,
             refresh,
             accept,
             decline,
+            remove,
+            sendRequestByUsername,
+            seedOutgoingRequest,
+            isFriendOnline,
             markAllSeen,
         ],
     );

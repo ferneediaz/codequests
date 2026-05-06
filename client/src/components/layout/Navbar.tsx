@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { SubscriptionBadge } from './SubscriptionBadge';
 import { NotificationBell } from './NotificationBell';
+import { useFriends } from '@/hooks/useFriends';
+import { useSocialLayout } from '@/hooks/useSocialLayout';
 import {
     ALLOWED_AVATAR_MIME,
     AvatarUploadError,
@@ -35,6 +37,12 @@ import {
 
 export function Navbar() {
     const { user, isAuthenticated, logout } = useAuth();
+    const { pendingRequests } = useFriends();
+    const {
+        friendsSidebarOpen,
+        toggleFriendsSidebar,
+        friendsSidebarHidden,
+    } = useSocialLayout();
     const dispatch = useAppDispatch();
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [uploading, setUploading] = useState(false);
@@ -118,6 +126,31 @@ export function Navbar() {
                     {isAuthenticated && user ? (
                         <>
                             <SubscriptionBadge />
+                            {!friendsSidebarHidden && (
+                                <Button
+                                    variant={friendsSidebarOpen ? 'secondary' : 'ghost'}
+                                    size="icon"
+                                    aria-label={
+                                        pendingRequests.length > 0
+                                            ? `Friends (${pendingRequests.length} pending request${pendingRequests.length === 1 ? '' : 's'})`
+                                            : 'Friends'
+                                    }
+                                    onClick={toggleFriendsSidebar}
+                                    className="relative h-9 w-9 text-muted-foreground hover:text-foreground"
+                                >
+                                    <Users className="h-5 w-5" />
+                                    {pendingRequests.length > 0 && (
+                                        <span
+                                            aria-hidden
+                                            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-card bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground"
+                                        >
+                                            {pendingRequests.length > 9
+                                                ? '9+'
+                                                : pendingRequests.length}
+                                        </span>
+                                    )}
+                                </Button>
+                            )}
                             <NotificationBell />
                             <RankBadge mmr={user.mmr} showMmr />
 

@@ -1,5 +1,6 @@
 import api from '@/services/api';
 import type { LobbySnapshot, LobbyChallengeResponse } from '@/types/lobby';
+import type { SentFriendRequest } from './friends';
 
 export async function getLobbySnapshot(): Promise<LobbySnapshot> {
     const { data } = await api.get<LobbySnapshot>('/lobby/snapshot');
@@ -8,8 +9,11 @@ export async function getLobbySnapshot(): Promise<LobbySnapshot> {
 
 export async function sendFriendRequestByUserId(
     targetUserId: string,
-): Promise<void> {
-    await api.post('/lobby/friend-request', { targetUserId });
+): Promise<SentFriendRequest> {
+    const { data } = await api.post<SentFriendRequest>('/lobby/friend-request', {
+        targetUserId,
+    });
+    return data;
 }
 
 export async function challengeUser(

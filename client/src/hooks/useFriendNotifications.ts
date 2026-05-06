@@ -1,8 +1,5 @@
-import { useContext } from 'react';
-import {
-    FriendNotificationsContext,
-    type FriendNotificationsContextValue,
-} from '@/context/friendNotificationsContext';
+import { useFriends } from './useFriends';
+import type { FriendNotificationsContextValue } from '@/context/friendNotificationsContext';
 
 /**
  * Hook for reading and mutating friend-request notifications.
@@ -13,11 +10,5 @@ import {
  * always render from the same source of truth.
  */
 export function useFriendNotifications(): FriendNotificationsContextValue {
-    const ctx = useContext(FriendNotificationsContext);
-    if (!ctx) {
-        throw new Error(
-            'useFriendNotifications must be used within FriendNotificationsProvider',
-        );
-    }
-    return ctx;
+    return useFriends();
 }

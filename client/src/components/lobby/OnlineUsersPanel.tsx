@@ -20,6 +20,7 @@ import {
 } from '@/services/lobby';
 import { acceptFriendRequest } from '@/services/friends';
 import { createDmConversation } from '@/services/chatApi';
+import { useFriends } from '@/hooks/useFriends';
 import type { LobbyUser } from '@/types/lobby';
 
 interface OnlineUsersPanelProps {
@@ -36,6 +37,7 @@ export function OnlineUsersPanel({
     onOpenDm,
 }: OnlineUsersPanelProps) {
     const navigate = useNavigate();
+    const { seedOutgoingRequest } = useFriends();
     const [query, setQuery] = useState('');
     const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -53,8 +55,16 @@ export function OnlineUsersPanel({
     const handleAddFriend = async (user: LobbyUser) => {
         setBusyId(user.id);
         try {
-            await sendFriendRequestByUserId(user.id);
-            onUserPatch(user.id, { friendship: 'PENDING_OUT' });
+            const request = await sendFriendRequestByUserId(user.id);
+            onUserPatch(user.id, {
+                friendship: 'PENDING_OUT',
+                friendshipId: request.id,
+            });
+            seedOutgoingRequest({
+                ...user,
+                friendship: 'PENDING_OUT',
+                friendshipId: request.id,
+            });
             toast.success(`Friend request sent to ${user.username}.`);
         } catch (error: unknown) {
             const message =
