@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from './Navbar';
+import { useClanChallengeNotifications } from '@/hooks/useClanChallengeNotifications';
 import { useInviteNotifications } from '@/hooks/useInviteNotifications';
 import { useSubscription } from '@/hooks/useSubscription';
 import { FriendNotificationsProvider } from '@/context/FriendNotificationsProvider';
@@ -20,8 +21,10 @@ interface OpenDmState {
 
 export function RootLayout() {
     const location = useLocation();
+    const navigate = useNavigate();
     const user = useAppSelector((state) => state.auth.user);
     useInviteNotifications();
+    useClanChallengeNotifications();
     // Initialize subscription state on app load. The hook is also used
     // ad-hoc by the paywall gate and the navbar badge — calling it here
     // guarantees the initial fetch happens once per session.
@@ -31,11 +34,13 @@ export function RootLayout() {
         return window.matchMedia('(min-width: 1024px)').matches;
     });
     const [openDmState, setOpenDmState] = useState<OpenDmState | null>(null);
+    const onMessagesRoute = location.pathname.startsWith('/messages');
 
     const friendsSidebarHidden = useMemo(() => {
         const path = location.pathname;
         return (
             path.startsWith('/battle/') ||
+            path.startsWith('/messages') ||
             path.startsWith('/onboarding') ||
             path.startsWith('/login') ||
             path.startsWith('/auth/callback') ||
@@ -47,9 +52,21 @@ export function RootLayout() {
         setFriendsSidebarOpen((open) => !open);
     }, []);
 
-    const openDm = useCallback((conversationId: string, otherUser: DmTargetUser) => {
-        setOpenDmState({ conversationId, user: otherUser });
-    }, []);
+    useEffect(() => {
+        if (!onMessagesRoute) return;
+        queueMicrotask(() => setOpenDmState(null));
+    }, [onMessagesRoute]);
+
+    const openDm = useCallback(
+        (conversationId: string, otherUser: DmTargetUser) => {
+            if (onMessagesRoute) {
+                navigate(`/messages?c=${encodeURIComponent(conversationId)}`);
+                return;
+            }
+            setOpenDmState({ conversationId, user: otherUser });
+        },
+        [navigate, onMessagesRoute],
+    );
 
     const socialLayoutValue = useMemo(
         () => ({
@@ -97,7 +114,7 @@ export function RootLayout() {
                             </>
                         )}
                     </div>
-                    {openDmState && (
+                    {!onMessagesRoute && openDmState && (
                         <DmDrawer
                             conversationId={openDmState.conversationId}
                             otherUser={openDmState.user}

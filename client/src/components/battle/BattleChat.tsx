@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle, Send, X, Flame } from 'lucide-react';
+import { MessageCircle, Send, X, Flame, Handshake } from 'lucide-react';
 import { useBattleChat } from '@/hooks/useBattleChat';
 import { Button } from '@/components/ui/button';
 
@@ -18,12 +18,15 @@ const TRASH_TALK_PRESETS = [
 
 const EMOJI_REACTIONS = ['😂', '🔥', '💀', '🤡', '🫵', '🐢', '🥶', '😮‍💨'];
 
+const GG_PRESETS = ['gg', 'gg wp', 'good game', 'rematch?'];
+
 interface BattleChatProps {
     battleId: string;
     currentUserId: string;
+    mode?: 'live' | 'postgame';
 }
 
-export function BattleChat({ battleId, currentUserId }: BattleChatProps) {
+export function BattleChat({ battleId, currentUserId, mode = 'live' }: BattleChatProps) {
     const { messages, sendMessage } = useBattleChat(battleId);
     const [open, setOpen] = useState(false);
     const [input, setInput] = useState('');
@@ -67,14 +70,23 @@ export function BattleChat({ battleId, currentUserId }: BattleChatProps) {
         sendMessage(text);
     };
 
+    const quickPresets = mode === 'postgame' ? GG_PRESETS : TRASH_TALK_PRESETS;
+    const quickTitle = mode === 'postgame' ? 'Post-game' : 'Quick taunts';
+    const emptyText =
+        mode === 'postgame'
+            ? 'Keep the post-game conversation going.'
+            : 'No trash talk yet. Break the ice 👇';
+    const title = mode === 'postgame' ? 'Post-game Chat' : 'Trash Talk';
+    const Icon = mode === 'postgame' ? Handshake : Flame;
+
     return (
         <div className="pointer-events-auto fixed bottom-4 right-4 z-50 flex flex-col items-end">
             {open && (
                 <div className="mb-2 flex h-[420px] w-[340px] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
                     <div className="flex items-center justify-between border-b border-border bg-card/90 px-3 py-2">
                         <div className="flex items-center gap-2 text-sm font-semibold">
-                            <Flame className="h-4 w-4 text-orange-400" />
-                            <span>Trash Talk</span>
+                            <Icon className="h-4 w-4 text-orange-400" />
+                            <span>{title}</span>
                         </div>
                         <button
                             onClick={handleToggleOpen}
@@ -91,7 +103,7 @@ export function BattleChat({ battleId, currentUserId }: BattleChatProps) {
                     >
                         {messages.length === 0 && (
                             <div className="py-6 text-center text-xs text-muted-foreground">
-                                No trash talk yet. Break the ice 👇
+                                {emptyText}
                             </div>
                         )}
                         {messages.map((m) => {
@@ -129,13 +141,13 @@ export function BattleChat({ battleId, currentUserId }: BattleChatProps) {
                         })}
                     </div>
 
-                    {/* Quick taunts */}
+                    {/* Quick presets */}
                     <div className="border-t border-border bg-card/80 px-2 py-1.5">
                         <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Quick taunts
+                            {quickTitle}
                         </div>
                         <div className="flex flex-wrap gap-1">
-                            {TRASH_TALK_PRESETS.map((taunt) => (
+                            {quickPresets.map((taunt) => (
                                 <button
                                     key={taunt}
                                     onClick={() => handleQuickSend(taunt)}
@@ -145,17 +157,19 @@ export function BattleChat({ battleId, currentUserId }: BattleChatProps) {
                                 </button>
                             ))}
                         </div>
-                        <div className="mt-1 flex gap-1">
-                            {EMOJI_REACTIONS.map((e) => (
-                                <button
-                                    key={e}
-                                    onClick={() => handleQuickSend(e)}
-                                    className="rounded px-1 text-base hover:bg-muted"
-                                >
-                                    {e}
-                                </button>
-                            ))}
-                        </div>
+                        {mode === 'live' && (
+                            <div className="mt-1 flex gap-1">
+                                {EMOJI_REACTIONS.map((e) => (
+                                    <button
+                                        key={e}
+                                        onClick={() => handleQuickSend(e)}
+                                        className="rounded px-1 text-base hover:bg-muted"
+                                    >
+                                        {e}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* Input */}

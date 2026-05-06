@@ -27,6 +27,18 @@ export async function getBattleHistory(
     return data;
 }
 
+export async function getDmHistory(
+    conversationId: string,
+    cursor?: string,
+    limit = 50,
+): Promise<ChatHistoryResponse> {
+    const { data } = await api.get<ChatHistoryResponse>(
+        `/chat/DM/${conversationId}`,
+        { params: { cursor, limit } },
+    );
+    return data;
+}
+
 export interface DmConversationResponse {
     id: string;
     type: 'DM';
@@ -35,7 +47,17 @@ export interface DmConversationResponse {
         username: string;
         avatarUrl?: string | null;
     }[];
+    lastMessage?: {
+        content: string;
+        senderId: string;
+        createdAt: string;
+    };
     createdAt: string;
+}
+
+export async function getDmConversations(): Promise<DmConversationResponse[]> {
+    const { data } = await api.get<DmConversationResponse[]>('/chat/conversations');
+    return data;
 }
 
 export async function createDmConversation(

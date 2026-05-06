@@ -37,7 +37,7 @@ export function OnlineClansPanel({ clans }: OnlineClansPanelProps) {
                             <button
                                 key={clan.id}
                                 type="button"
-                                onClick={() => navigate('/clan')}
+                                onClick={() => navigate(`/clans/${clan.id}`)}
                                 className="group flex w-full items-center justify-between rounded-md border border-border bg-background/60 px-3 py-2 text-left hover:border-primary/40"
                             >
                                 <div className="min-w-0">

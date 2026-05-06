@@ -9,6 +9,7 @@ import { clanRoutes } from '@/routes/clan';
 import { dashboardRoutes } from '@/routes/dashboard';
 import { protectedMarketingRoutes, publicMarketingRoutes } from '@/routes/marketing';
 import { practiceRoutes } from '@/routes/practice';
+import Messages from '@/pages/messages/Messages';
 
 export const router = createBrowserRouter([
     ...publicMarketingRoutes,
@@ -27,6 +28,10 @@ export const router = createBrowserRouter([
                             ...dashboardRoutes,
                             ...protectedBattleRoutes,
                             ...clanRoutes,
+                            {
+                                path: '/messages',
+                                element: <Messages />,
+                            },
                             ...practiceRoutes,
                             ...protectedMarketingRoutes,
                             ...authorRoutes,

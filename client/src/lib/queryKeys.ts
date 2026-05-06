@@ -15,6 +15,15 @@ export const queryKeys = {
         list: () => ['friends', 'list'] as const,
         incoming: () => ['friends', 'incoming'] as const,
     },
+    chat: {
+        conversations: () => ['chat', 'conversations'] as const,
+    },
+    clans: {
+        list: (limit: number, offset: number) => ['clans', 'list', limit, offset] as const,
+        detail: (id: string) => ['clans', 'detail', id] as const,
+        challenges: (id: string, pending?: boolean) =>
+            ['clans', 'challenges', id, pending] as const,
+    },
     practice: {
         problems: () => ['practice', 'problems'] as const,
         stats: () => ['practice', 'stats'] as const,

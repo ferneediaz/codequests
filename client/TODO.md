@@ -450,53 +450,78 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 - [x] Use focused hooks/components instead of a monolithic `chatSlice` /
   `useChat` abstraction (`useBattleChat`, `useLobbyChat`, `BattleChat`,
   `LobbyChatPanel`, `DmDrawer`)
-- [ ] Battle chat:
+- [x] Battle chat:
   - [x] Chat panel on battle page (floating, collapsible `BattleChat`)
   - [x] Auto-join battle chat room on battle start (`useBattleChat` + `chat.join_room`)
   - [x] Send/receive real-time messages in battle room (`chat.send`, `chat.message`)
   - [x] Initial chat history loads from `GET /api/chat/BATTLE/:battleId`
-- [ ] Post-game chat:
-  - [ ] Chat persists on results page
-  - [ ] GG / rematch conversation
+- [x] Post-game chat:
+  - [x] Chat persists on results page (`BattleChat` mounted in post-game mode)
+  - [x] GG conversation presets
+  - [ ] Rematch flow (blocked until backend exposes a rematch/challenge endpoint)
 - [x] Lobby chat:
   - [x] Global chat room on `/lobby`
   - [x] Visible to all logged-in users
   - [x] Auto-join on lobby mount
-- [ ] Direct Messages:
+- [x] Direct Messages:
   - [x] Lightweight DM drawer opens from social surfaces
   - [x] Joins DM room and streams real-time messages
   - [x] Fetches recent DM history for active conversation
-  - [ ] Full `/messages` inbox page (conversation list + thread view)
-  - [ ] "New Message" flow in `/messages` (search username → start conversation)
+  - [x] Full `/messages` inbox page (conversation list + thread view)
+  - [x] "New Message" flow in `/messages` (friends picker → start conversation)
+  - [x] Messaging entry points unified:
+    navbar utility icon + friends sidebar inbox shortcut + drawer "open in inbox"
+    action + route-aware drawer suppression on `/messages`
   - [ ] Unread message count badge in navbar
 - [x] Socket.IO events:
   - [x] Emit `chat.send`: `{ roomType, roomId, content }`
   - [x] Listen `chat.message`: `{ senderId, username, content, timestamp }`
   - [x] Emit `chat.join_room` / `chat.leave_room`
-- [ ] **Success Criteria:** Can chat in-game, in lobby, and via DMs in real-time ✅
+- [x] **Success Criteria:** Can chat in-game, post-game, in lobby, and via DMs in real-time ✅
+
+#### Follow-ups
+- [ ] Add true unread DM counts once the server adds message read state,
+  mark-read APIs, and an unread-count endpoint. Current `Message` records do
+  not store read status.
+- [ ] Expand `/messages` compose from friends picker to username search once
+  the server exposes username search. `POST /chat/conversations` currently
+  requires friendship.
+- [ ] Add rematch flow once the backend exposes a rematch endpoint.
 
 ### 3.3 Clan Pages
-- [ ] Clan directory (`/clans`):
-  - [ ] List all clans (sorted by MMR)
-  - [ ] Search by clan name or tag
-  - [ ] "Create Clan" button (→ `/clans/create`)
-  - [ ] Pagination
-- [ ] Create clan page (`/clans/create`):
-  - [ ] Form: name, tag (3-5 chars), banner/logo upload or selection
-  - [ ] Call `POST /api/clans`
-- [ ] Clan detail page (`/clans/:id`):
-  - [ ] Clan banner/logo + name + tag
-  - [ ] Clan MMR + leaderboard rank
-  - [ ] Member list with roles (Owner, Member)
+- [x] Clan directory (`/clans`):
+  - [x] List all clans (sorted by MMR by server response)
+  - [x] Search by clan name or tag (client-side for loaded page)
+  - [x] "Create Clan" button (→ `/clans/create`)
+  - [x] Pagination
+- [x] Create clan page (`/clans/create`):
+  - [x] Form: name, tag (2-5 chars to match current server DTO)
+  - [x] Banner/logo placeholder until backend adds clan media fields
+  - [x] Call `POST /api/clans`
+- [x] Clan detail page (`/clans/:id`):
+  - [x] Clan name + tag
+  - [x] Clan MMR + tier badge
+  - [x] Member list with roles (Owner, Member)
   - [ ] Clan battle history (list of clan vs clan battles)
-  - [ ] Join/Leave button (if not a member / if a member)
-  - [ ] Kick member button (owner only)
+  - [x] Join/Leave button (if not a member / if a member)
+  - [x] Kick member button (owner only)
   - [ ] Clan chat section (Socket.IO room `clan:{clanId}`)
-  - [ ] "Challenge Another Clan" button (owner only)
+  - [x] "Challenge Another Clan" button (owner only)
 - [ ] Join request / invite system:
   - [ ] Open clans: "Join" button
   - [ ] Invite-only clans: "Request to Join" → pending review by owner
 - [ ] **Success Criteria:** Can browse, create, join, and manage clans ✅
+
+#### Follow-ups
+- [ ] Add server-side search to `GET /clans` so directory search can span all
+  pages instead of only the loaded page.
+- [ ] Align tag length in product/server rules (`TODO` originally said 3-5;
+  current `CreateClanDto` accepts 2-5).
+- [ ] Add clan banner/logo schema, upload support, and display.
+- [ ] Expose clan battle history over HTTP. `ClansService.getBattleHistory`
+  exists server-side, but there is no controller route yet.
+- [ ] Add clan chat rooms and persistence for `clan:{clanId}`.
+- [ ] Add invite-only clans and join-request review models/endpoints.
 
 ### 3.4 Clan Wars (Challenges)
 - [ ] Send challenge:

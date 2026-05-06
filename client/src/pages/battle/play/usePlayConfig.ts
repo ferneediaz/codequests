@@ -92,7 +92,7 @@ export function usePlayConfig(userId: string | undefined) {
         let cancelled = false;
         (async () => {
             try {
-                const all = await listClans(200);
+                const all = await listClans({ limit: 200 });
                 if (cancelled) return;
                 const mine = all.find((c) => c.members.some((m) => m.id === userId));
                 setMyClanId(mine?.id ?? null);

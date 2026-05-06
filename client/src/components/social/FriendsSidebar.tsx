@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { X, Users, Wifi, WifiOff, Inbox, Send } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { X, Users, Wifi, WifiOff, Inbox, Send, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFriends } from '@/hooks/useFriends';
@@ -40,6 +41,15 @@ export function FriendsSidebar() {
                 </div>
                 <div className="flex items-center gap-1.5">
                     <AddFriendPopover />
+                    <Link to="/messages" aria-label="Open inbox">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                        >
+                            <MessageSquare className="h-4 w-4" />
+                        </Button>
+                    </Link>
                     <Button
                         variant="ghost"
                         size="icon"

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { CodeEditor } from '@/components/battle/CodeEditor';
+import { BattleChat } from '@/components/battle/BattleChat';
 import { Loader2, ArrowLeft, Trophy } from 'lucide-react';
 import { battlesApi } from '@/services/battles';
 import type { BattleResponse, BattleParticipant } from '@/types/api';
@@ -187,6 +188,13 @@ export default function Results() {
                     Back to Dashboard
                 </Button>
             </div>
+            {userId && (
+                <BattleChat
+                    battleId={battle.id}
+                    currentUserId={userId}
+                    mode="postgame"
+                />
+            )}
         </div>
     );
 }

@@ -22,6 +22,7 @@ import {
     Crown,
     Shield,
     Users,
+    MessageSquare,
     ImagePlus,
     Loader2,
 } from 'lucide-react';
@@ -112,10 +113,10 @@ export function Navbar() {
                                     Lobby
                                 </Button>
                             </Link>
-                            <Link to="/clan">
+                            <Link to="/clans">
                                 <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                                     <Shield className="mr-1.5 h-4 w-4" />
-                                    Clan
+                                    Clans
                                 </Button>
                             </Link>
                         </div>
@@ -151,6 +152,15 @@ export function Navbar() {
                                     )}
                                 </Button>
                             )}
+                            <Link to="/messages" aria-label="Messages">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                                >
+                                    <MessageSquare className="h-5 w-5" />
+                                </Button>
+                            </Link>
                             <NotificationBell />
                             <RankBadge mmr={user.mmr} showMmr />
 
