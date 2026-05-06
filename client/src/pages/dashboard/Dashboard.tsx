@@ -22,12 +22,13 @@ import {
     Users,
     Zap,
 } from 'lucide-react';
-import api from '@/services/api';
 import type {
     UserStats,
     MatchHistoryEntry,
     NewsResponse,
 } from '@/types/api';
+import { queryKeys } from '@/lib/queryKeys';
+import { usersApi } from '@/services/users';
 import { getRankTier, getRankProgress, getRankTiers, getMmrToNextRankFloor } from '@/utils/rank';
 import {
     computeStreak,
@@ -55,6 +56,7 @@ import { StatTile } from './components/StatTile';
 export default function Dashboard() {
     const navigate = useNavigate();
     const user = useAppSelector((state) => state.auth.user);
+    const userId = user?.id ?? '';
     const [showAllMatches, setShowAllMatches] = useState(false);
     const [heatmapYear, setHeatmapYear] = useState<string>('rolling');
     const { requireCanPlay } = usePaywall();
@@ -73,23 +75,15 @@ export default function Dashboard() {
     };
 
     const { data: stats, isLoading: statsLoading } = useQuery<UserStats>({
-        queryKey: ['userStats', user?.id],
-        queryFn: async () => {
-            const { data } = await api.get(`/users/${user!.id}/stats`);
-            return data;
-        },
-        enabled: !!user?.id,
+        queryKey: queryKeys.userStats(userId),
+        queryFn: () => usersApi.getStats(userId),
+        enabled: !!userId,
     });
 
     const { data: history, isLoading: historyLoading } = useQuery<MatchHistoryEntry[]>({
-        queryKey: ['matchHistory', user?.id, 20],
-        queryFn: async () => {
-            const { data } = await api.get(`/users/${user!.id}/history`, {
-                params: { limit: 20 },
-            });
-            return data;
-        },
-        enabled: !!user?.id,
+        queryKey: queryKeys.matchHistory(userId, 20),
+        queryFn: () => usersApi.getMatchHistory(userId, { limit: 20 }),
+        enabled: !!userId,
     });
 
     const {
@@ -99,27 +93,23 @@ export default function Dashboard() {
         hasNextPage: hasMoreNews,
         isFetchingNextPage: isFetchingMoreNews,
     } = useInfiniteQuery<NewsResponse>({
-        queryKey: ['newsFeed', user?.id],
+        queryKey: queryKeys.newsFeed(userId),
         initialPageParam: undefined as string | undefined,
-        queryFn: async ({ pageParam }) => {
-            const { data } = await api.get(`/users/${user!.id}/news`, {
-                params: {
-                    limit: 15,
-                    filter: 'all',
-                    before: pageParam,
-                },
-            });
-            return data;
-        },
+        queryFn: ({ pageParam }) =>
+            usersApi.getNews(userId, {
+                limit: 15,
+                filter: 'all',
+                before: pageParam as string | undefined,
+            }),
         getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-        enabled: !!user?.id,
+        enabled: !!userId,
     });
 
     const { data: githubActivity } = useQuery<{
         username: string;
         commitsByDate: Record<string, number>;
     } | null>({
-        queryKey: ['githubActivity', user?.id, heatmapYear],
+        queryKey: queryKeys.githubActivity(userId, heatmapYear),
         queryFn: async () => {
             const {
                 data: { session },
@@ -210,7 +200,7 @@ export default function Dashboard() {
 
             return { username: githubUsername, commitsByDate };
         },
-        enabled: !!user?.id,
+        enabled: !!userId,
         staleTime: 1000 * 60 * 10,
     });
 

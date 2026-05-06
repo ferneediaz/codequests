@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { CodeEditor } from '@/components/battle/CodeEditor';
 import { Loader2, ArrowLeft, Trophy } from 'lucide-react';
-import api from '@/services/api';
+import { battlesApi } from '@/services/battles';
 import type { BattleResponse, BattleParticipant } from '@/types/api';
 
 function participantName(p: BattleParticipant) {
@@ -23,8 +23,9 @@ export default function Results() {
 
     useEffect(() => {
         async function load() {
+            if (!id) return;
             try {
-                const { data } = await api.get<BattleResponse>(`/battles/${id}`);
+                const data = await battlesApi.getBattle(id);
                 setBattle(data);
             } catch (error) {
                 console.error('Failed to load battle results:', error);

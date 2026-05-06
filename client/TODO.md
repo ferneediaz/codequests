@@ -959,7 +959,10 @@ Living checklist of client-side cleanup. Order is roughly by impact. Tick items 
 ### P2 — Data layer consistency
 
 - [ ] Add `services/battles.ts` and `services/users.ts` so pages never call `axios`/`api` directly
-- [ ] Centralize TanStack query keys in `lib/queryKeys.ts`:
+  - [x] Added `services/battles.ts` and `services/users.ts`
+  - [x] Migrated dashboard, Play presets/invites, practice solve run, battle results, and `useBattle` off direct `api`
+  - [ ] Broader follow-up: author/auth/invite pages and a few shared hooks/components still import `api` directly
+- [x] Centralize TanStack query keys in `lib/queryKeys.ts`:
   ```ts
   export const queryKeys = {
     userStats: (userId: string) => ['userStats', userId] as const,
@@ -974,8 +977,8 @@ Living checklist of client-side cleanup. Order is roughly by impact. Tick items 
       ['githubActivity', userId, year] as const,
   };
   ```
-- [ ] Migrate `pages/dashboard/Dashboard.tsx`, `pages/practice/*`, and `hooks/useBattle.ts` to use `queryKeys`
-- [ ] Audit `store/slices/battleSlice.ts`: server-shaped fields (`battle`, `problem`) should live in TanStack Query; keep only UI flags (`isSubmitting`, `isRunning`, `usedSkills`, `activeEffects`) in Redux
+- [x] Migrate `pages/dashboard/Dashboard.tsx`, `pages/practice/*`, and `hooks/useBattle.ts` to use `queryKeys`
+- [x] Audit `store/slices/battleSlice.ts`: server-shaped fields (`battle`, `problem`) now live in TanStack Query; Redux keeps battle UI flags (`isSubmitting`, `isRunning`, `usedSkills`, `activeEffects`)
 
 ### P3 — Hooks & components
 

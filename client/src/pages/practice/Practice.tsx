@@ -18,6 +18,7 @@ import {
     Sparkles,
     Activity,
 } from 'lucide-react';
+import { queryKeys } from '@/lib/queryKeys';
 import { practiceApi } from '@/services/practice';
 import type { Difficulty } from '@/types/api';
 import type { PracticeProblemSummary } from '@/types/practice';
@@ -40,12 +41,12 @@ export default function Practice() {
     const [unsolvedOnly, setUnsolvedOnly] = useState(false);
 
     const { data: problems, isLoading } = useQuery<PracticeProblemSummary[]>({
-        queryKey: ['practice', 'problems'],
+        queryKey: queryKeys.practice.problems(),
         queryFn: () => practiceApi.listProblems(),
     });
 
     const { data: stats } = useQuery({
-        queryKey: ['practice', 'stats'],
+        queryKey: queryKeys.practice.stats(),
         queryFn: () => practiceApi.getStats(),
     });
 

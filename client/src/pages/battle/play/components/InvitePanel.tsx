@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AnimateIn } from '@/components/layout/AnimateIn';
-import api from '@/services/api';
+import { battlesApi } from '@/services/battles';
 import { usePaywall } from '@/hooks/usePaywall';
 import { useSubscription } from '@/hooks/useSubscription';
 import type {
@@ -91,8 +91,8 @@ export function InvitePanel({ cfg }: { cfg: PlayConfig }) {
             };
             setIsCreatingPrivate(true);
             try {
-                const { data } = await api.post('/battles/clan-wars', payload);
-                setInviteCode(data.inviteCode);
+                const data = await battlesApi.createClanWars(payload);
+                setInviteCode(data.inviteCode ?? null);
                 void refreshSubscription();
             } catch (error: unknown) {
                 const message =
@@ -127,8 +127,8 @@ export function InvitePanel({ cfg }: { cfg: PlayConfig }) {
 
         setIsCreatingPrivate(true);
         try {
-            const { data } = await api.post('/battles/invite', payload);
-            setInviteCode(data.inviteCode);
+            const data = await battlesApi.createInvite(payload);
+            setInviteCode(data.inviteCode ?? null);
             void refreshSubscription();
         } catch (error: unknown) {
             const message =
@@ -153,11 +153,10 @@ export function InvitePanel({ cfg }: { cfg: PlayConfig }) {
         if (!requireCanPlay()) return;
         setIsJoining(true);
         try {
-            const path =
-                cfg.mode === 'GROUP'
-                    ? `/battles/clan-wars/invite/${joinCode.trim()}/join`
-                    : `/battles/invite/${joinCode.trim()}/join`;
-            const { data } = await api.post(path);
+            const data = await battlesApi.joinInvite(
+                joinCode.trim(),
+                cfg.mode === 'GROUP' ? 'clan-wars' : 'battle',
+            );
             void refreshSubscription();
             navigate(`/battle/${data.id}`);
         } catch (error) {
@@ -170,7 +169,7 @@ export function InvitePanel({ cfg }: { cfg: PlayConfig }) {
 
     const handleGoToBattle = () => {
         if (!inviteCode) return;
-        api.get(`/battles/invite/${inviteCode}`).then(({ data }) => {
+        battlesApi.getBattleByInvite(inviteCode).then((data) => {
             navigate(`/battle/${data.id}`);
         });
     };

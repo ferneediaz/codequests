@@ -7,7 +7,8 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import api from '@/services/api';
+import { queryKeys } from '@/lib/queryKeys';
+import { battlesApi } from '@/services/battles';
 import { practiceApi } from '@/services/practice';
 import { useResizable } from '@/hooks/useResizable';
 import { ProblemPanel } from '@/components/battle/ProblemPanel';
@@ -56,13 +57,13 @@ export default function PracticeSolve() {
     const vSplit = useResizable(0.65, 'vertical');
 
     const { data: problem, isLoading: problemLoading } = useQuery<PracticeProblemDetail>({
-        queryKey: ['practice', 'problem', problemId],
+        queryKey: queryKeys.practice.problem(problemId ?? ''),
         queryFn: () => practiceApi.getProblem(problemId!),
         enabled: !!problemId,
     });
 
     const { data: practiceStats } = useQuery({
-        queryKey: ['practice', 'stats'],
+        queryKey: queryKeys.practice.stats(),
         queryFn: () => practiceApi.getStats(),
     });
 
@@ -92,11 +93,8 @@ export default function PracticeSolve() {
         try {
             setIsRunning(true);
             setLastAction('run');
-            const { data } = await api.post<SubmissionResult>(
-                `/problems/${problemId}/execute`,
-                { code, language },
-            );
-            setRunResult(data);
+            const result = await battlesApi.executeProblem(problemId, { code, language });
+            setRunResult(result);
         } catch (error) {
             console.error('Run failed:', error);
             toast.error('Run failed. Check your code and try again.');

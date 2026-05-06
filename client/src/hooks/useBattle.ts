@@ -1,25 +1,19 @@
-import { useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-    setBattle,
-    setProblem,
-    setOpponentProgress,
-    setSubmissionResult,
-    setRunResult,
     setIsSubmitting,
     setIsRunning,
     addUsedSkill,
     addActiveEffect,
     removeActiveEffect,
-    completeBattle,
-    setBattleStartedAt,
     resetBattle,
 } from '@/store/slices/battleSlice';
+import { battlesApi } from '@/services/battles';
 import { getSocket } from '@/services/socket';
-import api from '@/services/api';
-import type { BattleResponse, ProblemResponse, SkillType } from '@/types/api';
+import type { BattleResponse, ProblemResponse, SkillType, SubmissionResult } from '@/types/api';
 import type {
     BattleStartedPayload,
     BattleSubmissionPayload,
@@ -31,48 +25,41 @@ import type {
     BattleTimeUpdatedPayload,
 } from '@/types/socket';
 
+interface OpponentProgress {
+    userId: string;
+    username: string;
+    testsPassed: number;
+    totalTests: number;
+}
+
 export function useBattle(battleId: string) {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const userId = useAppSelector((state) => state.auth.user?.id);
-    const {
-        battle,
-        problem,
-        opponentProgress,
-        lastSubmissionResult,
-        runResult,
-        isSubmitting,
-        isRunning,
-        usedSkills,
-        activeEffects,
-    } = useAppSelector((state) => state.battle);
+    const { isSubmitting, isRunning, usedSkills, activeEffects } = useAppSelector(
+        (state) => state.battle,
+    );
+    const [opponentProgress, setOpponentProgress] =
+        useState<OpponentProgress | null>(null);
+    const [lastSubmissionResult, setLastSubmissionResult] =
+        useState<SubmissionResult | null>(null);
+    const [runResult, setRunResult] = useState<SubmissionResult | null>(null);
 
-    // Fetch battle data and join room
+    const { data: battle } = useQuery<BattleResponse>({
+        queryKey: queryKeys.battle(battleId),
+        queryFn: () => battlesApi.getBattle(battleId),
+        enabled: !!battleId,
+    });
+
+    const problemId = battle?.problemId ?? '';
+    const { data: problem } = useQuery<ProblemResponse>({
+        queryKey: queryKeys.problem(problemId),
+        queryFn: () => battlesApi.getProblem(problemId),
+        enabled: !!problemId,
+    });
+
     useEffect(() => {
-        let mounted = true;
-
-        async function loadBattle() {
-            try {
-                const { data } = await api.get<BattleResponse>(`/battles/${battleId}`);
-                if (!mounted) return;
-                dispatch(setBattle(data));
-
-                // Load problem if battle has a problemId
-                if (data.problemId) {
-                    const { data: problemData } = await api.get<ProblemResponse>(
-                        `/problems/${data.problemId}`,
-                    );
-                    if (mounted) dispatch(setProblem(problemData));
-                }
-            } catch (error) {
-                console.error('Failed to load battle:', error);
-            }
-        }
-
-        loadBattle();
-
-        // Join battle room via WebSocket
         const socket = getSocket();
         if (socket) {
             socket.emit('battle.join', { battleId }, (response: { success: boolean; error?: string }) => {
@@ -83,75 +70,93 @@ export function useBattle(battleId: string) {
         }
 
         return () => {
-            mounted = false;
             if (socket) {
                 socket.emit('battle.leave', { battleId });
             }
             dispatch(resetBattle());
+            setOpponentProgress(null);
+            setLastSubmissionResult(null);
+            setRunResult(null);
         };
     }, [battleId, dispatch]);
 
-    // Listen for WebSocket events
     useEffect(() => {
         const socket = getSocket();
         if (!socket) return;
 
+        const setBattleData = (
+            updater: (current: BattleResponse) => BattleResponse,
+        ) => {
+            queryClient.setQueryData<BattleResponse>(
+                queryKeys.battle(battleId),
+                (current) => (current ? updater(current) : current),
+            );
+        };
+
         const handleStarted = (data: BattleStartedPayload) => {
-            dispatch(setBattle({
-                ...battle!,
+            setBattleData((current) => ({
+                ...current,
                 status: data.status,
                 startedAt: data.startedAt,
+                problemId: current.problemId ?? data.problem.id,
             }));
             if (data.problem) {
-                dispatch(setProblem(data.problem as ProblemResponse));
+                queryClient.setQueryData(
+                    queryKeys.problem(data.problem.id),
+                    data.problem as ProblemResponse,
+                );
             }
         };
 
         const handleSubmission = (data: BattleSubmissionPayload) => {
-            // Only track opponent's submissions
+            // Only track opponent's submissions.
             if (data.userId !== userId) {
-                dispatch(setOpponentProgress({
+                setOpponentProgress({
                     userId: data.userId,
                     username: data.username,
                     testsPassed: data.testsPassed,
                     totalTests: data.totalTests,
-                }));
+                });
             }
         };
 
         const handleCompleted = (data: BattleCompletedPayload) => {
-            dispatch(completeBattle({
-                ...battle!,
+            setBattleData((current) => ({
+                ...current,
                 status: 'COMPLETED',
                 winnerId: data.winnerId,
                 endedAt: data.endedAt,
-                participants: battle?.participants.map((p) => {
+                participants: current.participants.map((p) => {
                     const updated = data.participants.find((dp) => dp.userId === p.userId);
                     return updated
-                        ? { ...p, testsPassed: updated.testsPassed, totalTests: updated.totalTests, mmrChange: updated.mmrChange }
+                        ? {
+                              ...p,
+                              testsPassed: updated.testsPassed,
+                              totalTests: updated.totalTests,
+                              mmrChange: updated.mmrChange,
+                          }
                         : p;
-                }) ?? [],
+                }),
             }));
             if (userId) {
-                void queryClient.invalidateQueries({ queryKey: ['userStats', userId] });
-                void queryClient.invalidateQueries({ queryKey: ['matchHistory', userId] });
+                void queryClient.invalidateQueries({
+                    queryKey: queryKeys.userStats(userId),
+                });
+                void queryClient.invalidateQueries({
+                    queryKey: queryKeys.matchHistory(userId),
+                });
             }
             navigate(`/battle/${battleId}/results`);
         };
 
-        socket.on('battle.started', handleStarted);
-        socket.on('battle.submission', handleSubmission);
-        socket.on('battle.completed', handleCompleted);
-
         const handlePlayerJoined = (data: PlayerJoinedPayload) => {
-            if (!battle) return;
-            // Add new participant if not already present
-            const exists = battle.participants.some((p) => p.userId === data.userId);
-            if (!exists) {
-                dispatch(setBattle({
-                    ...battle,
+            setBattleData((current) => {
+                const exists = current.participants.some((p) => p.userId === data.userId);
+                if (exists) return current;
+                return {
+                    ...current,
                     participants: [
-                        ...battle.participants,
+                        ...current.participants,
                         {
                             id: data.userId,
                             userId: data.userId,
@@ -162,25 +167,21 @@ export function useBattle(battleId: string) {
                             isReady: false,
                         },
                     ],
-                }));
-            }
+                };
+            });
         };
 
         const handlePlayerReady = (data: PlayerReadyPayload) => {
-            if (!battle) return;
-            dispatch(setBattle({
-                ...battle,
-                participants: battle.participants.map((p) =>
+            setBattleData((current) => ({
+                ...current,
+                participants: current.participants.map((p) =>
                     p.userId === data.userId ? { ...p, isReady: data.isReady } : p,
                 ),
             }));
         };
 
-        socket.on('battle.player_joined', handlePlayerJoined);
-        socket.on('battle.player_ready', handlePlayerReady);
-
         const handleSkillEffect = (data: SkillEffectPayload) => {
-            // Instant skills (duration = 0) still get a brief visual flash
+            // Instant skills (duration = 0) still get a brief visual flash.
             const durationSec = data.duration > 0 ? data.duration : 3;
             const expiresAt = Date.now() + durationSec * 1000;
             dispatch(addActiveEffect({ skillType: data.skillType, expiresAt }));
@@ -196,9 +197,14 @@ export function useBattle(battleId: string) {
         };
 
         const handleTimeUpdated = (data: BattleTimeUpdatedPayload) => {
-            dispatch(setBattleStartedAt(data.startedAt));
+            setBattleData((current) => ({ ...current, startedAt: data.startedAt }));
         };
 
+        socket.on('battle.started', handleStarted);
+        socket.on('battle.submission', handleSubmission);
+        socket.on('battle.completed', handleCompleted);
+        socket.on('battle.player_joined', handlePlayerJoined);
+        socket.on('battle.player_ready', handlePlayerReady);
         socket.on('skill.effect', handleSkillEffect);
         socket.on('skill.used', handleSkillUsed);
         socket.on('battle.time_updated', handleTimeUpdated);
@@ -213,18 +219,17 @@ export function useBattle(battleId: string) {
             socket.off('skill.used', handleSkillUsed);
             socket.off('battle.time_updated', handleTimeUpdated);
         };
-    }, [battle, battleId, userId, dispatch, navigate, queryClient]);
+    }, [battleId, dispatch, navigate, queryClient, userId]);
 
     const submitCode = useCallback(
         async (code: string, language: string) => {
             dispatch(setIsSubmitting(true));
             try {
-                const { data } = await api.post(`/battles/${battleId}/submit`, { code, language });
-                dispatch(setSubmissionResult(data));
-                return data;
-            } catch (error) {
+                const result = await battlesApi.submitCode(battleId, { code, language });
+                setLastSubmissionResult(result);
+                return result;
+            } finally {
                 dispatch(setIsSubmitting(false));
-                throw error;
             }
         },
         [battleId, dispatch],
@@ -235,15 +240,14 @@ export function useBattle(battleId: string) {
             if (!problem) return;
             dispatch(setIsRunning(true));
             try {
-                const { data } = await api.post(`/problems/${problem.id}/execute`, {
+                const result = await battlesApi.executeProblem(problem.id, {
                     code,
                     language,
                 });
-                dispatch(setRunResult(data));
-                return data;
-            } catch (error) {
+                setRunResult(result);
+                return result;
+            } finally {
                 dispatch(setIsRunning(false));
-                throw error;
             }
         },
         [problem, dispatch],
@@ -261,10 +265,14 @@ export function useBattle(battleId: string) {
 
     const completeBattleManually = useCallback(async () => {
         try {
-            await api.post(`/battles/${battleId}/complete`);
+            await battlesApi.completeBattle(battleId);
             if (userId) {
-                await queryClient.invalidateQueries({ queryKey: ['userStats', userId] });
-                await queryClient.invalidateQueries({ queryKey: ['matchHistory', userId] });
+                await queryClient.invalidateQueries({
+                    queryKey: queryKeys.userStats(userId),
+                });
+                await queryClient.invalidateQueries({
+                    queryKey: queryKeys.matchHistory(userId),
+                });
             }
         } catch (error) {
             console.error('Failed to complete battle:', error);

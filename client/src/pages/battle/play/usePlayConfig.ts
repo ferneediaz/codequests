@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/services/api';
+import { queryKeys } from '@/lib/queryKeys';
+import { battlesApi } from '@/services/battles';
 import { listClans } from '@/services/clans';
 import type {
     BattleMode,
@@ -57,13 +58,8 @@ export function usePlayConfig(userId: string | undefined) {
     // mode is selected. Using `useQuery` instead of useEffect+useState keeps
     // the synchronous part of effects free of setState calls.
     const presetsQuery = useQuery<RoyalePreset[]>({
-        queryKey: ['battles', 'royale', 'presets'],
-        queryFn: async () => {
-            const { data } = await api.get<RoyalePreset[]>(
-                '/battles/royale/presets',
-            );
-            return data;
-        },
+        queryKey: queryKeys.battlePresets.royale(),
+        queryFn: () => battlesApi.getRoyalePresets(),
         enabled: mode === 'BATTLE_ROYALE',
         staleTime: Infinity,
     });
@@ -77,13 +73,8 @@ export function usePlayConfig(userId: string | undefined) {
         : null;
 
     const cwPresetsQuery = useQuery<ClanWarsPreset[]>({
-        queryKey: ['battles', 'clan-wars', 'presets'],
-        queryFn: async () => {
-            const { data } = await api.get<ClanWarsPreset[]>(
-                '/battles/clan-wars/presets',
-            );
-            return data;
-        },
+        queryKey: queryKeys.battlePresets.clanWars(),
+        queryFn: () => battlesApi.getClanWarsPresets(),
         enabled: mode === 'GROUP',
         staleTime: Infinity,
     });
