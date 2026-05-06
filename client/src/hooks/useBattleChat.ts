@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getChatSocket } from '@/services/socket';
+import { getBattleHistory } from '@/services/chatApi';
 import type { ChatMessagePayload } from '@/types/socket';
 
 interface SystemMessage {
@@ -12,8 +13,37 @@ interface SystemMessage {
 export type ChatItem = ChatMessagePayload | SystemMessage;
 
 export function useBattleChat(battleId: string | undefined) {
-    const [messages, setMessages] = useState<ChatItem[]>([]);
+    const [chatState, setChatState] = useState<{
+        battleId: string | undefined;
+        messages: ChatItem[];
+    }>({ battleId: undefined, messages: [] });
     const joinedRef = useRef(false);
+    const messages = chatState.battleId === battleId ? chatState.messages : [];
+
+    useEffect(() => {
+        if (!battleId) return;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const { messages: history } = await getBattleHistory(battleId);
+                if (cancelled) return;
+                setChatState((prev) => ({
+                    battleId,
+                    messages: mergeChatMessages(
+                        history,
+                        prev.battleId === battleId ? prev.messages : [],
+                    ),
+                }));
+            } catch {
+                // History is best-effort; realtime chat still works without it.
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [battleId]);
 
     useEffect(() => {
         if (!battleId) return;
@@ -37,20 +67,29 @@ export function useBattleChat(battleId: string | undefined) {
 
         const handleMessage = (msg: ChatMessagePayload) => {
             if (msg.roomType !== 'BATTLE' || msg.roomId !== battleId) return;
-            setMessages((prev) => [...prev, msg]);
+            setChatState((prev) => ({
+                battleId,
+                messages: mergeChatMessages(
+                    prev.battleId === battleId ? prev.messages : [],
+                    [msg],
+                ),
+            }));
         };
 
         const handleUserJoined = (data: { username: string; roomType: string; roomId: string }) => {
             if (data.roomType !== 'BATTLE' || data.roomId !== battleId) return;
-            setMessages((prev) => [
-                ...prev,
-                {
-                    id: `sys-${Date.now()}-${Math.random()}`,
-                    system: true,
-                    content: `${data.username} joined the chat`,
-                    createdAt: new Date().toISOString(),
-                },
-            ]);
+            setChatState((prev) => ({
+                battleId,
+                messages: [
+                    ...(prev.battleId === battleId ? prev.messages : []),
+                    {
+                        id: `sys-${Date.now()}-${Math.random()}`,
+                        system: true,
+                        content: `${data.username} joined the chat`,
+                        createdAt: new Date().toISOString(),
+                    },
+                ],
+            }));
         };
 
         socket.on('chat.message', handleMessage);
@@ -83,4 +122,18 @@ export function useBattleChat(battleId: string | undefined) {
     );
 
     return { messages, sendMessage };
+}
+
+function mergeChatMessages(
+    existing: ChatItem[],
+    incoming: ChatItem[],
+): ChatItem[] {
+    const seen = new Set(existing.map((message) => message.id));
+    const next = [...existing];
+    for (const message of incoming) {
+        if (seen.has(message.id)) continue;
+        seen.add(message.id);
+        next.push(message);
+    }
+    return next;
 }

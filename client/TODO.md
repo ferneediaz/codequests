@@ -61,18 +61,15 @@
 
 ## 🚧 In Progress
 
-**Next up (queued after Subscription System shipped):**
+**Current focus queue:**
 
-1. **Friends UI (Phase 3.1)** — backend endpoints and real-time presence are
-   complete; this delivers the biggest social-retention lift for the least
-   client effort. Start with `friendsSlice` + friends list sidebar.
-2. **Chat completion (Phase 3.2)** — backend (DMs, lobby/battle history) is
-   complete and `BattleChat` is already wired in-battle. Finish history
-   pagination, lobby chat, and direct-message threads.
+1. **Chat completion (Phase 3.2)** — realtime battle/lobby/DM chat is in place.
+   Finish remaining history + full DM inbox UX.
+2. **Clan pages/challenges (Phase 3.3/3.4)** — next major social feature set
+   once chat follow-ups are done.
 
-Clan pages/challenges (3.3/3.4) and Push notifications (3.5) come after,
-in that order. Avoid Battle Royale UI and Achievements until their server
-TODOs close out.
+Push notifications (3.5) comes after clans/challenges. Avoid Battle Royale UI
+and Achievements until their server TODOs close out.
 
 ---
 
@@ -423,6 +420,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 **Depends on backend:** Friends module, Chat module, Clan challenge module, Push notification module.
 
 ### 3.1 Friends System
+- [x] Shipped in `b771e36` (friends sidebar + unified friends data flow + presence wiring)
 - [x] Use TanStack Query + `FriendNotificationsProvider` for friends, pendingRequests, and local sentRequests
   - Chosen instead of `friendsSlice` to match the current client architecture:
     server-list state lives in TanStack Query; Redux stays focused on UI/game
@@ -449,34 +447,32 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
   a username search endpoint.
 
 ### 3.2 Chat System
-- [ ] Create `chatSlice` (activeRoom, messages, conversations)
-- [ ] Create `useChat` hook (sendMessage, joinRoom, leaveRoom, getHistory)
-- [ ] Chat components:
-  - [ ] `ChatPanel` — collapsible panel for in-game/lobby chat
-  - [ ] `ChatMessage` — single message (avatar, username, text, timestamp)
-  - [ ] `ChatInput` — text input with send button (Enter to send)
-  - [ ] `ChatWindow` — full page chat for DMs (`/messages`)
+- [x] Use focused hooks/components instead of a monolithic `chatSlice` /
+  `useChat` abstraction (`useBattleChat`, `useLobbyChat`, `BattleChat`,
+  `LobbyChatPanel`, `DmDrawer`)
 - [ ] Battle chat:
   - [x] Chat panel on battle page (floating, collapsible `BattleChat`)
   - [x] Auto-join battle chat room on battle start (`useBattleChat` + `chat.join_room`)
   - [x] Send/receive real-time messages in battle room (`chat.send`, `chat.message`)
-  - [ ] Chat history loads from `GET /api/chat/battle/:battleId`
+  - [x] Initial chat history loads from `GET /api/chat/BATTLE/:battleId`
 - [ ] Post-game chat:
   - [ ] Chat persists on results page
   - [ ] GG / rematch conversation
-- [ ] Lobby chat:
-  - [ ] Global chat room on dashboard
-  - [ ] Visible to all logged-in users
-  - [ ] Auto-join on dashboard mount
-- [ ] Direct Messages (`/messages`):
-  - [ ] Conversation list (sorted by most recent)
-  - [ ] Click conversation → show message thread
-  - [ ] "New Message" → search username → start conversation
+- [x] Lobby chat:
+  - [x] Global chat room on `/lobby`
+  - [x] Visible to all logged-in users
+  - [x] Auto-join on lobby mount
+- [ ] Direct Messages:
+  - [x] Lightweight DM drawer opens from social surfaces
+  - [x] Joins DM room and streams real-time messages
+  - [x] Fetches recent DM history for active conversation
+  - [ ] Full `/messages` inbox page (conversation list + thread view)
+  - [ ] "New Message" flow in `/messages` (search username → start conversation)
   - [ ] Unread message count badge in navbar
-- [ ] Socket.IO events:
-  - [ ] Emit `chat.send`: `{ roomType, roomId, content }`
-  - [ ] Listen `chat.message`: `{ senderId, username, content, timestamp }`
-  - [ ] Emit `chat.join_room` / `chat.leave_room`
+- [x] Socket.IO events:
+  - [x] Emit `chat.send`: `{ roomType, roomId, content }`
+  - [x] Listen `chat.message`: `{ senderId, username, content, timestamp }`
+  - [x] Emit `chat.join_room` / `chat.leave_room`
 - [ ] **Success Criteria:** Can chat in-game, in lobby, and via DMs in real-time ✅
 
 ### 3.3 Clan Pages

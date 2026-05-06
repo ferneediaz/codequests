@@ -16,6 +16,17 @@ export async function getLobbyHistory(
     return data;
 }
 
+export async function getBattleHistory(
+    battleId: string,
+    cursor?: string,
+    limit = 50,
+): Promise<ChatHistoryResponse> {
+    const { data } = await api.get<ChatHistoryResponse>(`/chat/BATTLE/${battleId}`, {
+        params: { cursor, limit },
+    });
+    return data;
+}
+
 export interface DmConversationResponse {
     id: string;
     type: 'DM';
