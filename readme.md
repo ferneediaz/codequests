@@ -235,7 +235,7 @@ codequest_battles/
 │   │   ├── components/     # React components
 │   │   ├── hooks/          # Custom hooks
 │   │   ├── pages/          # Route pages
-│   │   ├── stores/         # Zustand stores
+│   │   ├── stores/         # Redux stores
 │   │   ├── services/       # API & Socket.IO clients
 │   │   └── types/          # TypeScript types
 │   └── ...

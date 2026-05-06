@@ -944,10 +944,10 @@ Living checklist of client-side cleanup. Order is roughly by impact. Tick items 
 
 - [x] `pages/battle/Play.tsx` — extracted to **`pages/battle/play/`**: `usePlayConfig.ts`, `constants.ts`, `utils.ts`, and `components/{ModeSelector,RulesPanel,SkillsPicker,BattleRoyalePanel,ClanWarPanel,InvitePanel,...}.tsx`; shell **`Play.tsx`** is now thin (~110 lines).
   - [ ] **Deferred to P2:** move clan-wars / invite **`api.post`** from `InvitePanel` into **`services/battles.ts`** (currently still direct `api` calls in the panel).
-- [ ] **`pages/author/AuthorNew.tsx`** (~1452 lines) — **not started**
-  - [ ] `pages/author/new/useAuthorForm.ts`
-  - [ ] `pages/author/new/utils.ts` (validation + YAML serialization)
-  - [ ] `pages/author/new/components/{MetaSection,StarterSection,TestsSection,HintsSection,SolutionSection}.tsx`
+- [x] **`pages/author/AuthorNew.tsx`** — extracted to **`pages/author/new/`**: `useAuthorForm.ts`, `utils.ts` (validation + YAML serialization), and `components/{MetaSection,StarterSection,TestsSection,HintsSection,SolutionSection,...}.tsx`; shell **`AuthorNew.tsx`** is now thin (~112 lines).
+  - [x] `pages/author/new/useAuthorForm.ts`
+  - [x] `pages/author/new/utils.ts` (validation + YAML serialization)
+  - [x] `pages/author/new/components/{MetaSection,StarterSection,TestsSection,HintsSection,SolutionSection}.tsx`
 - [ ] **`pages/dashboard/Dashboard.tsx`** (~780 lines after partial split; target <~400 lines)
   - [x] Extracted: `Heatmap`, `MatchRow`, `NewsRow`, `StatTile`, `StatCard`, `QuickAction`, `ModeBreakdown` → `pages/dashboard/components/`
   - [x] Extracted: `constants.ts`, `utils.ts` (dashboard-specific helpers/constants)
@@ -997,7 +997,6 @@ Living checklist of client-side cleanup. Order is roughly by impact. Tick items 
 
 ### P5 — Docs / DX
 
-- [ ] Update root `readme.md` Project Structure section: it says `stores/` (Zustand) but actual is `store/` with Redux Toolkit
 - [ ] Add a short `client/ARCHITECTURE.md` (Redux vs TanStack split, socket flow, paywall flow) once P1/P2 settle
 - [ ] After P0, audit for any silently kept `eslint-disable` comments
 
