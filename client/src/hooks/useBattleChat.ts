@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getChatSocket } from '@/services/socket';
-import { getBattleHistory } from '@/services/chatApi';
+import { getBattleHistory, markChatRoomRead } from '@/services/chatApi';
 import type { ChatMessagePayload } from '@/types/socket';
 
 interface SystemMessage {
@@ -35,6 +35,7 @@ export function useBattleChat(battleId: string | undefined) {
                         prev.battleId === battleId ? prev.messages : [],
                     ),
                 }));
+                await markChatRoomRead('BATTLE', battleId);
             } catch {
                 // History is best-effort; realtime chat still works without it.
             }
@@ -74,6 +75,7 @@ export function useBattleChat(battleId: string | undefined) {
                     [msg],
                 ),
             }));
+            void markChatRoomRead('BATTLE', battleId);
         };
 
         const handleUserJoined = (data: { username: string; roomType: string; roomId: string }) => {

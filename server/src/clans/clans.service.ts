@@ -25,10 +25,19 @@ export class ClansService {
     /**
      * Get all clans with member counts
      */
-    async findAll(options?: { limit?: number; offset?: number }) {
+    async findAll(options?: { limit?: number; offset?: number; q?: string }) {
+        const q = options?.q?.trim();
         const clans = await this.prisma.clan.findMany({
             take: options?.limit || 50,
             skip: options?.offset || 0,
+            where: q
+                ? {
+                    OR: [
+                        { name: { contains: q, mode: 'insensitive' } },
+                        { tag: { contains: q, mode: 'insensitive' } },
+                    ],
+                }
+                : undefined,
             orderBy: { mmr: 'desc' },
             include: {
                 members: {
@@ -137,6 +146,9 @@ export class ClansService {
                 name: createClanDto.name,
                 tag: createClanDto.tag.toUpperCase(),
                 ownerId: userId,
+                bannerUrl: createClanDto.bannerUrl || null,
+                logoUrl: createClanDto.logoUrl || null,
+                inviteOnly: createClanDto.inviteOnly ?? false,
                 members: {
                     connect: { id: userId },
                 },
@@ -197,6 +209,15 @@ export class ClansService {
             data: {
                 ...(updateClanDto.name && { name: updateClanDto.name }),
                 ...(updateClanDto.tag && { tag: updateClanDto.tag.toUpperCase() }),
+                ...(updateClanDto.bannerUrl !== undefined && {
+                    bannerUrl: updateClanDto.bannerUrl || null,
+                }),
+                ...(updateClanDto.logoUrl !== undefined && {
+                    logoUrl: updateClanDto.logoUrl || null,
+                }),
+                ...(updateClanDto.inviteOnly !== undefined && {
+                    inviteOnly: updateClanDto.inviteOnly,
+                }),
             },
             include: {
                 members: {

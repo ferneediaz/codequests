@@ -57,6 +57,30 @@ export class ChatController {
         return this.chatService.createConversation(req.user.id, dto.targetUserId);
     }
 
+    @Get('unread-counts')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Get unread DM counts' })
+    @ApiResponse({ status: 200, description: 'Unread DM counts' })
+    getUnreadCounts(@Req() req: AuthedRequest) {
+        return this.chatService.getUnreadCounts(req.user.id);
+    }
+
+    @Post(':roomType/:roomId/read')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Mark a chat room as read' })
+    @ApiParam({ name: 'roomType', enum: ChatRoomType, description: 'Room type' })
+    @ApiParam({ name: 'roomId', description: 'Room ID' })
+    @ApiResponse({ status: 200, description: 'Room marked read' })
+    markRead(
+        @Param('roomType') roomType: ChatRoomType,
+        @Param('roomId') roomId: string,
+        @Req() req: AuthedRequest,
+    ) {
+        return this.chatService.markRead(req.user.id, roomType, roomId);
+    }
+
     /**
      * Get message history for a chat room (paginated)
      */

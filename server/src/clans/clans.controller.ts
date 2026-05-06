@@ -23,6 +23,8 @@ import {
 } from '@nestjs/swagger';
 import { ClansService } from './clans.service';
 import { ClanChallengeService } from './clan-challenges.service';
+import { ClanJoinRequestsService } from './clan-join-requests.service';
+import { ClanJoinRequestStatus } from '@prisma/client';
 import {
     CLAN_EVENTS_PORT,
     ClanEventsPort,
@@ -34,6 +36,7 @@ import {
     SendChallengeDto,
     CounterChallengeDto,
     ChallengeResponseDto,
+    CreateJoinRequestDto,
 } from './dto';
 import { AuthedRequest } from '../common/types/authed-request';
 
@@ -43,6 +46,7 @@ export class ClansController {
     constructor(
         private readonly clansService: ClansService,
         private readonly clanChallengeService: ClanChallengeService,
+        private readonly clanJoinRequestsService: ClanJoinRequestsService,
         @Inject(CLAN_EVENTS_PORT)
         private readonly clanEvents: ClanEventsPort,
     ) { }
@@ -52,14 +56,16 @@ export class ClansController {
      */
     @Get()
     @ApiOperation({ summary: 'Get all clans' })
+    @ApiQuery({ name: 'q', required: false, type: String, description: 'Search by clan name or tag' })
     @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
     @ApiQuery({ name: 'offset', required: false, type: Number, example: 0 })
     @ApiResponse({ status: 200, description: 'List of clans', type: [ClanResponseDto] })
     findAll(
+        @Query('q') q?: string,
         @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
         @Query('offset', new ParseIntPipe({ optional: true })) offset?: number,
     ) {
-        return this.clansService.findAll({ limit, offset });
+        return this.clansService.findAll({ q, limit, offset });
     }
 
     // ============================================
@@ -131,6 +137,7 @@ export class ClansController {
             challengeId: challenge.id,
             challengerClan: challenge.challengerClan,
             challengedClan: challenge.challengedClan,
+            battleId: challenge.battleId,
         });
 
         return challenge;
@@ -226,6 +233,18 @@ export class ClansController {
     // ============================================
 
     /**
+     * Get clan by tag
+     */
+    @Get('tag/:tag')
+    @ApiOperation({ summary: 'Get clan by tag' })
+    @ApiParam({ name: 'tag', description: 'Clan tag (e.g., CW)', example: 'CW' })
+    @ApiResponse({ status: 200, description: 'Clan found', type: ClanResponseDto })
+    @ApiResponse({ status: 404, description: 'Clan not found' })
+    findByTag(@Param('tag') tag: string) {
+        return this.clansService.findByTag(tag);
+    }
+
+    /**
      * Get clan by ID
      */
     @Get(':id')
@@ -259,16 +278,97 @@ export class ClansController {
         return this.clanChallengeService.getChallenges(id, req.user.id);
     }
 
-    /**
-     * Get clan by tag
-     */
-    @Get('tag/:tag')
-    @ApiOperation({ summary: 'Get clan by tag' })
-    @ApiParam({ name: 'tag', description: 'Clan tag (e.g., CW)', example: 'CW' })
-    @ApiResponse({ status: 200, description: 'Clan found', type: ClanResponseDto })
+    @Get(':id/battles')
+    @ApiOperation({ summary: 'Get clan battle history' })
+    @ApiParam({ name: 'id', description: 'Clan ID' })
+    @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+    @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+    @ApiResponse({ status: 200, description: 'Clan battle history' })
     @ApiResponse({ status: 404, description: 'Clan not found' })
-    findByTag(@Param('tag') tag: string) {
-        return this.clansService.findByTag(tag);
+    getBattleHistory(
+        @Param('id') id: string,
+        @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+        @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    ) {
+        return this.clansService.getBattleHistory(id, page, limit);
+    }
+
+    @Post(':id/join-requests')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Request to join a clan' })
+    async requestToJoin(
+        @Param('id') id: string,
+        @Body() dto: CreateJoinRequestDto,
+        @Req() req: AuthedRequest,
+    ) {
+        const result = await this.clanJoinRequestsService.requestToJoin(
+            id,
+            req.user.id,
+            dto.message,
+        );
+        if (!result.joined && result.request) {
+            this.clanEvents.emitToUser(
+                result.request.clan.ownerId,
+                'clan.join_request_received',
+                result.request,
+            );
+        }
+        return result;
+    }
+
+    @Get(':id/join-requests')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'List join requests for a clan' })
+    listJoinRequests(
+        @Param('id') id: string,
+        @Req() req: AuthedRequest,
+        @Query('status') status?: ClanJoinRequestStatus,
+    ) {
+        return this.clanJoinRequestsService.list(id, req.user.id, status);
+    }
+
+    @Post('join-requests/:id/approve')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Approve a clan join request' })
+    async approveJoinRequest(
+        @Param('id') id: string,
+        @Req() req: AuthedRequest,
+    ) {
+        const request = await this.clanJoinRequestsService.approve(id, req.user.id);
+        this.clanEvents.emitToUser(
+            request.userId,
+            'clan.join_request_resolved',
+            request,
+        );
+        return request;
+    }
+
+    @Post('join-requests/:id/reject')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Reject a clan join request' })
+    async rejectJoinRequest(
+        @Param('id') id: string,
+        @Req() req: AuthedRequest,
+    ) {
+        const request = await this.clanJoinRequestsService.reject(id, req.user.id);
+        this.clanEvents.emitToUser(
+            request.userId,
+            'clan.join_request_resolved',
+            request,
+        );
+        return request;
+    }
+
+    @Delete('join-requests/:id')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Cancel a clan join request' })
+    cancelJoinRequest(@Param('id') id: string, @Req() req: AuthedRequest) {
+        return this.clanJoinRequestsService.cancel(id, req.user.id);
     }
 
     /**

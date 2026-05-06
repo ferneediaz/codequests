@@ -175,6 +175,77 @@ export class ChatService {
         );
     }
 
+    async markRead(userId: string, roomType: ChatRoomType, roomId: string) {
+        await this.validateRoomAccess(userId, roomType, roomId);
+        return this.prisma.messageRead.upsert({
+            where: {
+                userId_roomType_roomId: {
+                    userId,
+                    roomType,
+                    roomId,
+                },
+            },
+            create: {
+                userId,
+                roomType,
+                roomId,
+                lastReadAt: new Date(),
+            },
+            update: {
+                lastReadAt: new Date(),
+            },
+        });
+    }
+
+    async getUnreadCounts(userId: string) {
+        const conversations = await this.prisma.conversation.findMany({
+            where: {
+                type: ConversationType.DM,
+                participantIds: { has: userId },
+            },
+            select: { id: true },
+        });
+        const roomIds = conversations.map((conversation) => conversation.id);
+        if (roomIds.length === 0) {
+            return { dmTotal: 0, perRoom: {} as Record<string, number> };
+        }
+
+        const reads = await this.prisma.messageRead.findMany({
+            where: {
+                userId,
+                roomType: ChatRoomType.DM,
+                roomId: { in: roomIds },
+            },
+        });
+        const readByRoom = new Map(reads.map((read) => [read.roomId, read.lastReadAt]));
+        const entries = await Promise.all(
+            roomIds.map(async (roomId) => {
+                const lastReadAt = readByRoom.get(roomId);
+                const count = await this.prisma.message.count({
+                    where: {
+                        roomType: ChatRoomType.DM,
+                        roomId,
+                        senderId: { not: userId },
+                        ...(lastReadAt ? { createdAt: { gt: lastReadAt } } : {}),
+                    },
+                });
+                return [roomId, count] as const;
+            }),
+        );
+
+        const perRoom = Object.fromEntries(entries);
+        const dmTotal = entries.reduce((sum, [, count]) => sum + count, 0);
+        return { dmTotal, perRoom };
+    }
+
+    async getDmParticipantIds(conversationId: string): Promise<string[]> {
+        const conversation = await this.prisma.conversation.findUnique({
+            where: { id: conversationId },
+            select: { participantIds: true },
+        });
+        return conversation?.participantIds ?? [];
+    }
+
     /**
      * Get a single conversation by ID. Verifies user is a participant.
      */
@@ -237,6 +308,17 @@ export class ChatService {
                     throw new ForbiddenException(
                         'You are not a participant of this conversation',
                     );
+                }
+                return;
+            }
+
+            case ChatRoomType.CLAN: {
+                const user = await this.prisma.user.findUnique({
+                    where: { id: userId },
+                    select: { clanId: true },
+                });
+                if (user?.clanId !== roomId) {
+                    throw new ForbiddenException('You are not a member of this clan');
                 }
                 return;
             }

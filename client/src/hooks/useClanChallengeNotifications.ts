@@ -9,6 +9,7 @@ interface ClanChallengeEventPayload {
     challengerClan?: ChallengeClan;
     challengedClan?: ChallengeClan;
     message?: string;
+    battleId?: string | null;
 }
 
 export function useClanChallengeNotifications() {
@@ -44,6 +45,15 @@ export function useClanChallengeNotifications() {
         };
 
         const handleAccepted = (data: ClanChallengeEventPayload) => {
+            if (data.battleId) {
+                toast('Clan challenge accepted', {
+                    action: {
+                        label: 'Join Battle',
+                        onClick: () => navigate(`/battle/${data.battleId}`),
+                    },
+                });
+                return;
+            }
             showToast('Clan challenge accepted', data);
         };
 

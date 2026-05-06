@@ -179,6 +179,9 @@ export class ChatGateway
 
             // Broadcast message to the room
             this.server.to(roomName).emit('chat.message', message);
+            if (roomType === ChatRoomType.DM) {
+                await this.emitUnreadChanges(roomId, userId);
+            }
 
             return { success: true, message };
         } catch (error: unknown) {
@@ -296,6 +299,29 @@ export class ChatGateway
                 return `battle:${roomId}`;
             case ChatRoomType.DM:
                 return `dm:${roomId}`;
+            case ChatRoomType.CLAN:
+                return `clan:${roomId}`;
+        }
+    }
+
+    private async emitUnreadChanges(conversationId: string, senderId: string) {
+        const participantIds = await this.chatService.getDmParticipantIds(conversationId);
+        await Promise.all(
+            participantIds
+                .filter((userId) => userId !== senderId)
+                .map(async (userId) => {
+                    const counts = await this.chatService.getUnreadCounts(userId);
+                    this.emitToUser(userId, 'chat.unread_changed', counts);
+                }),
+        );
+    }
+
+    private emitToUser(userId: string, event: string, payload: unknown) {
+        const socketIds = this.userSocketMap.get(userId);
+        if (!socketIds) return;
+        for (const socketId of socketIds) {
+            const socket = this.connectedClients.get(socketId);
+            socket?.emit(event, payload);
         }
     }
 

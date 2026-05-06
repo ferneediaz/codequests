@@ -323,6 +323,17 @@ export class BattlesController {
         return this.battlesService.getBattleDetails(id);
     }
 
+    @Post(':id/rematch')
+    @ApiOperation({ summary: 'Create a rematch from a completed battle' })
+    @ApiParam({ name: 'id', description: 'Battle ID' })
+    @ApiResponse({ status: 201, description: 'Rematch created', type: BattleResponseDto })
+    @ApiResponse({ status: 400, description: 'Battle cannot be rematched' })
+    @ApiResponse({ status: 403, description: 'Not a participant' })
+    @ApiResponse({ status: 404, description: 'Battle not found' })
+    async createRematch(@Req() req: AuthedRequest, @Param('id') id: string) {
+        return this.battlesService.createRematch(req.user.id, id);
+    }
+
     @Post(':id/join')
     @ApiOperation({ summary: 'Join an existing battle' })
     @ApiParam({ name: 'id', description: 'Battle ID' })

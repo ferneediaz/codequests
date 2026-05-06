@@ -8,19 +8,22 @@ import { AmbientBackground } from '@/components/layout/AmbientBackground';
 import { AnimateIn } from '@/components/layout/AnimateIn';
 import { createClan } from '@/services/clans';
 
-const TAG_PATTERN = /^[A-Z0-9]{2,5}$/;
+const TAG_PATTERN = /^[A-Z]{2,5}$/;
 
 export default function ClanCreate() {
     const navigate = useNavigate();
     const [name, setName] = useState('');
     const [tag, setTag] = useState('');
+    const [bannerUrl, setBannerUrl] = useState('');
+    const [logoUrl, setLogoUrl] = useState('');
+    const [inviteOnly, setInviteOnly] = useState(false);
     const [busy, setBusy] = useState(false);
 
     const canSubmit = name.trim().length > 0 && TAG_PATTERN.test(tag.trim());
 
     const onSubmit = async () => {
         if (!canSubmit) {
-            toast.error('Clan tag must be 2-5 uppercase letters or numbers.');
+            toast.error('Clan tag must be 2-5 uppercase letters.');
             return;
         }
         setBusy(true);
@@ -28,6 +31,9 @@ export default function ClanCreate() {
             const clan = await createClan({
                 name: name.trim(),
                 tag: tag.trim().toUpperCase(),
+                bannerUrl: bannerUrl.trim() || undefined,
+                logoUrl: logoUrl.trim() || undefined,
+                inviteOnly,
             });
             toast.success('Clan created.');
             navigate(`/clans/${clan.id}`);
@@ -73,15 +79,14 @@ export default function ClanCreate() {
                             <input
                                 value={tag}
                                 onChange={(e) =>
-                                    setTag(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))
+                                    setTag(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))
                                 }
                                 placeholder="CW"
                                 maxLength={5}
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm uppercase outline-none focus:ring-2 focus:ring-ring"
                             />
                             <span className="mt-1 block text-xs text-muted-foreground">
-                                Tags currently follow the server rule: 2-5 uppercase letters
-                                or numbers.
+                                Tags currently follow the server rule: 2-5 uppercase letters.
                             </span>
                         </label>
 
@@ -90,9 +95,36 @@ export default function ClanCreate() {
                                 <ImagePlus className="h-4 w-4" />
                                 Banner / logo
                             </div>
-                            Banner and logo uploads are coming soon once clans have media
-                            fields on the backend.
+                            <div className="space-y-3">
+                                <input
+                                    value={bannerUrl}
+                                    onChange={(e) => setBannerUrl(e.target.value)}
+                                    placeholder="Banner image URL"
+                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                />
+                                <input
+                                    value={logoUrl}
+                                    onChange={(e) => setLogoUrl(e.target.value)}
+                                    placeholder="Logo image URL"
+                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                />
+                            </div>
                         </div>
+
+                        <label className="flex items-center gap-3 rounded-xl border border-border p-4 text-sm">
+                            <input
+                                type="checkbox"
+                                checked={inviteOnly}
+                                onChange={(e) => setInviteOnly(e.target.checked)}
+                                className="h-4 w-4"
+                            />
+                            <span>
+                                <span className="font-medium">Invite-only clan</span>
+                                <span className="block text-xs text-muted-foreground">
+                                    New members must request to join and wait for owner approval.
+                                </span>
+                            </span>
+                        </label>
 
                         <div className="flex flex-wrap gap-3">
                             <Button onClick={onSubmit} disabled={!canSubmit || busy}>

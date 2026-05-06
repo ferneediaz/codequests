@@ -4,6 +4,7 @@ import { Popover } from 'radix-ui';
 import { Loader2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFriends } from '@/hooks/useFriends';
+import { UserSearchInput } from './UserSearchInput';
 
 export function AddFriendPopover() {
     const { sendRequestByUsername } = useFriends();
@@ -43,16 +44,15 @@ export function AddFriendPopover() {
                         <div>
                             <div className="text-sm font-semibold">Add friend</div>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                Enter an exact username. Search autocomplete needs a
-                                server endpoint and is deferred.
+                                Search by username, then send a friend request.
                             </p>
                         </div>
-                        <input
-                            autoFocus
+                        <UserSearchInput
                             value={username}
-                            onChange={(event) => setUsername(event.target.value)}
-                            placeholder="username"
-                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                            onChange={setUsername}
+                            onSelect={(user) => setUsername(user.username)}
+                            placeholder="Search username..."
+                            autoFocus
                         />
                         <div className="flex justify-end gap-2">
                             <Button

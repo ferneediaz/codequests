@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MessageCircle, Plus, Search } from 'lucide-react';
+import { MessageCircle, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DmConversationView } from '@/components/messages/DmConversationView';
 import { useAppSelector } from '@/store/hooks';
-import { useFriends } from '@/hooks/useFriends';
 import { queryKeys } from '@/lib/queryKeys';
 import {
     createDmConversation,
@@ -15,14 +14,16 @@ import {
     type DmConversationResponse,
 } from '@/services/chatApi';
 import type { DmTargetUser } from '@/context/socialLayoutContext';
+import { UserSearchInput } from '@/components/social/UserSearchInput';
+import { useUnreadDms } from '@/hooks/useUnreadDms';
 
 export default function Messages() {
     const user = useAppSelector((state) => state.auth.user);
-    const { friends, loading: friendsLoading } = useFriends();
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
     const [composeOpen, setComposeOpen] = useState(false);
     const [friendQuery, setFriendQuery] = useState('');
+    const unreadDms = useUnreadDms();
     const lastMissingConversationRef = useRef<string | null>(null);
     const selectedConversationId = searchParams.get('c');
 
@@ -42,14 +43,6 @@ export default function Messages() {
     const selectedOtherUser = selectedConversation
         ? getOtherParticipant(selectedConversation, user?.id)
         : null;
-
-    const filteredFriends = useMemo(() => {
-        const query = friendQuery.trim().toLowerCase();
-        if (!query) return friends;
-        return friends.filter((friend) =>
-            friend.username.toLowerCase().includes(query),
-        );
-    }, [friendQuery, friends]);
 
     useEffect(() => {
         if (
@@ -113,49 +106,16 @@ export default function Messages() {
             {composeOpen && (
                 <Card className="mb-4">
                     <CardContent className="space-y-3 p-4">
-                        <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2">
-                            <Search className="h-4 w-4 text-muted-foreground" />
-                            <input
-                                value={friendQuery}
-                                onChange={(e) => setFriendQuery(e.target.value)}
-                                placeholder="Search friends..."
-                                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                            />
-                        </div>
-                        <div className="max-h-48 space-y-2 overflow-y-auto">
-                            {friendsLoading ? (
-                                <p className="text-sm text-muted-foreground">Loading friends...</p>
-                            ) : filteredFriends.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No friends match that search.
-                                </p>
-                            ) : (
-                                filteredFriends.map((friend) => (
-                                    <button
-                                        key={friend.id}
-                                        type="button"
-                                        onClick={() => void startConversation(friend)}
-                                        className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left hover:border-primary/50 hover:bg-primary/5"
-                                    >
-                                        {friend.avatarUrl ? (
-                                            <img
-                                                src={friend.avatarUrl}
-                                                alt={friend.username}
-                                                className="h-8 w-8 rounded-full"
-                                            />
-                                        ) : (
-                                            <div className="h-8 w-8 rounded-full bg-muted" />
-                                        )}
-                                        <div>
-                                            <p className="text-sm font-medium">{friend.username}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {friend.mmr} MMR
-                                            </p>
-                                        </div>
-                                    </button>
-                                ))
-                            )}
-                        </div>
+                        <UserSearchInput
+                            value={friendQuery}
+                            onChange={setFriendQuery}
+                            onSelect={(target) => void startConversation(target)}
+                            placeholder="Search users..."
+                            autoFocus
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Conversations can only start with users the server allows.
+                        </p>
                     </CardContent>
                 </Card>
             )}
@@ -210,10 +170,19 @@ export default function Messages() {
                                                     )}
                                                 </span>
                                             </div>
-                                            <p className="truncate text-xs text-muted-foreground">
-                                                {conversation.lastMessage?.content ??
-                                                    'No messages yet'}
-                                            </p>
+                                            <div className="mt-0.5 flex items-center gap-2">
+                                                <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                                                    {conversation.lastMessage?.content ??
+                                                        'No messages yet'}
+                                                </p>
+                                                {(unreadDms.perRoom[conversation.id] ?? 0) > 0 && (
+                                                    <span className="shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary-foreground">
+                                                        {unreadDms.perRoom[conversation.id] > 9
+                                                            ? '9+'
+                                                            : unreadDms.perRoom[conversation.id]}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </button>
                                 );

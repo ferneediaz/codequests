@@ -100,7 +100,7 @@ export interface ChatMessagePayload {
     senderUsername: string;
     senderAvatarUrl?: string | null;
     content: string;
-    roomType: 'LOBBY' | 'BATTLE' | 'DM';
+    roomType: 'LOBBY' | 'BATTLE' | 'DM' | 'CLAN';
     roomId: string;
     createdAt: string;
 }

@@ -287,6 +287,81 @@ export class BattlesService {
         });
     }
 
+    async createRematch(userId: string, battleId: string) {
+        const original = await this.prisma.battle.findUnique({
+            where: { id: battleId },
+            include: {
+                participants: true,
+                problem: { include: { testCases: true } },
+                problemPool: { include: { items: true } },
+            },
+        });
+
+        if (!original) {
+            throw new NotFoundException(`Battle with ID ${battleId} not found`);
+        }
+        if (original.status !== BattleStatus.COMPLETED) {
+            throw new BadRequestException('Only completed battles can be rematched');
+        }
+        if (
+            original.mode === BattleMode.CLAN_WARS ||
+            original.mode === BattleMode.BATTLE_ROYALE
+        ) {
+            throw new BadRequestException('This battle mode does not support rematches');
+        }
+        if (!original.participants.some((participant) => participant.userId === userId)) {
+            throw new ForbiddenException('Only participants can request a rematch');
+        }
+
+        const canPlay = await this.subscriptionsService.canPlay(userId);
+        if (!canPlay) {
+            throw new ForbiddenException(
+                'Daily free game limit reached. Upgrade to Pro for unlimited games.',
+            );
+        }
+
+        const activeSeason = await this.seasonsService.getActiveSeason();
+        const rematch = await this.prisma.battle.create({
+            data: {
+                mode: original.mode,
+                rematchOfBattleId: original.id,
+                problemId: original.problemId,
+                teamSize: original.teamSize,
+                timeLimitMinutes: original.timeLimitMinutes,
+                autoBalance: original.autoBalance,
+                enabledSkills: original.enabledSkills,
+                seasonId: activeSeason?.id ?? null,
+                status: BattleStatus.WAITING,
+                participants: {
+                    create: original.participants.map((participant) => ({
+                        userId: participant.userId,
+                        teamId: participant.teamId,
+                        totalTests:
+                            original.problem?.testCases.length ??
+                            original.problemPool?.items.length ??
+                            0,
+                    })),
+                },
+            },
+        });
+
+        if (original.problemPool) {
+            await this.prisma.problemPool.create({
+                data: {
+                    battleId: rematch.id,
+                    items: {
+                        create: original.problemPool.items.map((item) => ({
+                            problemId: item.problemId,
+                            pointValue: item.pointValue,
+                        })),
+                    },
+                },
+            });
+        }
+
+        return this.getBattleDetails(rematch.id);
+    }
+
     /**
      * Join an existing battle
      */

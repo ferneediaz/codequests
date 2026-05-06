@@ -86,4 +86,9 @@ export const battlesApi = {
     async completeBattle(battleId: string): Promise<void> {
         await api.post(`/battles/${battleId}/complete`);
     },
+
+    async createRematch(battleId: string): Promise<BattleResponse> {
+        const { data } = await api.post<BattleResponse>(`/battles/${battleId}/rematch`);
+        return data;
+    },
 };

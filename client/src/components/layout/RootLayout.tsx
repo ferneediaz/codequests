@@ -5,6 +5,7 @@ import { useClanChallengeNotifications } from '@/hooks/useClanChallengeNotificat
 import { useInviteNotifications } from '@/hooks/useInviteNotifications';
 import { useSubscription } from '@/hooks/useSubscription';
 import { FriendNotificationsProvider } from '@/context/FriendNotificationsProvider';
+import { NotificationsProvider } from '@/context/NotificationsProvider';
 import {
     SocialLayoutContext,
     type DmTargetUser,
@@ -87,8 +88,9 @@ export function RootLayout() {
     const shouldRenderSidebar = friendsSidebarOpen && !friendsSidebarHidden;
 
     return (
-        <FriendNotificationsProvider>
-            <SocialLayoutContext.Provider value={socialLayoutValue}>
+        <NotificationsProvider>
+            <FriendNotificationsProvider>
+                <SocialLayoutContext.Provider value={socialLayoutValue}>
                 <div className="flex min-h-screen flex-col bg-background">
                     <Navbar />
                     <div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -123,7 +125,8 @@ export function RootLayout() {
                         />
                     )}
                 </div>
-            </SocialLayoutContext.Provider>
-        </FriendNotificationsProvider>
+                </SocialLayoutContext.Provider>
+            </FriendNotificationsProvider>
+        </NotificationsProvider>
     );
 }

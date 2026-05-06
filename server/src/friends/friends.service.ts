@@ -294,6 +294,24 @@ export class FriendsService {
     }
 
     /**
+     * Get pending friend requests sent by a user.
+     */
+    async getSentRequests(userId: string) {
+        return this.prisma.friendship.findMany({
+            where: {
+                requesterId: userId,
+                status: FriendshipStatus.PENDING,
+            },
+            include: {
+                addressee: {
+                    select: { id: true, username: true, avatarUrl: true, mmr: true },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+    }
+
+    /**
      * Get all accepted friend user IDs for a given user
      * Used by WebSocket gateway for presence notifications
      */

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getDmHistory } from '@/services/chatApi';
+import { getDmHistory, markChatRoomRead } from '@/services/chatApi';
 import { getChatSocket } from '@/services/socket';
 import type { DmTargetUser } from '@/context/socialLayoutContext';
 import type { ChatMessagePayload } from '@/types/socket';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface DmConversationViewProps {
     conversationId: string;
@@ -24,11 +26,19 @@ export function DmConversationView({
         messages: ChatMessagePayload[];
     }>({ conversationId: '', messages: [] });
     const [input, setInput] = useState('');
+    const queryClient = useQueryClient();
     const joinedRef = useRef(false);
     const listRef = useRef<HTMLDivElement>(null);
     const loading = chatState.conversationId !== conversationId;
     const messages =
         chatState.conversationId === conversationId ? chatState.messages : [];
+
+    const markRead = useCallback(async () => {
+        await markChatRoomRead('DM', conversationId);
+        await queryClient.invalidateQueries({
+            queryKey: queryKeys.chat.unreadCounts(),
+        });
+    }, [conversationId, queryClient]);
 
     useEffect(() => {
         let cancelled = false;
@@ -37,6 +47,7 @@ export function DmConversationView({
                 const { messages: history } = await getDmHistory(conversationId);
                 if (!cancelled) {
                     setChatState({ conversationId, messages: history });
+                    await markRead();
                 }
             } catch {
                 if (!cancelled) {
@@ -47,7 +58,7 @@ export function DmConversationView({
         return () => {
             cancelled = true;
         };
-    }, [conversationId]);
+    }, [conversationId, markRead]);
 
     useEffect(() => {
         const socket = getChatSocket();
@@ -77,6 +88,7 @@ export function DmConversationView({
                     messages: [...messages, msg],
                 };
             });
+            void markRead();
         };
 
         socket.on('chat.message', handleMessage);
@@ -91,7 +103,7 @@ export function DmConversationView({
                 joinedRef.current = false;
             }
         };
-    }, [conversationId]);
+    }, [conversationId, markRead]);
 
     useEffect(() => {
         if (listRef.current) {

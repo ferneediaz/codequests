@@ -53,11 +53,11 @@ enum AvatarSource {
 // ============================================
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  username  String   @unique
+  id        String  @id @default(uuid())
+  email     String  @unique
+  username  String  @unique
   avatarUrl String?
-  role      String   @default("user") // "user" or "admin"
+  role      String  @default("user") // "user" or "admin"
 
   // Onboarding & profile survey (null until user completes POST /auth/onboarding)
   onboardingCompletedAt DateTime?
@@ -82,8 +82,9 @@ model User {
   subscription     Subscription?
 
   // Clan membership
-  clanId String?
-  clan   Clan?   @relation(fields: [clanId], references: [id])
+  clanId           String?
+  clan             Clan?             @relation(fields: [clanId], references: [id])
+  clanJoinRequests ClanJoinRequest[]
 
   // Battle participation
   battles BattleParticipant[]
@@ -100,6 +101,7 @@ model User {
 
   // Chat
   sentMessages Message[]
+  messageReads MessageRead[]
 
   // Practice
   practiceAttempts PracticeAttempt[]
@@ -141,17 +143,21 @@ model Subscription {
 // ============================================
 
 model Clan {
-  id      String @id @default(uuid())
-  name    String @unique
-  tag     String @unique // e.g., [ABC]
-  ownerId String
+  id         String  @id @default(uuid())
+  name       String  @unique
+  tag        String  @unique // e.g., [ABC]
+  ownerId    String
+  bannerUrl  String?
+  logoUrl    String?
+  inviteOnly Boolean @default(false)
 
   // Clan MMR for clan vs clan battles
   mmr    Int @default(1000)
   wins   Int @default(0)
   losses Int @default(0)
 
-  members User[]
+  members      User[]
+  joinRequests ClanJoinRequest[]
 
   // Clan challenges
   sentChallenges     ClanChallenge[] @relation("ChallengerClan")
@@ -159,6 +165,33 @@ model Clan {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum ClanJoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model ClanJoinRequest {
+  id String @id @default(uuid())
+
+  clanId String
+  clan   Clan   @relation(fields: [clanId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status  ClanJoinRequestStatus @default(PENDING)
+  message String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clanId, userId])
+  @@index([clanId, status])
+  @@index([userId, status])
 }
 
 // ============================================
@@ -174,37 +207,37 @@ enum ClanChallengeStatus {
 }
 
 model ClanChallenge {
-  id              String @id @default(uuid())
+  id               String @id @default(uuid())
   challengerClanId String
   challengerClan   Clan   @relation("ChallengerClan", fields: [challengerClanId], references: [id], onDelete: Cascade)
   challengedClanId String
   challengedClan   Clan   @relation("ChallengedClan", fields: [challengedClanId], references: [id], onDelete: Cascade)
 
   status  ClanChallengeStatus @default(PENDING)
-  message String?             // Optional challenge message (max 500 chars)
+  message String? // Optional challenge message (max 500 chars)
 
   // Proposed battle config
-  mode             BattleMode @default(CLAN_VS_CLAN) // CLAN_VS_CLAN (legacy single-problem team battle) or CLAN_WARS (multi-round)
-  teamSize         Int       @default(2)
-  timeLimitMinutes Int       @default(30)
+  mode             BattleMode  @default(CLAN_VS_CLAN) // CLAN_VS_CLAN (legacy single-problem team battle) or CLAN_WARS (multi-round)
+  teamSize         Int         @default(2)
+  timeLimitMinutes Int         @default(30)
   enabledSkills    SkillType[] @default([])
   preferredTopic   String?
 
   // CLAN_WARS-specific proposed config (null for CLAN_VS_CLAN challenges)
   clanWarsFormat ClanWarsFormat?
-  rounds         Json?            // Serialized RoundConfigDto[] for CLAN_WARS
+  rounds         Json? // Serialized RoundConfigDto[] for CLAN_WARS
 
   // Counter-proposal config (set when status = COUNTERED)
   counterMode             BattleMode?
   counterTeamSize         Int?
   counterTimeLimitMinutes Int?
-  counterEnabledSkills    SkillType[] @default([])
+  counterEnabledSkills    SkillType[]     @default([])
   counterPreferredTopic   String?
   counterMessage          String?
   counterClanWarsFormat   ClanWarsFormat?
   counterRounds           Json?
 
-  expiresAt   DateTime  // createdAt + 24h, reset on counter
+  expiresAt   DateTime // createdAt + 24h, reset on counter
   respondedAt DateTime?
 
   createdAt DateTime @default(now())
@@ -230,9 +263,9 @@ model Problem {
   hints    String[] @default([])
   solution String   @default("") @db.Text
 
-  testCases TestCase[]
-  battles   Battle[]
-  poolItems ProblemPoolItem[]
+  testCases        TestCase[]
+  battles          Battle[]
+  poolItems        ProblemPoolItem[]
   practiceAttempts PracticeAttempt[]
 
   createdAt DateTime @default(now())
@@ -260,8 +293,11 @@ enum Difficulty {
 // ============================================
 
 model Battle {
-  id   String     @id @default(uuid())
-  mode BattleMode @default(ONE_V_ONE)
+  id                String     @id @default(uuid())
+  mode              BattleMode @default(ONE_V_ONE)
+  rematchOfBattleId String?
+  rematchOfBattle   Battle?    @relation("BattleRematches", fields: [rematchOfBattleId], references: [id])
+  rematches         Battle[]   @relation("BattleRematches")
 
   // For single-problem battles (1v1)
   problemId String?
@@ -271,7 +307,7 @@ model Battle {
   problemPool ProblemPool?
 
   // Team battle settings
-  teamSize         Int?             // 2, 3, or 5 for team battles
+  teamSize         Int? // 2, 3, or 5 for team battles
   timeLimitMinutes Int     @default(5)
   autoBalance      Boolean @default(true) // Auto-assign teams by MMR
 
@@ -288,21 +324,21 @@ model Battle {
 
   // Battle Royale fields
   battleRoyaleFormat BattleRoyaleFormat?
-  maxPlayers         Int?                // BR only: total lobby size (3..50)
+  maxPlayers         Int? // BR only: total lobby size (3..50)
   currentRound       Int                 @default(0) // 0 = not started; else matches BattleRound.roundNumber in progress
   rounds             BattleRound[]
 
   // Clan Wars fields (CLAN_WARS mode only)
-  clanWarsFormat    ClanWarsFormat?
-  teamOneName       String?
-  teamTwoName       String?
-  teamOneTag        String?
-  teamTwoTag        String?
-  teamOneClanId     String? // null = temporary clan (no stats persistence)
-  teamTwoClanId     String?
-  teamOneCaptainId  String?
-  teamTwoCaptainId  String?
-  isInIntermission  Boolean @default(false) // true between rounds; advances only when all participants ready
+  clanWarsFormat   ClanWarsFormat?
+  teamOneName      String?
+  teamTwoName      String?
+  teamOneTag       String?
+  teamTwoTag       String?
+  teamOneClanId    String? // null = temporary clan (no stats persistence)
+  teamTwoClanId    String?
+  teamOneCaptainId String?
+  teamTwoCaptainId String?
+  isInIntermission Boolean         @default(false) // true between rounds; advances only when all participants ready
 
   participants BattleParticipant[]
   skillUses    BattleSkillUse[]
@@ -321,13 +357,13 @@ model Battle {
 // ============================================
 
 enum BattleRoyaleFormat {
-  SAME_PROBLEM  // Everyone solves the same problem each round; slowest eliminated
-  SCORE_ATTACK  // Solve as many pool problems as possible per round; lowest cumulative points eliminated
+  SAME_PROBLEM // Everyone solves the same problem each round; slowest eliminated
+  SCORE_ATTACK // Solve as many pool problems as possible per round; lowest cumulative points eliminated
 }
 
 enum ClanWarsFormat {
-  SAME_PROBLEM  // Both teams solve the same problem each round; round-winner is the team with most distinct members passing all
-  SCORE_ATTACK  // Teams accumulate points from pool problems; cumulative team score determines the overall winner
+  SAME_PROBLEM // Both teams solve the same problem each round; round-winner is the team with most distinct members passing all
+  SCORE_ATTACK // Teams accumulate points from pool problems; cumulative team score determines the overall winner
 }
 
 enum BattleRoundStatus {
@@ -338,9 +374,9 @@ enum BattleRoundStatus {
 
 enum BattleRoundEndReason {
   EARLY_ALL_PASSED // SAME_PROBLEM: enough players fully passed to trigger immediate end
-  TIMER            // Per-round timer expired
-  NO_PLAYERS       // No non-eliminated players remained
-  HOST_ENDED       // Future: host-forced end
+  TIMER // Per-round timer expired
+  NO_PLAYERS // No non-eliminated players remained
+  HOST_ENDED // Future: host-forced end
 }
 
 model BattleRound {
@@ -374,12 +410,12 @@ model BattleRoundSubmission {
   userId    String
   problemId String
 
-  code        String
-  language    String
-  testsPassed Int     @default(0)
-  totalTests  Int     @default(0)
-  allPassed   Boolean @default(false)
-  pointsEarned Int    @default(0)
+  code         String
+  language     String
+  testsPassed  Int     @default(0)
+  totalTests   Int     @default(0)
+  allPassed    Boolean @default(false)
+  pointsEarned Int     @default(0)
 
   submittedAt DateTime @default(now())
 
@@ -393,8 +429,8 @@ model BattleSkillUse {
   battleId String
   battle   Battle @relation(fields: [battleId], references: [id], onDelete: Cascade)
 
-  userId       String    // The user who used the skill
-  targetUserId String    // The user targeted by the skill
+  userId       String // The user who used the skill
+  targetUserId String // The user targeted by the skill
   skillType    SkillType
   usedAt       DateTime  @default(now())
 
@@ -427,7 +463,7 @@ model BattleParticipant {
 
   // Battle Royale state
   isEliminated      Boolean @default(false)
-  placement         Int?    // 1 = winner; N = first eliminated (only set after battle ends)
+  placement         Int? // 1 = winner; N = first eliminated (only set after battle ends)
   eliminatedInRound Int?
 
   // MMR change after battle
@@ -451,11 +487,11 @@ enum BattleStatus {
 }
 
 enum SkillType {
-  FREEZE       // Lock opponent's editor for 10 seconds
-  SCRAMBLE     // Shuffle opponent's code lines instantly
-  BLIND        // Hide opponent's test case results until next submission
-  TIME_STEAL   // Reduce opponent's remaining time by 60 seconds
-  FOG_OF_WAR   // Blur opponent's screen for 20 seconds
+  FREEZE // Lock opponent's editor for 10 seconds
+  SCRAMBLE // Shuffle opponent's code lines instantly
+  BLIND // Hide opponent's test case results until next submission
+  TIME_STEAL // Reduce opponent's remaining time by 60 seconds
+  FOG_OF_WAR // Blur opponent's screen for 20 seconds
 }
 
 // ============================================
@@ -467,7 +503,7 @@ model MatchmakingEntry {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  mode                BattleMode @default(ONE_V_ONE)
+  mode                BattleMode  @default(ONE_V_ONE)
   preferredDifficulty Difficulty?
   preferredTopic      String?
   mmrAtQueue          Int // Snapshot of user MMR when they joined
@@ -514,7 +550,7 @@ model ProblemPoolItem {
 model Season {
   id       String  @id @default(uuid())
   number   Int     @unique // 1, 2, 3, ...
-  name     String  // "Season 1", "Season 2", ...
+  name     String // "Season 1", "Season 2", ...
   isActive Boolean @default(false)
 
   startDate DateTime
@@ -537,9 +573,9 @@ model SeasonRecord {
   peakRankTier  String // e.g. "Cracked", "10x Dev"
   finalMmr      Int
   finalRankTier String
-  wins          Int   @default(0)
-  losses        Int   @default(0)
-  winRate       Float @default(0)
+  wins          Int    @default(0)
+  losses        Int    @default(0)
+  winRate       Float  @default(0)
 
   isDisplayed Boolean @default(false) // User toggle for profile display
 
@@ -583,6 +619,7 @@ enum ChatRoomType {
   BATTLE
   LOBBY
   DM
+  CLAN
 }
 
 enum ConversationType {
@@ -604,6 +641,23 @@ model Message {
   @@index([roomType, roomId, createdAt])
 }
 
+model MessageRead {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  roomType   ChatRoomType
+  roomId     String
+  lastReadAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, roomType, roomId])
+  @@index([roomType, roomId])
+}
+
 model Conversation {
   id             String           @id @default(uuid())
   type           ConversationType @default(DM)
@@ -618,11 +672,11 @@ model Conversation {
 // ============================================
 
 model PracticeAttempt {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   problemId String
-  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
   language    String
   code        String

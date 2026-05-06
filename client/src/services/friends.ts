@@ -46,6 +46,11 @@ export async function listPendingRequests(): Promise<PendingRequest[]> {
     return data;
 }
 
+export async function listSentRequests(): Promise<SentFriendRequest[]> {
+    const { data } = await api.get<SentFriendRequest[]>('/friends/sent');
+    return data;
+}
+
 export async function acceptFriendRequest(friendshipId: string): Promise<void> {
     await api.post(`/friends/${friendshipId}/accept`);
 }

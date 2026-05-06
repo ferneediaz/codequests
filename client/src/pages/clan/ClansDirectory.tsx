@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Shield, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -15,25 +15,24 @@ const PAGE_SIZE = 20;
 export default function ClansDirectory() {
     const navigate = useNavigate();
     const [query, setQuery] = useState('');
+    const [debouncedQuery, setDebouncedQuery] = useState('');
     const [page, setPage] = useState(0);
     const offset = page * PAGE_SIZE;
 
+    useEffect(() => {
+        const timeout = window.setTimeout(() => {
+            setDebouncedQuery(query.trim());
+            setPage(0);
+        }, 250);
+        return () => window.clearTimeout(timeout);
+    }, [query]);
+
     const clansQuery = useQuery({
-        queryKey: queryKeys.clans.list(PAGE_SIZE, offset),
-        queryFn: () => listClans({ limit: PAGE_SIZE, offset }),
+        queryKey: queryKeys.clans.list(PAGE_SIZE, offset, debouncedQuery),
+        queryFn: () => listClans({ limit: PAGE_SIZE, offset, q: debouncedQuery }),
     });
 
     const clans = useMemo(() => clansQuery.data ?? [], [clansQuery.data]);
-    const filteredClans = useMemo(() => {
-        const needle = query.trim().toLowerCase();
-        if (!needle) return clans;
-        return clans.filter((clan) => {
-            return (
-                clan.name.toLowerCase().includes(needle) ||
-                clan.tag.toLowerCase().includes(needle)
-            );
-        });
-    }, [clans, query]);
 
     return (
         <div className="relative min-h-[calc(100vh-4rem)]">
@@ -76,13 +75,13 @@ export default function ClansDirectory() {
 
                         {clansQuery.isLoading ? (
                             <p className="text-sm text-muted-foreground">Loading clans...</p>
-                        ) : filteredClans.length === 0 ? (
+                        ) : clans.length === 0 ? (
                             <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                                No clans found on this page.
+                                No clans found.
                             </div>
                         ) : (
                             <div className="grid gap-3 md:grid-cols-2">
-                                {filteredClans.map((clan) => (
+                                {clans.map((clan) => (
                                     <button
                                         key={clan.id}
                                         type="button"

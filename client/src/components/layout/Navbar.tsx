@@ -30,6 +30,7 @@ import { SubscriptionBadge } from './SubscriptionBadge';
 import { NotificationBell } from './NotificationBell';
 import { useFriends } from '@/hooks/useFriends';
 import { useSocialLayout } from '@/hooks/useSocialLayout';
+import { useUnreadDms } from '@/hooks/useUnreadDms';
 import {
     ALLOWED_AVATAR_MIME,
     AvatarUploadError,
@@ -39,6 +40,7 @@ import {
 export function Navbar() {
     const { user, isAuthenticated, logout } = useAuth();
     const { pendingRequests } = useFriends();
+    const unreadDms = useUnreadDms();
     const {
         friendsSidebarOpen,
         toggleFriendsSidebar,
@@ -156,9 +158,17 @@ export function Navbar() {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                                    className="relative h-9 w-9 text-muted-foreground hover:text-foreground"
                                 >
                                     <MessageSquare className="h-5 w-5" />
+                                    {unreadDms.dmTotal > 0 && (
+                                        <span
+                                            aria-hidden
+                                            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-card bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground"
+                                        >
+                                            {unreadDms.dmTotal > 9 ? '9+' : unreadDms.dmTotal}
+                                        </span>
+                                    )}
                                 </Button>
                             </Link>
                             <NotificationBell />

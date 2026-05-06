@@ -23,6 +23,9 @@ export interface Clan {
     name: string;
     tag: string;
     ownerId: string;
+    bannerUrl?: string | null;
+    logoUrl?: string | null;
+    inviteOnly?: boolean;
     mmr: number;
     members: ClanMember[];
     tier?: ClanTier;
@@ -32,16 +35,76 @@ export interface Clan {
 export interface CreateClanPayload {
     name: string;
     tag: string;
+    bannerUrl?: string;
+    logoUrl?: string;
+    inviteOnly?: boolean;
 }
 
 export interface UpdateClanPayload {
     name?: string;
     tag?: string;
+    bannerUrl?: string;
+    logoUrl?: string;
+    inviteOnly?: boolean;
 }
 
 export interface ListClansParams {
     limit?: number;
     offset?: number;
+    q?: string;
+}
+
+export interface ClanBattleHistory {
+    clan: {
+        id: string;
+        name: string;
+        tag: string;
+        wins: number;
+        losses: number;
+        mmr: number;
+    };
+    data: {
+        id: string;
+        mode: BattleMode | 'CLAN_WARS';
+        winningTeam?: string | null;
+        teamSize?: number | null;
+        endedAt?: string | null;
+        createdAt: string;
+        clanResult: 'win' | 'loss' | 'draw';
+        participants: {
+            userId: string;
+            username: string;
+            avatarUrl?: string | null;
+            teamId?: string | null;
+            pointsEarned: number;
+            clan?: { id: string; name: string; tag: string } | null;
+        }[];
+    }[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export type ClanJoinRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export interface ClanJoinRequest {
+    id: string;
+    clanId: string;
+    userId: string;
+    status: ClanJoinRequestStatus;
+    message?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    clan: { id: string; name: string; tag: string; ownerId: string };
+    user: {
+        id: string;
+        username: string;
+        avatarUrl?: string | null;
+        mmr: number;
+    };
 }
 
 export type ClanChallengeStatus =
@@ -77,6 +140,7 @@ export interface ClanChallenge {
     expiresAt: string;
     respondedAt?: string;
     createdAt: string;
+    battleId?: string | null;
 }
 
 export interface SendClanChallengePayload {

@@ -14,6 +14,7 @@ import {
     declineFriendRequest,
     listFriends,
     listPendingRequests,
+    listSentRequests,
     removeFriend,
     sendFriendRequestByUsername,
     type FriendRecord,
@@ -131,6 +132,36 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
             cancelled = true;
         };
     }, [isAuthenticated, queryClient, user?.id]);
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            queueMicrotask(() => setOutgoingRequests([]));
+            return;
+        }
+
+        let cancelled = false;
+        void listSentRequests()
+            .then((requests) => {
+                if (cancelled) return;
+                setOutgoingRequests(
+                    requests.map((request) => ({
+                        friendshipId: request.id,
+                        addresseeId: request.addressee.id,
+                        username: request.addressee.username,
+                        avatarUrl: request.addressee.avatarUrl ?? null,
+                        mmr: request.addressee.mmr,
+                        createdAt: request.createdAt,
+                    })),
+                );
+            })
+            .catch(() => {
+                if (!cancelled) setOutgoingRequests([]);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isAuthenticated]);
 
     // Socket subscriptions. We attach once the socket is available after
     // sign-in. The /battles namespace is where the server pushes friend

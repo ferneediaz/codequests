@@ -1,12 +1,11 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
     Crown,
     DoorOpen,
-    History,
-    MessageCircle,
+    Settings,
     Shield,
     Swords,
     UserMinus,
@@ -24,10 +23,19 @@ import {
     joinClan,
     kickMember,
     leaveClan,
-    listClans,
+    listJoinRequests,
+    approveJoinRequest,
+    rejectJoinRequest,
+    requestJoin,
+    searchClans,
     sendClanChallenge,
+    updateClan,
 } from '@/services/clans';
 import type { SkillType } from '@/types/battle';
+import type { Clan, ClanJoinRequest } from '@/types/clans';
+import { ClanChatPanel } from '@/components/clan/ClanChatPanel';
+import { ClanBattleHistory } from '@/components/clan/ClanBattleHistory';
+import { ChallengesPanel } from '@/components/clan/ChallengesPanel';
 
 const SKILLS: SkillType[] = ['FREEZE', 'SCRAMBLE', 'BLIND', 'TIME_STEAL', 'FOG_OF_WAR'];
 
@@ -38,6 +46,7 @@ export default function ClanDetail() {
     const queryClient = useQueryClient();
     const [busy, setBusy] = useState(false);
     const [challengeOpen, setChallengeOpen] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
 
     const clanQuery = useQuery({
         queryKey: queryKeys.clans.detail(id ?? ''),
@@ -58,6 +67,12 @@ export default function ClanDetail() {
         }));
     }, [clan]);
 
+    const joinRequestsQuery = useQuery({
+        queryKey: ['clans', 'join-requests', id],
+        queryFn: () => listJoinRequests(id ?? ''),
+        enabled: Boolean(id && isOwner),
+    });
+
     const refreshClan = async () => {
         if (!id) return;
         await queryClient.invalidateQueries({ queryKey: queryKeys.clans.detail(id) });
@@ -67,11 +82,37 @@ export default function ClanDetail() {
         if (!clan) return;
         setBusy(true);
         try {
-            await joinClan(clan.id);
-            toast.success(`Joined ${clan.name}.`);
+            if (clan.inviteOnly) {
+                await requestJoin(clan.id);
+                toast.success(`Request sent to ${clan.name}.`);
+            } else {
+                await joinClan(clan.id);
+                toast.success(`Joined ${clan.name}.`);
+            }
             await refreshClan();
         } catch (error: unknown) {
             toast.error(getApiError(error, 'Failed to join clan.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const onResolveJoinRequest = async (requestId: string, approve: boolean) => {
+        setBusy(true);
+        try {
+            if (approve) {
+                await approveJoinRequest(requestId);
+                toast.success('Join request approved.');
+            } else {
+                await rejectJoinRequest(requestId);
+                toast.message('Join request rejected.');
+            }
+            await Promise.all([
+                refreshClan(),
+                queryClient.invalidateQueries({ queryKey: ['clans', 'join-requests', id] }),
+            ]);
+        } catch (error: unknown) {
+            toast.error(getApiError(error, 'Failed to update join request.'));
         } finally {
             setBusy(false);
         }
@@ -135,9 +176,17 @@ export default function ClanDetail() {
                     <div className="mb-6 rounded-2xl border border-border bg-card/90 p-6 shadow-lg">
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div className="flex items-start gap-4">
-                                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                                    <Shield className="h-8 w-8 text-primary" />
-                                </div>
+                                {clan.logoUrl ? (
+                                    <img
+                                        src={clan.logoUrl}
+                                        alt={clan.name}
+                                        className="h-16 w-16 rounded-2xl object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                                        <Shield className="h-8 w-8 text-primary" />
+                                    </div>
+                                )}
                                 <div>
                                     <div className="flex flex-wrap items-center gap-2">
                                         <h1 className="text-4xl font-extrabold tracking-tight">
@@ -163,7 +212,7 @@ export default function ClanDetail() {
                                         }
                                     >
                                         <Users className="mr-2 h-4 w-4" />
-                                        Join Clan
+                                        {clan.inviteOnly ? 'Request to Join' : 'Join Clan'}
                                     </Button>
                                 )}
                                 {isMember && (
@@ -176,6 +225,12 @@ export default function ClanDetail() {
                                     <Button onClick={() => setChallengeOpen(true)}>
                                         <Swords className="mr-2 h-4 w-4" />
                                         Challenge Another Clan
+                                    </Button>
+                                )}
+                                {isOwner && (
+                                    <Button variant="outline" onClick={() => setEditOpen(true)}>
+                                        <Settings className="mr-2 h-4 w-4" />
+                                        Edit Clan
                                     </Button>
                                 )}
                             </div>
@@ -253,19 +308,39 @@ export default function ClanDetail() {
                     </Card>
 
                     <div className="space-y-6 lg:col-span-5">
-                        <PlaceholderCard
-                            icon={<MessageCircle className="h-4 w-4 text-primary" />}
-                            title="Clan Chat"
-                            description="Clan chat is coming soon once the backend exposes clan chat rooms and persistence."
-                        />
-                        <PlaceholderCard
-                            icon={<History className="h-4 w-4 text-primary" />}
-                            title="Battle History"
-                            description="Clan battle history is ready at the service layer, but still needs a public HTTP route."
-                        />
+                        {isMember ? (
+                            <ClanChatPanel clanId={clan.id} currentUserId={user?.id} />
+                        ) : (
+                            <div className="rounded-xl border border-border p-6 text-sm text-muted-foreground">
+                                Join this clan to access clan chat.
+                            </div>
+                        )}
+                        <ClanBattleHistory clanId={clan.id} />
+                        {isMember && (
+                            <ChallengesPanel clanId={clan.id} isOwner={Boolean(isOwner)} />
+                        )}
+                        {isOwner && (
+                            <JoinRequestsPanel
+                                requests={joinRequestsQuery.data ?? []}
+                                loading={joinRequestsQuery.isLoading}
+                                busy={busy}
+                                onResolve={onResolveJoinRequest}
+                            />
+                        )}
                     </div>
                 </div>
             </div>
+
+            {editOpen && (
+                <EditClanModal
+                    clan={clan}
+                    onClose={() => setEditOpen(false)}
+                    onSaved={async () => {
+                        setEditOpen(false);
+                        await refreshClan();
+                    }}
+                />
+            )}
 
             {challengeOpen && (
                 <ChallengeModal
@@ -311,7 +386,7 @@ function ChallengeModal({
         setBusy(true);
         try {
             const normalizedTag = targetTag.trim().toUpperCase();
-            const clans = await listClans({ limit: 500 });
+            const clans = await searchClans(normalizedTag, 10);
             const target = clans.find((clan) => clan.tag.toUpperCase() === normalizedTag);
             if (!target) {
                 toast.error('No clan found with that tag.');
@@ -444,25 +519,132 @@ function ChallengeModal({
     );
 }
 
-function PlaceholderCard({
-    icon,
-    title,
-    description,
+function EditClanModal({
+    clan,
+    onClose,
+    onSaved,
 }: {
-    icon: ReactNode;
-    title: string;
-    description: string;
+    clan: Clan;
+    onClose: () => void;
+    onSaved: () => void | Promise<void>;
+}) {
+    const [bannerUrl, setBannerUrl] = useState(clan.bannerUrl ?? '');
+    const [logoUrl, setLogoUrl] = useState(clan.logoUrl ?? '');
+    const [inviteOnly, setInviteOnly] = useState(Boolean(clan.inviteOnly));
+    const [busy, setBusy] = useState(false);
+
+    const save = async () => {
+        setBusy(true);
+        try {
+            await updateClan(clan.id, {
+                bannerUrl: bannerUrl.trim(),
+                logoUrl: logoUrl.trim(),
+                inviteOnly,
+            });
+            toast.success('Clan updated.');
+            await onSaved();
+        } catch (error: unknown) {
+            toast.error(getApiError(error, 'Failed to update clan.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-xl border border-border bg-card p-5 shadow-2xl">
+                <h2 className="text-lg font-semibold">Edit Clan</h2>
+                <div className="mt-4 space-y-3">
+                    <input
+                        value={bannerUrl}
+                        onChange={(e) => setBannerUrl(e.target.value)}
+                        placeholder="Banner image URL"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <input
+                        value={logoUrl}
+                        onChange={(e) => setLogoUrl(e.target.value)}
+                        placeholder="Logo image URL"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <label className="flex items-center gap-3 rounded-lg border p-3 text-sm">
+                        <input
+                            type="checkbox"
+                            checked={inviteOnly}
+                            onChange={(e) => setInviteOnly(e.target.checked)}
+                        />
+                        Invite-only clan
+                    </label>
+                </div>
+                <div className="mt-5 flex justify-end gap-2">
+                    <Button variant="outline" onClick={onClose} disabled={busy}>
+                        Cancel
+                    </Button>
+                    <Button onClick={() => void save()} disabled={busy}>
+                        Save
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function JoinRequestsPanel({
+    requests,
+    loading,
+    busy,
+    onResolve,
+}: {
+    requests: ClanJoinRequest[];
+    loading: boolean;
+    busy: boolean;
+    onResolve: (requestId: string, approve: boolean) => void;
 }) {
     return (
-        <Card>
-            <CardContent className="p-6">
-                <div className="mb-2 flex items-center gap-2">
-                    {icon}
-                    <h2 className="text-lg font-semibold">{title}</h2>
-                </div>
-                <p className="text-sm text-muted-foreground">{description}</p>
-            </CardContent>
-        </Card>
+        <div className="rounded-xl border border-border">
+            <div className="border-b border-border px-4 py-3">
+                <h2 className="text-lg font-semibold">Join Requests</h2>
+            </div>
+            <div className="space-y-3 p-4">
+                {loading ? (
+                    <p className="text-sm text-muted-foreground">Loading requests...</p>
+                ) : requests.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No pending requests.</p>
+                ) : (
+                    requests.map((request) => (
+                        <div
+                            key={request.id}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                        >
+                            <div>
+                                <p className="text-sm font-medium">{request.user.username}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {request.user.mmr} MMR
+                                    {request.message ? ` · ${request.message}` : ''}
+                                </p>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    size="sm"
+                                    disabled={busy}
+                                    onClick={() => onResolve(request.id, true)}
+                                >
+                                    Approve
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={() => onResolve(request.id, false)}
+                                >
+                                    Reject
+                                </Button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
     );
 }
 

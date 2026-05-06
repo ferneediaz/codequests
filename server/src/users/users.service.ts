@@ -81,6 +81,27 @@ export class UsersService {
     }));
   }
 
+  async searchByUsername(query: string, viewerId: string, limit = 10) {
+    const q = query.trim();
+    if (!q) return [];
+
+    return this.prisma.user.findMany({
+      where: {
+        id: { not: viewerId },
+        username: { startsWith: q, mode: 'insensitive' },
+      },
+      take: Math.min(Math.max(limit, 1), 25),
+      orderBy: { username: 'asc' },
+      select: {
+        id: true,
+        username: true,
+        avatarUrl: true,
+        mmr: true,
+        clanId: true,
+      },
+    });
+  }
+
   /**
    * Get user by ID with full details. Selects an explicit public column
    * set so internal billing/usage fields (`stripeCustomerId`,

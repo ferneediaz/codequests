@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getChatSocket } from '@/services/socket';
-import { getLobbyHistory } from '@/services/chatApi';
+import { getLobbyHistory, markChatRoomRead } from '@/services/chatApi';
 import type { ChatMessagePayload } from '@/types/socket';
 
 /**
@@ -21,7 +21,10 @@ export function useLobbyChat() {
         (async () => {
             try {
                 const { messages: history } = await getLobbyHistory();
-                if (!cancelled) setMessages(history);
+                if (!cancelled) {
+                    setMessages(history);
+                    await markChatRoomRead('LOBBY', 'lobby');
+                }
             } catch {
                 // History is best-effort; failure just means an empty view.
             } finally {
@@ -57,6 +60,7 @@ export function useLobbyChat() {
                 if (prev.some((m) => m.id === msg.id)) return prev;
                 return [...prev, msg];
             });
+            void markChatRoomRead('LOBBY', 'lobby');
         };
 
         socket.on('chat.message', handleMessage);

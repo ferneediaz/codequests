@@ -116,4 +116,16 @@ export class FriendsController {
     getPendingRequests(@Req() req: AuthedRequest) {
         return this.friendsService.getPendingRequests(req.user.id);
     }
+
+    /**
+     * Get sent friend requests
+     */
+    @Get('sent')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Get sent pending friend requests' })
+    @ApiResponse({ status: 200, description: 'List of sent requests', type: [FriendshipResponseDto] })
+    getSentRequests(@Req() req: AuthedRequest) {
+        return this.friendsService.getSentRequests(req.user.id);
+    }
 }

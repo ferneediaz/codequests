@@ -440,11 +440,8 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 - [x] **Success Criteria:** Can add friends, see online status, accept/decline requests ✅
 
 #### Follow-ups
-- [ ] Persist outgoing pending requests across reloads once the server exposes
-  a `GET /friends/sent` endpoint. Current client state can show outgoing
-  requests created in-session, but the backend has no sent-request list yet.
-- [ ] Replace exact-username add flow with autocomplete once the server exposes
-  a username search endpoint.
+- [x] Persist outgoing pending requests across reloads via `GET /friends/sent`.
+- [x] Replace exact-username add flow with username autocomplete via `GET /users/search`.
 
 ### 3.2 Chat System
 - [x] Use focused hooks/components instead of a monolithic `chatSlice` /
@@ -472,7 +469,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
   - [x] Messaging entry points unified:
     navbar utility icon + friends sidebar inbox shortcut + drawer "open in inbox"
     action + route-aware drawer suppression on `/messages`
-  - [ ] Unread message count badge in navbar
+  - [x] Unread message count badge in navbar
 - [x] Socket.IO events:
   - [x] Emit `chat.send`: `{ roomType, roomId, content }`
   - [x] Listen `chat.message`: `{ senderId, username, content, timestamp }`
@@ -480,13 +477,10 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 - [x] **Success Criteria:** Can chat in-game, post-game, in lobby, and via DMs in real-time ✅
 
 #### Follow-ups
-- [ ] Add true unread DM counts once the server adds message read state,
-  mark-read APIs, and an unread-count endpoint. Current `Message` records do
-  not store read status.
-- [ ] Expand `/messages` compose from friends picker to username search once
-  the server exposes username search. `POST /chat/conversations` currently
-  requires friendship.
-- [ ] Add rematch flow once the backend exposes a rematch endpoint.
+- [x] Add true unread DM counts with message read cursors, mark-read APIs,
+  unread-count endpoint, socket invalidation, and navbar/inbox badges.
+- [x] Expand `/messages` compose from friends picker to username search.
+- [x] Add rematch flow with `POST /battles/:id/rematch`.
 
 ### 3.3 Clan Pages
 - [x] Clan directory (`/clans`):
@@ -502,53 +496,55 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
   - [x] Clan name + tag
   - [x] Clan MMR + tier badge
   - [x] Member list with roles (Owner, Member)
-  - [ ] Clan battle history (list of clan vs clan battles)
+  - [x] Clan battle history (list of clan vs clan battles)
   - [x] Join/Leave button (if not a member / if a member)
   - [x] Kick member button (owner only)
-  - [ ] Clan chat section (Socket.IO room `clan:{clanId}`)
+  - [x] Clan chat section (Socket.IO room `clan:{clanId}`)
   - [x] "Challenge Another Clan" button (owner only)
-- [ ] Join request / invite system:
-  - [ ] Open clans: "Join" button
-  - [ ] Invite-only clans: "Request to Join" → pending review by owner
-- [ ] **Success Criteria:** Can browse, create, join, and manage clans ✅
+- [x] Join request / invite system:
+  - [x] Open clans: "Join" button
+  - [x] Invite-only clans: "Request to Join" → pending review by owner
+- [x] **Success Criteria:** Can browse, create, join, and manage clans ✅
 
 #### Follow-ups
-- [ ] Add server-side search to `GET /clans` so directory search can span all
+- [x] Add server-side search to `GET /clans` so directory search can span all
   pages instead of only the loaded page.
-- [ ] Align tag length in product/server rules (`TODO` originally said 3-5;
+- [x] Align tag length in product/server rules (`TODO` originally said 3-5;
   current `CreateClanDto` accepts 2-5).
-- [ ] Add clan banner/logo schema, upload support, and display.
-- [ ] Expose clan battle history over HTTP. `ClansService.getBattleHistory`
+- [x] Add clan banner/logo schema and display (URL fields; upload pipeline out of scope).
+- [x] Expose clan battle history over HTTP. `ClansService.getBattleHistory`
   exists server-side, but there is no controller route yet.
-- [ ] Add clan chat rooms and persistence for `clan:{clanId}`.
-- [ ] Add invite-only clans and join-request review models/endpoints.
+- [x] Add clan chat rooms and persistence for `clan:{clanId}`.
+- [x] Add invite-only clans and join-request review models/endpoints.
 
 ### 3.4 Clan Wars (Challenges)
-- [ ] Send challenge:
-  - [ ] From clan page: "Challenge" button on another clan's page
-  - [ ] Select game settings (mode, team size, skills, time limit)
-  - [ ] Send challenge → `POST /api/clans/:id/challenge`
-- [ ] Receive challenge:
-  - [ ] Notification: "Clan [X] has challenged your clan!"
-  - [ ] View challenge details (game settings, challenger clan stats)
-  - [ ] Accept → creates CLAN_VS_CLAN battle → redirects clan members to lobby
-  - [ ] Decline → notification to challenger
-- [ ] Challenges list on clan page:
-  - [ ] Pending incoming and outgoing challenges
-  - [ ] Challenge history
-- [ ] **Success Criteria:** Can send clan challenge → accept → play clan war ✅
+- [x] Send challenge:
+  - [x] From clan page: "Challenge" button on another clan's page
+  - [x] Select game settings (mode, team size, skills, time limit)
+  - [x] Send challenge → `POST /api/clans/challenges`
+- [x] Receive challenge:
+  - [x] Notification: "Clan [X] has challenged your clan!"
+  - [x] View challenge details (game settings, challenger clan stats)
+  - [x] Accept → creates battle where supported and redirects clan members
+  - [x] Decline → notification to challenger
+- [x] Challenges list on clan page:
+  - [x] Pending incoming and outgoing challenges
+  - [x] Challenge history
+- [x] **Success Criteria:** Can send clan challenge → accept → play clan war ✅
 
-### 3.5 Push Notifications
-- [ ] Request browser notification permission on login
-- [ ] Register push subscription with `POST /api/notifications/subscribe`
-- [ ] Handle push events:
-  - [ ] Match found → "Your match is ready! Click to play"
-  - [ ] Battle invite received → "PlayerX invited you to battle!"
-  - [ ] Friend request → "PlayerX sent you a friend request"
-  - [ ] Clan challenge → "Clan [X] challenged your clan!"
-- [ ] Notification click → navigate to relevant page
-- [ ] Unsubscribe on logout
-- [ ] **Success Criteria:** Push notifications appear when app is in background ✅
+### 3.5 In-app Notifications
+- [x] Global `NotificationsProvider` with recent notification history
+- [x] Persist recent notifications in localStorage
+- [x] Handle in-app events:
+  - [x] Match found → "Your match is ready! Click to play"
+  - [x] Battle invite received → "PlayerX invited you to battle!"
+  - [x] Friend request → "PlayerX sent you a friend request"
+  - [x] Clan challenge → "Clan [X] challenged your clan!"
+  - [x] Clan join request → "PlayerX requested to join your clan"
+  - [x] Direct message → "New message from PlayerX"
+- [x] Notification click → navigate to relevant page
+- [x] Navbar bell unread count + mark-all-read
+- [x] **Success Criteria:** In-app notifications appear while the app is open ✅
 
 ---
 

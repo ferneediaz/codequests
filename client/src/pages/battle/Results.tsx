@@ -7,9 +7,10 @@ import { Separator } from '@/components/ui/separator';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { CodeEditor } from '@/components/battle/CodeEditor';
 import { BattleChat } from '@/components/battle/BattleChat';
-import { Loader2, ArrowLeft, Trophy } from 'lucide-react';
+import { Loader2, ArrowLeft, Trophy, RotateCcw } from 'lucide-react';
 import { battlesApi } from '@/services/battles';
 import type { BattleResponse, BattleParticipant } from '@/types/api';
+import { toast } from 'sonner';
 
 function participantName(p: BattleParticipant) {
     return p.username || p.user?.username || 'Player';
@@ -21,6 +22,7 @@ export default function Results() {
     const userId = useAppSelector((state) => state.auth.user?.id);
     const [battle, setBattle] = useState<BattleResponse | null>(null);
     const [loading, setLoading] = useState(true);
+    const [rematching, setRematching] = useState(false);
 
     useEffect(() => {
         async function load() {
@@ -49,6 +51,23 @@ export default function Results() {
     const opponent = battle.participants.find((p) => p.userId !== userId);
     const iWon = battle.winnerId === userId;
     const isDraw = battle.status === 'COMPLETED' && !battle.winnerId;
+    const canRematch = ['ONE_V_ONE', 'GROUP', 'CLAN_VS_CLAN'].includes(battle.mode);
+
+    const createRematch = async () => {
+        setRematching(true);
+        try {
+            const rematch = await battlesApi.createRematch(battle.id);
+            toast.success('Rematch created.');
+            navigate(`/battle/${rematch.id}`);
+        } catch (error: unknown) {
+            const message =
+                (error as { response?: { data?: { message?: string } } })?.response?.data
+                    ?.message ?? 'Could not create rematch.';
+            toast.error(message);
+        } finally {
+            setRematching(false);
+        }
+    };
 
     return (
         <div className="mx-auto max-w-5xl px-4 py-8">
@@ -182,11 +201,25 @@ export default function Results() {
                 })}
             </div>
 
-            <div className="flex justify-center">
+            <div className="flex justify-center gap-3">
                 <Button onClick={() => navigate('/dashboard')}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back to Dashboard
                 </Button>
+                {canRematch && (
+                    <Button
+                        variant="secondary"
+                        onClick={() => void createRematch()}
+                        disabled={rematching}
+                    >
+                        {rematching ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                        )}
+                        Rematch
+                    </Button>
+                )}
             </div>
             {userId && (
                 <BattleChat

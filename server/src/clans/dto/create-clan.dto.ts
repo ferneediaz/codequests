@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, MinLength, MaxLength, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsOptional, IsString, IsNotEmpty, MinLength, MaxLength, Matches } from 'class-validator';
 
 export class CreateClanDto {
     @ApiProperty({
@@ -26,4 +26,21 @@ export class CreateClanDto {
         message: 'Tag must be 2-5 uppercase letters',
     })
     tag: string;
+
+    @ApiPropertyOptional({ description: 'Clan banner image URL' })
+    @IsString()
+    @IsOptional()
+    @MaxLength(500)
+    bannerUrl?: string;
+
+    @ApiPropertyOptional({ description: 'Clan logo image URL' })
+    @IsString()
+    @IsOptional()
+    @MaxLength(500)
+    logoUrl?: string;
+
+    @ApiPropertyOptional({ description: 'Whether join requests require owner approval' })
+    @IsBoolean()
+    @IsOptional()
+    inviteOnly?: boolean;
 }

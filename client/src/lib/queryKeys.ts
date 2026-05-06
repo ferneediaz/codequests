@@ -17,9 +17,11 @@ export const queryKeys = {
     },
     chat: {
         conversations: () => ['chat', 'conversations'] as const,
+        unreadCounts: () => ['chat', 'unreadCounts'] as const,
     },
     clans: {
-        list: (limit: number, offset: number) => ['clans', 'list', limit, offset] as const,
+        list: (limit: number, offset: number, q?: string) =>
+            ['clans', 'list', limit, offset, q ?? ''] as const,
         detail: (id: string) => ['clans', 'detail', id] as const,
         challenges: (id: string, pending?: boolean) =>
             ['clans', 'challenges', id, pending] as const,

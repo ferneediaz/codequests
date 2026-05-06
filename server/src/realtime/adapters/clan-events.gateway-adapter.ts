@@ -13,4 +13,9 @@ export class ClanEventsGatewayAdapter implements ClanEventsPort {
     ): void {
         this.gateway.emitToClanMembers(memberIds, event, data);
     }
+
+    emitToUser(userId: string, event: string, data: unknown): void {
+        const socket = this.gateway.getSocketByUserId(userId);
+        socket?.emit(event, data);
+    }
 }

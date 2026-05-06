@@ -48,6 +48,21 @@ export class UsersController {
     return this.usersService.findAll({ limit, offset });
   }
 
+  @Get('search')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Search users by username prefix' })
+  @ApiQuery({ name: 'q', required: true, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiResponse({ status: 200, description: 'Matching public user records' })
+  search(
+    @Req() req: AuthedRequest,
+    @Query('q') q: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    return this.usersService.searchByUsername(q, req.user.id, limit);
+  }
+
   /**
    * Get user by ID
    */

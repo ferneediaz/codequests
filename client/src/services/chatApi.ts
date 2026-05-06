@@ -6,6 +6,11 @@ export interface ChatHistoryResponse {
     nextCursor: string | null;
 }
 
+export interface UnreadCountsResponse {
+    dmTotal: number;
+    perRoom: Record<string, number>;
+}
+
 export async function getLobbyHistory(
     cursor?: string,
     limit = 50,
@@ -39,6 +44,17 @@ export async function getDmHistory(
     return data;
 }
 
+export async function getClanHistory(
+    clanId: string,
+    cursor?: string,
+    limit = 50,
+): Promise<ChatHistoryResponse> {
+    const { data } = await api.get<ChatHistoryResponse>(`/chat/CLAN/${clanId}`, {
+        params: { cursor, limit },
+    });
+    return data;
+}
+
 export interface DmConversationResponse {
     id: string;
     type: 'DM';
@@ -68,4 +84,16 @@ export async function createDmConversation(
         { targetUserId },
     );
     return data;
+}
+
+export async function getUnreadCounts(): Promise<UnreadCountsResponse> {
+    const { data } = await api.get<UnreadCountsResponse>('/chat/unread-counts');
+    return data;
+}
+
+export async function markChatRoomRead(
+    roomType: 'BATTLE' | 'LOBBY' | 'DM' | 'CLAN',
+    roomId: string,
+): Promise<void> {
+    await api.post(`/chat/${roomType}/${roomId}/read`);
 }
