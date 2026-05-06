@@ -982,15 +982,15 @@ Living checklist of client-side cleanup. Order is roughly by impact. Tick items 
 
 ### P3 — Hooks & components
 
-- [ ] Split `hooks/useBattle.ts` (305 lines) into:
-  - [ ] `useBattleData` (TanStack Query for battle + problem)
-  - [ ] `useBattleSocket` (socket subscriptions only)
-  - [ ] `useBattleActions` (submit/run/skills/ready)
-- [ ] Extract reusable layout pieces:
-  - [ ] `PageHero` (gradient hero used across Dashboard/Practice)
-  - [ ] `DataState` (loading + empty + error wrapper)
-  - [ ] `StatTileGrid`
-- [ ] Co-locate page-only components under `pages/<feature>/components/`
+- [x] Split `hooks/useBattle.ts` (thin facade) into:
+  - [x] `useBattleData` (TanStack Query for battle + problem)
+  - [x] `useBattleSocket` (socket subscriptions only)
+  - [x] `useBattleActions` (submit/run/skills/ready)
+- [x] Extract reusable layout pieces:
+  - [x] `PageHero` (gradient hero used across Dashboard/Practice)
+  - [x] `DataState` (loading + empty + error wrapper)
+  - [x] `StatTileGrid`
+- [x] Co-locate page-only components under `pages/<feature>/components/` (Dashboard + Practice; Author/Play already page-local)
 
 ### P4 — Routing & types
 

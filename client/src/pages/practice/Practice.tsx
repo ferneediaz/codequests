@@ -3,25 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AmbientBackground } from '@/components/layout/AmbientBackground';
 import { AnimateIn } from '@/components/layout/AnimateIn';
+import { DataState } from '@/components/layout/DataState';
+import { PageHero } from '@/components/layout/PageHero';
 import {
     BookOpen,
-    CheckCircle2,
-    Circle,
     Filter,
-    Lock,
     Target,
     Trophy,
-    Sparkles,
     Activity,
 } from 'lucide-react';
 import { queryKeys } from '@/lib/queryKeys';
 import { practiceApi } from '@/services/practice';
 import type { Difficulty } from '@/types/api';
 import type { PracticeProblemSummary } from '@/types/practice';
+import { MiniStat } from './components/MiniStat';
+import { ProblemRow } from './components/ProblemRow';
+import { UpsellBanner } from './components/UpsellBanner';
 
 const DIFFICULTY_META: Record<
     Difficulty,
@@ -83,48 +83,33 @@ export default function Practice() {
             <AmbientBackground variant="default" />
 
             <div className="relative mx-auto max-w-6xl px-4 py-8 space-y-6">
-                {/* Header */}
-                <AnimateIn direction="up">
-                    <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card/60 to-blue-500/10 p-8 backdrop-blur-sm">
-                        <div className="pointer-events-none absolute -top-20 -right-20 h-60 w-60 rounded-full bg-primary/30 blur-3xl opacity-40" />
-                        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                            <div className="flex items-center gap-5">
-                                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-background/60 text-3xl shadow-lg">
-                                    <BookOpen className="h-8 w-8 text-primary" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">No pressure, no clock</p>
-                                    <h1 className="text-3xl font-extrabold tracking-tight">
-                                        Practice Ground
-                                    </h1>
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        Solve problems at your own pace. Free and unlimited.
-                                    </p>
-                                </div>
+                <PageHero
+                    icon={<BookOpen className="h-8 w-8 text-primary" />}
+                    eyebrow="No pressure, no clock"
+                    title="Practice Ground"
+                    description="Solve problems at your own pace. Free and unlimited."
+                    aside={
+                        stats && (
+                            <div className="flex gap-3">
+                                <MiniStat
+                                    icon={<Target className="h-4 w-4" />}
+                                    label="Solved"
+                                    value={`${solvedCount}/${totalCount}`}
+                                />
+                                <MiniStat
+                                    icon={<Activity className="h-4 w-4" />}
+                                    label="Attempts"
+                                    value={stats.totalAttempts.toString()}
+                                />
+                                <MiniStat
+                                    icon={<Trophy className="h-4 w-4" />}
+                                    label="Solve rate"
+                                    value={`${stats.solveRate}%`}
+                                />
                             </div>
-
-                            {stats && (
-                                <div className="flex gap-3">
-                                    <MiniStat
-                                        icon={<Target className="h-4 w-4" />}
-                                        label="Solved"
-                                        value={`${solvedCount}/${totalCount}`}
-                                    />
-                                    <MiniStat
-                                        icon={<Activity className="h-4 w-4" />}
-                                        label="Attempts"
-                                        value={stats.totalAttempts.toString()}
-                                    />
-                                    <MiniStat
-                                        icon={<Trophy className="h-4 w-4" />}
-                                        label="Solve rate"
-                                        value={`${stats.solveRate}%`}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </AnimateIn>
+                        )
+                    }
+                />
 
                 {stats && !stats.isTracked && (
                     <AnimateIn>
@@ -190,20 +175,25 @@ export default function Practice() {
                 <AnimateIn delay={150}>
                     <Card>
                         <CardContent className="p-0">
-                            {isLoading ? (
-                                <div className="space-y-2 p-4">
-                                    {[...Array(5)].map((_, i) => (
-                                        <Skeleton key={i} className="h-16 w-full" />
-                                    ))}
-                                </div>
-                            ) : filtered.length === 0 ? (
-                                <div className="py-16 text-center">
-                                    <BookOpen className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                                    <p className="text-muted-foreground">
-                                        No problems match your filters.
-                                    </p>
-                                </div>
-                            ) : (
+                            <DataState
+                                isLoading={isLoading}
+                                isEmpty={filtered.length === 0}
+                                loading={
+                                    <div className="space-y-2 p-4">
+                                        {[...Array(5)].map((_, i) => (
+                                            <Skeleton key={i} className="h-16 w-full" />
+                                        ))}
+                                    </div>
+                                }
+                                empty={
+                                    <div className="py-16 text-center">
+                                        <BookOpen className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                                        <p className="text-muted-foreground">
+                                            No problems match your filters.
+                                        </p>
+                                    </div>
+                                }
+                            >
                                 <ul className="divide-y divide-border/60">
                                     {filtered.map((problem) => (
                                         <ProblemRow
@@ -214,7 +204,7 @@ export default function Practice() {
                                         />
                                     ))}
                                 </ul>
-                            )}
+                            </DataState>
                         </CardContent>
                     </Card>
                 </AnimateIn>
@@ -223,92 +213,3 @@ export default function Practice() {
     );
 }
 
-function MiniStat({
-    icon,
-    label,
-    value,
-}: {
-    icon: React.ReactNode;
-    label: string;
-    value: string;
-}) {
-    return (
-        <div className="rounded-xl border border-border bg-background/60 px-4 py-3">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                {icon}
-                {label}
-            </div>
-            <p className="mt-1 text-xl font-bold tracking-tight">{value}</p>
-        </div>
-    );
-}
-
-function ProblemRow({
-    problem,
-    isTracked,
-    onClick,
-}: {
-    problem: PracticeProblemSummary;
-    isTracked: boolean;
-    onClick: () => void;
-}) {
-    const meta = DIFFICULTY_META[problem.difficulty];
-    return (
-        <li>
-            <button
-                onClick={onClick}
-                className="group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-card/60"
-            >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-                    {!isTracked ? (
-                        <Lock className="h-4 w-4 text-muted-foreground/50" />
-                    ) : problem.solved ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    ) : (
-                        <Circle className="h-5 w-5 text-muted-foreground/40" />
-                    )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                        <p className="truncate font-semibold">{problem.title}</p>
-                        <Badge variant="outline" className={meta.className}>
-                            {meta.label}
-                        </Badge>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                        {problem.tags.map((t) => (
-                            <span key={t}>#{t}</span>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="hidden shrink-0 text-right text-xs text-muted-foreground sm:block">
-                    {isTracked
-                        ? problem.attempts > 0
-                            ? `${problem.attempts} attempt${problem.attempts === 1 ? '' : 's'}`
-                            : 'No attempts'
-                        : 'Upgrade to track'}
-                </div>
-            </button>
-        </li>
-    );
-}
-
-function UpsellBanner() {
-    return (
-        <div className="flex items-start gap-3 rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm">
-            <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-yellow-500" />
-            <div className="flex-1">
-                <p className="font-semibold text-foreground">
-                    Practice is free — stats tracking is a Pro perk.
-                </p>
-                <p className="mt-1 text-muted-foreground">
-                    You can run and submit any problem unlimited times. Upgrade to Pro
-                    (or start a free trial) to save attempt history, get a solve-rate
-                    breakdown, and see which topics you crush.
-                </p>
-            </div>
-        </div>
-    );
-}

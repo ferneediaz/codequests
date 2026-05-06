@@ -7,6 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AmbientBackground } from '@/components/layout/AmbientBackground';
 import { AnimateIn } from '@/components/layout/AnimateIn';
+import { PageHero } from '@/components/layout/PageHero';
+import { StatTileGrid } from '@/components/layout/StatTileGrid';
 import {
     Activity,
     ArrowRight,
@@ -279,45 +281,29 @@ export default function Dashboard() {
             <AmbientBackground variant="default" />
 
             <div className="relative mx-auto max-w-6xl px-4 py-8 space-y-8">
-                {/* ---------------- HERO ---------------- */}
-                <AnimateIn direction="up">
-                    <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card/60 to-violet-500/10 p-8 backdrop-blur-sm">
-                        <div
-                            className="pointer-events-none absolute -top-20 -right-20 h-60 w-60 rounded-full blur-3xl opacity-40"
-                            style={{ background: tier.color }}
-                        />
-                        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                            <div className="flex items-center gap-5">
-                                <div
-                                    className="flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-background/60 text-4xl shadow-lg"
-                                    style={{ boxShadow: `0 0 30px ${tier.color}25` }}
-                                >
-                                    {tier.icon}
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Welcome back,</p>
-                                    <h1 className="text-3xl font-extrabold tracking-tight">
-                                        {user?.username ?? 'Player'}
-                                    </h1>
-                                    <div className="mt-2 flex items-center gap-2">
-                                        <span
-                                            className="inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-xs font-semibold"
-                                            style={{
-                                                color: tier.color,
-                                                borderColor: `${tier.color}40`,
-                                                background: `${tier.color}15`,
-                                            }}
-                                        >
-                                            {tier.icon} {tier.name}
-                                        </span>
-                                        <span className="text-xs text-muted-foreground font-mono">
-                                            {mmr} MMR
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col items-stretch gap-3 sm:flex-row lg:items-center">
+                <PageHero
+                    icon={tier.icon}
+                    eyebrow="Welcome back,"
+                    title={user?.username ?? 'Player'}
+                    description={
+                        <div className="mt-1 flex items-center gap-2">
+                            <span
+                                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-xs font-semibold"
+                                style={{
+                                    color: tier.color,
+                                    borderColor: `${tier.color}40`,
+                                    background: `${tier.color}15`,
+                                }}
+                            >
+                                {tier.icon} {tier.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground font-mono">
+                                {mmr} MMR
+                            </span>
+                        </div>
+                    }
+                    actions={
+                        <div className="flex flex-col items-stretch gap-3 sm:flex-row lg:items-center">
                                 <Button
                                     size="lg"
                                     className="h-14 px-8 text-base"
@@ -337,7 +323,11 @@ export default function Dashboard() {
                                     Quick Match
                                 </Button>
                             </div>
-                        </div>
+                    }
+                    accentClassName=""
+                    accentStyle={{ background: tier.color }}
+                    iconClassName="h-20 w-20 text-4xl"
+                >
 
                         {/* Rank progress */}
                         <div className="relative mt-8">
@@ -474,11 +464,10 @@ export default function Dashboard() {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </AnimateIn>
+                </PageHero>
 
                 {/* ---------------- STAT TILES ---------------- */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <StatTileGrid>
                     <StatTile
                         delay={0}
                         label="Wins"
@@ -543,7 +532,7 @@ export default function Dashboard() {
                         }
                         loading={historyLoading}
                     />
-                </div>
+                </StatTileGrid>
 
                 {/* ---------------- HEATMAP + BREAKDOWN ---------------- */}
                 <div className="grid gap-6 lg:grid-cols-3">
