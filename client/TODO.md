@@ -258,14 +258,12 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 
 Animated polish (MMR count-up, confetti, rank-up flash, sound) is owned by [Phase 2.3](client/TODO.md#23-win-celebrations).
 
-### 1.8 Basic Profile Page
-- [ ] Fetch user data from `GET /api/users/:username` or `GET /api/users/:id`
-- [ ] Display: avatar, username, MMR, rank badge (name + icon + color), W/L record
-- [ ] Match history list (last 20, paginated) from `GET /api/users/:id/history`
-- [ ] If viewing own profile, show "Edit Profile" button → `/profile/settings`
-- [ ] Profile settings page: update username, avatar URL
-  - [ ] Call `PATCH /api/users/:id` to save changes
-- [ ] **Success Criteria:** Profile page shows real user data, editable for own profile ✅
+### 1.8 ~~Basic Profile Page~~ — DROPPED
+Dashboard already covers own-profile use cases (stats, rank, recent matches,
+heatmap). The contributor-link consumer in `ProblemPanel` can render a
+hovercard later instead of routing to a separate page. Public profile may
+return as part of [Phase 4.5](client/TODO.md#45-profile-enhancements) if
+needed.
 
 ---
 
@@ -311,7 +309,7 @@ Animated polish (MMR count-up, confetti, rank-up flash, sound) is owned by [Phas
   once a shared Dialog primitive lands in `components/ui/`.
 - [ ] Surface the subscription status on the Profile page when that page
   lands.
-- [ ] Quick Play preset (`/play/quick`) should share the same gate flow.
+- [x] Quick Play preset (`/play/quick`) shares the same gate flow via `usePaywall().requireCanPlay()` on the "Play Now" button.
 
 ### 2.2 Skills System UI ✅
 - [x] Skill bar component (`SkillBar.tsx`) displayed during battle:
@@ -373,17 +371,27 @@ Animated polish (MMR count-up, confetti, rank-up flash, sound) is owned by [Phas
   - [ ] Option C: "Invite Player" → search by username, send in-app invite
   - [x] Shareable invite code with copy button
   - [ ] QR code for invite link (nice-to-have)
-- [ ] **Save Preset**: save current settings as named preset (stored in localStorage)
+- [x] **Save Preset**: save current settings as named preset (stored in localStorage)
+  - Lives on the Step 4 invite panel for 1v1 mode; presets show up in
+    `/play/quick` ([Phase 2.5](client/TODO.md#25-quick-play)).
 - [x] Step progress indicator (dots at top)
 - [x] Back/Next navigation between steps
 - [x] **Success Criteria:** Full wizard creates game with all settings, invite code generated ✅
 
-### 2.5 Quick Play
-- [ ] `/play/quick` route
-- [ ] Load saved preset from localStorage (or use defaults: 1v1, 5 min, Medium, no skills)
-- [ ] Show preset summary → "Play Now" button
-- [ ] Manage presets (list, rename, delete saved presets)
-- [ ] **Success Criteria:** One-click play from dashboard using saved settings ✅
+### 2.5 Quick Play ✅
+- [x] `/play/quick` route
+- [x] Load saved preset from localStorage (or use built-in "Quick 1v1" default: 1v1, 5 min, any difficulty, no skills)
+- [x] Show preset summary → "Play Now" button (gated through `usePaywall().requireCanPlay()`)
+- [x] Manage presets (list, switch active, rename, delete; built-in default is uneditable)
+- [x] Save-from-wizard: Step 4 invite panel exposes "Save as Quick Play preset" for 1v1 configs
+- [x] Dashboard Quick Match CTA now points to `/play/quick` so a single source of truth handles defaults + preset selection
+- [x] **Success Criteria:** One-click play from dashboard using saved settings ✅
+
+#### Follow-ups (deferred)
+- [ ] Battle Royale / Clan Wars Quick Play presets — needs storage shape that
+  carries rounds + team size + format; out of v1 scope.
+- [ ] Sync presets to the server so they roam across devices (TODO §2.5 itself
+  notes "store in localStorage (sync to backend later)").
 
 ### 2.6 Direct Invites ✅
 - [x] Invite code flow: creator gets code → opponent enters code → joins battle
@@ -974,7 +982,7 @@ client/
 - [ ] Subscription gating works (paywall after 1 free game/day)
 - [ ] Skills system works in-battle (5 skills, visual effects)
 - [ ] Win celebrations feel satisfying (confetti, MMR animation, sound)
-- [ ] Game creation wizard works with presets
+- [x] Game creation wizard works with presets (Quick Play 1v1 covered; BR/CW deferred)
 - [x] Direct invites work (link + in-app)
 - [ ] Sound effects working with mute toggle
 

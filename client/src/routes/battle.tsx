@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router-dom';
 import Play from '@/pages/battle/Play';
+import QuickPlay from '@/pages/battle/QuickPlay';
 import Lobby from '@/pages/battle/Lobby';
 import Matchmaking from '@/pages/battle/Matchmaking';
 import Battle from '@/pages/battle/Battle';
@@ -19,6 +20,10 @@ export const protectedBattleRoutes: RouteObject[] = [
     {
         path: '/play',
         element: <Play />,
+    },
+    {
+        path: '/play/quick',
+        element: <QuickPlay />,
     },
     {
         path: '/lobby',

@@ -58,3 +58,4 @@ export type {
     NewsItem,
     NewsResponse,
 } from './news';
+export type { QuickPlayPreset } from './preset';

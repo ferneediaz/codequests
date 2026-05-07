@@ -40,7 +40,6 @@ import {
     computeAverageTestsPassed,
     buildHeatmap,
 } from '@/utils/stats';
-import { usePaywall } from '@/hooks/usePaywall';
 import { supabase } from '@/services/supabase';
 import { HARD_CODED_NEWS_PREVIEW } from './constants';
 import {
@@ -61,19 +60,9 @@ export default function Dashboard() {
     const userId = user?.id ?? '';
     const [showAllMatches, setShowAllMatches] = useState(false);
     const [heatmapYear, setHeatmapYear] = useState<string>('rolling');
-    const { requireCanPlay } = usePaywall();
 
     const handleQuickMatch = () => {
-        if (!requireCanPlay()) return;
-        navigate('/matchmaking', {
-            state: {
-                config: {
-                    mode: 'ONE_V_ONE',
-                    timeLimitMinutes: 10,
-                    enabledSkills: [],
-                },
-            },
-        });
+        navigate('/play/quick');
     };
 
     const { data: stats, isLoading: statsLoading } = useQuery<UserStats>({

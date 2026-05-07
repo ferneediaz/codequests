@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
+    Bookmark,
     Check,
     Copy,
     Crown,
     Link2,
     Loader2,
     Users,
+    X,
     Zap,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,6 +20,7 @@ import { AnimateIn } from '@/components/layout/AnimateIn';
 import { battlesApi } from '@/services/battles';
 import { usePaywall } from '@/hooks/usePaywall';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useQuickPlayPresets } from '@/hooks/useQuickPlayPresets';
 import type {
     CreateBattleRequest,
     CreateClanWarsRequest,
@@ -37,12 +40,15 @@ export function InvitePanel({ cfg }: { cfg: PlayConfig }) {
     const navigate = useNavigate();
     const { requireCanPlay } = usePaywall();
     const { refresh: refreshSubscription } = useSubscription();
+    const { save: savePreset } = useQuickPlayPresets();
 
     const [isCreatingPrivate, setIsCreatingPrivate] = useState(false);
     const [inviteCode, setInviteCode] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [joinCode, setJoinCode] = useState('');
     const [isJoining, setIsJoining] = useState(false);
+    const [savingPreset, setSavingPreset] = useState(false);
+    const [presetName, setPresetName] = useState('');
 
     const modeMeta = MODES.find((m) => m.value === cfg.mode)!;
     const diffMeta = DIFFICULTIES.find((d) => d.value === cfg.difficulty)!;
@@ -171,6 +177,23 @@ export function InvitePanel({ cfg }: { cfg: PlayConfig }) {
         if (!inviteCode) return;
         battlesApi.getBattleByInvite(inviteCode).then((data) => {
             navigate(`/battle/${data.id}`);
+        });
+    };
+
+    const handleSavePreset = () => {
+        const name = presetName.trim();
+        if (!name) {
+            toast.error('Give your preset a name');
+            return;
+        }
+        const preset = savePreset({ name, config: cfg.getMatchConfig() });
+        setPresetName('');
+        setSavingPreset(false);
+        toast.success(`Saved "${preset.name}" as a Quick Play preset`, {
+            action: {
+                label: 'Open',
+                onClick: () => navigate('/play/quick'),
+            },
         });
     };
 
@@ -309,13 +332,63 @@ export function InvitePanel({ cfg }: { cfg: PlayConfig }) {
                             </p>
                         </div>
                     ) : (
-                        <Button
-                            className="h-12 w-full text-base"
-                            onClick={handleFindMatch}
-                        >
-                            <Zap className="mr-2 h-4 w-4" />
-                            Find Match
-                        </Button>
+                        <>
+                            <Button
+                                className="h-12 w-full text-base"
+                                onClick={handleFindMatch}
+                            >
+                                <Zap className="mr-2 h-4 w-4" />
+                                Find Match
+                            </Button>
+                            {savingPreset ? (
+                                <div className="flex gap-2">
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        placeholder="Preset name"
+                                        value={presetName}
+                                        onChange={(e) => setPresetName(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleSavePreset();
+                                            else if (e.key === 'Escape') {
+                                                setSavingPreset(false);
+                                                setPresetName('');
+                                            }
+                                        }}
+                                        maxLength={48}
+                                        className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleSavePreset}
+                                        disabled={!presetName.trim()}
+                                    >
+                                        Save
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Cancel save preset"
+                                        onClick={() => {
+                                            setSavingPreset(false);
+                                            setPresetName('');
+                                        }}
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full text-muted-foreground hover:text-foreground"
+                                    onClick={() => setSavingPreset(true)}
+                                >
+                                    <Bookmark className="mr-2 h-3.5 w-3.5" />
+                                    Save as Quick Play preset
+                                </Button>
+                            )}
+                        </>
                     )}
 
                     <div className="relative">
