@@ -417,10 +417,21 @@ Payment system for frontend monetization.
 - [x] 7-day free trial (one-time)
 - [x] **Success Criteria:** Stripe checkout works end-to-end ✅
 
-#### 6. Tests ✅
-- [x] 39 tests passing
+#### 6. Stripe Readiness Hardening ✅
+- [x] Fix Stripe Checkout success/cancel redirects to return to `/pricing?checkout=success|cancel`
+- [x] Fix Stripe Billing Portal return URL to `/pricing`
+- [x] Mirror `userId` metadata onto Stripe subscriptions so subscription webhooks can resolve the owner
+- [x] Support Stripe API 2025-04-30+ subscription payloads by reading period dates from `items.data[0]`
+- [x] Add a no-card 7-day free trial CTA to the pricing page
+- [x] Document required Stripe env vars and the bimonthly price setup gotcha in `.env.example`
+- [x] Create the correct test-mode Stripe bimonthly price (`$5 every 2 months`) and wire it into local env
+- [x] Configure local Stripe CLI webhook forwarding and capture the `whsec_...` signing secret
+
+#### 7. Tests ✅
+- [x] 50 tests passing
 - [x] Checkout session creation tests
 - [x] Webhook handling tests (all event types)
+- [x] Webhook tests for Stripe API 2025-04-30+ item-level period dates
 - [x] canPlay() logic tests (free vs pro vs trial, daily counter, reset)
 - [x] Trial lifecycle tests
 - [x] Battle integration tests (gating)

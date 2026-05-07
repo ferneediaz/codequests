@@ -45,13 +45,19 @@ export class StripeService {
     this.ensureConfigured();
     const clientUrl = this.configService.get<string>('CLIENT_URL') || 'http://localhost:5173';
 
+    // Redirect back to /pricing with a checkout=success|cancel query param.
+    // Pricing.tsx reads this and shows the toast + refreshes status.
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${clientUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${clientUrl}/subscription/cancel`,
+      success_url: `${clientUrl}/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${clientUrl}/pricing?checkout=cancel`,
+      // Mirror userId on the subscription itself so the
+      // customer.subscription.created webhook (which arrives without the
+      // checkout session metadata) can still resolve the owning user.
+      subscription_data: { metadata: { userId } },
       metadata: { userId },
     });
 
@@ -68,7 +74,7 @@ export class StripeService {
 
     const session = await this.stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${clientUrl}/settings`,
+      return_url: `${clientUrl}/pricing`,
     });
 
     return session.url;

@@ -24,13 +24,22 @@ interface StripeCheckoutSession {
   customer?: string | { id: string };
 }
 
+interface StripeSubscriptionItem {
+  price: { id: string };
+  // Stripe API >= 2025-04-30 moved current_period_start/end from the
+  // Subscription object onto each SubscriptionItem. We read from here
+  // first and fall back to the legacy top-level fields below.
+  current_period_start?: number;
+  current_period_end?: number;
+}
+
 interface StripeSubscription {
   id: string;
   metadata?: { userId?: string };
   status: string;
-  items: { data: Array<{ price: { id: string } }> };
-  current_period_start: number;
-  current_period_end: number;
+  items: { data: StripeSubscriptionItem[] };
+  current_period_start?: number;
+  current_period_end?: number;
   cancel_at_period_end: boolean;
 }
 
@@ -389,6 +398,29 @@ export class SubscriptionsService {
 
     const isActive = subscription.status === 'active' || subscription.status === 'trialing';
 
+    const item = subscription.items.data[0];
+    if (!item) {
+      this.logger.warn(
+        `Subscription ${subscription.id} webhook missing subscription item; skipping DB upsert`,
+      );
+      return;
+    }
+
+    // Read item-level period first (Stripe API >= 2025-04-30 schema), fall
+    // back to the top-level fields for older API versions.
+    const periodStartUnix =
+      item.current_period_start ?? subscription.current_period_start;
+    const periodEndUnix =
+      item.current_period_end ?? subscription.current_period_end;
+    if (periodStartUnix == null || periodEndUnix == null) {
+      this.logger.warn(
+        `Subscription ${subscription.id} webhook missing period dates; skipping DB upsert`,
+      );
+      return;
+    }
+    const currentPeriodStart = new Date(periodStartUnix * 1000);
+    const currentPeriodEnd = new Date(periodEndUnix * 1000);
+
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -401,25 +433,17 @@ export class SubscriptionsService {
       create: {
         userId,
         stripeSubscriptionId: subscription.id,
-        stripePriceId: subscription.items.data[0].price.id,
+        stripePriceId: item.price.id,
         status: this.mapStripeStatus(subscription.status),
-        currentPeriodStart: new Date(
-          subscription.current_period_start * 1000,
-        ),
-        currentPeriodEnd: new Date(
-          subscription.current_period_end * 1000,
-        ),
+        currentPeriodStart,
+        currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
       },
       update: {
-        stripePriceId: subscription.items.data[0].price.id,
+        stripePriceId: item.price.id,
         status: this.mapStripeStatus(subscription.status),
-        currentPeriodStart: new Date(
-          subscription.current_period_start * 1000,
-        ),
-        currentPeriodEnd: new Date(
-          subscription.current_period_end * 1000,
-        ),
+        currentPeriodStart,
+        currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
       },
     });

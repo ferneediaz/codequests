@@ -635,6 +635,100 @@ describe('SubscriptionsService', () => {
             expect(prisma.user.update).not.toHaveBeenCalled();
         });
 
+        it('should read current_period_start/end from items.data[0] (Stripe API >= 2025-04-30 schema)', async () => {
+            const periodStart = Math.floor(Date.now() / 1000);
+            const periodEnd = periodStart + 60 * 60 * 24 * 60;
+            const event = {
+                type: 'customer.subscription.created',
+                data: {
+                    object: {
+                        id: 'sub_item_level',
+                        metadata: { userId: 'user-free' },
+                        status: 'active',
+                        items: {
+                            data: [
+                                {
+                                    price: { id: 'price_bimonthly' },
+                                    current_period_start: periodStart,
+                                    current_period_end: periodEnd,
+                                },
+                            ],
+                        },
+                        // Top-level fields intentionally omitted to simulate
+                        // the post-2025-04-30 Stripe API payload.
+                        cancel_at_period_end: false,
+                    },
+                },
+            } as any;
+
+            prisma.user.update.mockResolvedValue({
+                ...mockFreeUser,
+                subscriptionTier: 'PRO',
+            });
+            prisma.subscription.upsert.mockResolvedValue({});
+
+            await service.handleWebhookEvent(event);
+
+            expect(prisma.subscription.upsert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    create: expect.objectContaining({
+                        currentPeriodStart: new Date(periodStart * 1000),
+                        currentPeriodEnd: new Date(periodEnd * 1000),
+                    }),
+                }),
+            );
+        });
+
+        it('should skip DB upsert when both top-level and item-level period dates are missing', async () => {
+            const event = {
+                type: 'customer.subscription.created',
+                data: {
+                    object: {
+                        id: 'sub_no_period',
+                        metadata: { userId: 'user-free' },
+                        status: 'active',
+                        items: { data: [{ price: { id: 'price_bimonthly' } }] },
+                        cancel_at_period_end: false,
+                    },
+                },
+            } as any;
+
+            prisma.user.update.mockResolvedValue({
+                ...mockFreeUser,
+                subscriptionTier: 'PRO',
+            });
+
+            await expect(
+                service.handleWebhookEvent(event),
+            ).resolves.not.toThrow();
+
+            expect(prisma.subscription.upsert).not.toHaveBeenCalled();
+        });
+
+        it('should skip DB upsert when subscription has no line items', async () => {
+            const event = {
+                type: 'customer.subscription.created',
+                data: {
+                    object: {
+                        id: 'sub_no_items',
+                        metadata: { userId: 'user-free' },
+                        status: 'active',
+                        items: { data: [] },
+                        current_period_start: Math.floor(Date.now() / 1000),
+                        current_period_end:
+                            Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 60,
+                        cancel_at_period_end: false,
+                    },
+                },
+            } as any;
+
+            await expect(
+                service.handleWebhookEvent(event),
+            ).resolves.not.toThrow();
+
+            expect(prisma.subscription.upsert).not.toHaveBeenCalled();
+        });
+
         it('should handle trialing subscription status — set tier to PRO', async () => {
             const event = {
                 type: 'customer.subscription.created',

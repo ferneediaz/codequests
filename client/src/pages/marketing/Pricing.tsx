@@ -45,6 +45,13 @@ export default function Pricing() {
     const { status, isPro, isDev, source, refresh } = useSubscription();
     const [submitting, setSubmitting] = useState<CheckoutPlan | null>(null);
     const [openingPortal, setOpeningPortal] = useState(false);
+    const [startingTrial, setStartingTrial] = useState(false);
+
+    // Free users who have not yet activated a trial see a "Start 7-day free
+    // trial" button. We can't tell `hasUsedTrial` from /status, so we just
+    // optimistically show it whenever tier === 'free' and surface the
+    // backend's BadRequest as a toast if they've already used one.
+    const showTrialCta = !isPro && status?.tier === 'free';
 
     const checkoutReturn: CheckoutReturn = useMemo(() => {
         const value = searchParams.get('checkout');
@@ -101,6 +108,25 @@ export default function Pricing() {
                 'Could not open the billing portal.';
             toast.error(message);
             setOpeningPortal(false);
+        }
+    };
+
+    const handleStartTrial = async () => {
+        setStartingTrial(true);
+        try {
+            const { trialEndsAt } = await subscriptionsApi.startTrial();
+            toast.success('7-day free trial activated', {
+                description: `Trial ends ${new Date(trialEndsAt).toLocaleDateString()}.`,
+            });
+            await refresh();
+        } catch (err: unknown) {
+            const message =
+                (err as { response?: { data?: { message?: string } } })
+                    ?.response?.data?.message ??
+                'Could not start the trial.';
+            toast.error(message);
+        } finally {
+            setStartingTrial(false);
         }
     };
 
@@ -203,13 +229,34 @@ export default function Pricing() {
                             description="Try a daily battle, practice on your own."
                             features={FREE_FEATURES}
                             footer={
-                                <Button
-                                    variant="outline"
-                                    className="w-full"
-                                    disabled
-                                >
-                                    Current plan for new players
-                                </Button>
+                                showTrialCta ? (
+                                    <div className="space-y-2">
+                                        <Button
+                                            variant="outline"
+                                            className="w-full"
+                                            onClick={handleStartTrial}
+                                            disabled={startingTrial}
+                                        >
+                                            {startingTrial ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Sparkles className="mr-2 h-4 w-4" />
+                                            )}
+                                            Start 7-day free trial
+                                        </Button>
+                                        <p className="text-center text-[11px] text-muted-foreground">
+                                            One-time. No card required.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <Button
+                                        variant="outline"
+                                        className="w-full"
+                                        disabled
+                                    >
+                                        Current plan for new players
+                                    </Button>
+                                )
                             }
                         />
                     </AnimateIn>

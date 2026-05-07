@@ -678,6 +678,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 - [ ] Clan info section (if in a clan):
   - [ ] Clan name, tag, role
   - [ ] Link to clan page
+  - [ ] Upload clan image jpg etc
 - [ ] Friends list section:
   - [ ] Mutual friends (if viewing someone else's profile)
   - [ ] "Add Friend" button
@@ -708,6 +709,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
   - [ ] Copy link to public results page
   - [ ] Download image
   - [ ] Instagram Story format (9:16 aspect ratio option)
+  - [ ] achievements share button for linkedin, IG, twitter/x , threads
 - [ ] Public results page (`/battle/:id/results/share`):
   - [ ] No auth required
   - [ ] OG meta tags for social media preview (title, description, image)
