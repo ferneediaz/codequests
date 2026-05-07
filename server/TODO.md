@@ -4,6 +4,19 @@
 
 ---
 
+## Context Reference Rules
+
+- When referencing a numbered section outside its own section, always include a markdown link.
+- Preferred format: `Feature name ([3.5](client/TODO.md#client-phase-3-5-in-app-notifications))` or `Module ([Push Notifications](server/TODO.md#server-todo-push-notifications))`.
+- Do not write bare references like `3.5` in summaries, issue templates, or import notes.
+
+**Quick context links (for issue bodies):**
+- Client Phase 3.5 In-app Notifications: [client/TODO.md#client-phase-3-5-in-app-notifications](client/TODO.md#client-phase-3-5-in-app-notifications)
+- Server Push Notifications TODO: [server/TODO.md#server-todo-push-notifications](server/TODO.md#server-todo-push-notifications)
+- Server Battle Royale Elimination (completed): [server/TODO.md#server-completed-battle-royale-elimination](server/TODO.md#server-completed-battle-royale-elimination)
+
+---
+
 ## ✅ Completed
 
 ### Phase 1: Foundation ✅
@@ -883,6 +896,7 @@ Humorous rank names with icons and colors.
 
 ---
 
+<a id="server-completed-battle-royale-elimination"></a>
 ## ✅ Battle Royale Elimination - COMPLETED
 
 Multi-round elimination for Battle Royale mode.
@@ -956,6 +970,7 @@ Enhanced leaderboard features.
 
 ---
 
+<a id="server-todo-push-notifications"></a>
 ## 📋 TODO - Push Notifications (MEDIUM PRIORITY)
 
 Browser push notifications for key events.

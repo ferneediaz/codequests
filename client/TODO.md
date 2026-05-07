@@ -4,6 +4,18 @@
 
 ---
 
+## Context Reference Rules
+
+- When referencing a numbered section outside its own section, always include a markdown link.
+- Preferred format: `Feature name ([Phase 4.1](client/TODO.md#client-phase-4-1-battle-royale-ui))`.
+- Do not write bare references like `4.1` or `3.5` in summaries, issue templates, or import notes.
+
+**Quick context links (for issue bodies):**
+- Phase 3.5 In-app Notifications: [client/TODO.md#client-phase-3-5-in-app-notifications](client/TODO.md#client-phase-3-5-in-app-notifications)
+- Phase 4.1 Battle Royale UI: [client/TODO.md#client-phase-4-1-battle-royale-ui](client/TODO.md#client-phase-4-1-battle-royale-ui)
+
+---
+
 ## 📐 Decisions & Constraints
 
 | Decision | Choice |
@@ -63,9 +75,9 @@
 
 **Current focus queue:**
 
-1. **Battle Royale UI (Phase 4.1)** — in-game multi-round BR flow is in place.
+1. **Battle Royale UI ([Phase 4.1](client/TODO.md#client-phase-4-1-battle-royale-ui))** — in-game multi-round BR flow is in place.
    Follow up with manual 6-8 player playtesting once enough clients are available.
-2. **Push notifications (3.5)** — next social/system follow-up after BR playtesting.
+2. **Push notifications ([3.5](client/TODO.md#client-phase-3-5-in-app-notifications))** — next social/system follow-up after BR playtesting.
 
 Avoid Achievements until their server TODOs close out.
 
@@ -530,6 +542,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
   - [x] Challenge history
 - [x] **Success Criteria:** Can send clan challenge → accept → play clan war ✅
 
+<a id="client-phase-3-5-in-app-notifications"></a>
 ### 3.5 In-app Notifications
 - [x] Global `NotificationsProvider` with recent notification history
 - [x] Persist recent notifications in localStorage
@@ -551,6 +564,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 **Goal:** Full Battle Royale mode, problem contributions, achievements, full leaderboard.
 **Depends on backend:** BR elimination module, Achievements module, Problem import pipeline.
 
+<a id="client-phase-4-1-battle-royale-ui"></a>
 ### 4.1 Battle Royale UI
 - [x] Pre-game lobby:
   - [x] Show all joined players (avatars/usernames via existing lobby rows)
@@ -572,7 +586,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
   - [x] "FINAL ROUND" banner
   - [x] 2 players remaining
   - [x] Standard 1v1-style editor/submit format
-  - [ ] Full win celebration for champion (Phase 2.3 polish)
+  - [ ] Full win celebration for champion ([Phase 2.3](client/TODO.md#23-win-celebrations) polish)
 - [x] Overall standings at end:
   - [x] 1st, 2nd, 3rd place with podium-style display
   - [x] MMR changes for podium players
@@ -787,7 +801,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 - [ ] Leaderboard (filters, pagination)
 
 ### E2E Tests (Playwright)
-- [ ] See Phase 5.5 above
+- [ ] See [Phase 5.5](client/TODO.md#55-e2e-tests-playwright) above
 
 ---
 
