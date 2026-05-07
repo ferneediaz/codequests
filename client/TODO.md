@@ -78,6 +78,7 @@
 1. **Battle Royale UI ([Phase 4.1](client/TODO.md#client-phase-4-1-battle-royale-ui))** — in-game multi-round BR flow is in place.
    Follow up with manual 6-8 player playtesting once enough clients are available.
 2. **Win Celebrations ([Phase 2.3](client/TODO.md#23-win-celebrations))** — confetti + MMR count-up + rank-up flash on Results landed; sound + win streak deferred (sound waits on §2.7, streak waits on a server `currentWinStreak` field).
+3. **Public profile page ([Phase 4.5](client/TODO.md#45-profile-enhancements-partial))** — `/profile/:username` shipped (other-users-only, self-redirects to /dashboard); `User.githubUsername` captured at auth sync, server-resolved GH heatmap + contributions list now feed both Profile and Dashboard.
 
 Avoid Achievements until their server TODOs close out. Web push (out-of-app browser notifications) is not yet scoped — §3.5 covers in-app only.
 
@@ -167,7 +168,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 - [x] Create `useAuth` hook (login, logout, getCurrentUser, isAuthenticated)
 - [x] Add auth persistence (store token in localStorage, restore on app load)
 - [x] Create `ProtectedRoute` wrapper component (redirect to `/login` if not auth'd)
-- [ ] Create `AdminRoute` wrapper component (redirect if not admin role)
+- [x] Create `AdminRoute` wrapper component (redirect if not admin role) — see `client/src/components/layout/AdminRoute.tsx`, used by [Phase 4.2](client/TODO.md#42-problem-contribution--admin-review)
 - [x] Add user avatar + dropdown to navbar (when logged in)
 - [x] Add logout functionality
 - [x] **Success Criteria:** User can sign up via GitHub/Google → synced to backend → stays logged in on refresh ✅
@@ -190,7 +191,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 - [x] Stats overview card: MMR, rank badge (with icon + color via `RankBadge` component), W/L record
 - [x] Activity heatmap component (GitHub-style, real battle history + GitHub commits via `getHeatmapBounds` / `buildHeatmap`, year selector)
 - [x] Recent activity feed (last 5 battles from `GET /api/users/:id/history`)
-- [ ] Remaining free games badge (if free tier, shows "1 game remaining today" or "Pro ∞")
+- ~~Remaining free games badge~~ — covered globally by the navbar `SubscriptionBadge` from [Phase 2.1](client/TODO.md#21-subscription-system); a Dashboard-only duplicate would just shadow that surface.
 - [x] **Success Criteria:** Dashboard loads with real user data after login ✅
 
 ### 1.5 Matchmaking UI ✅
@@ -258,12 +259,13 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 
 Animated polish (MMR count-up, confetti, rank-up flash, sound) is owned by [Phase 2.3](client/TODO.md#23-win-celebrations).
 
-### 1.8 ~~Basic Profile Page~~ — DROPPED
-Dashboard already covers own-profile use cases (stats, rank, recent matches,
-heatmap). The contributor-link consumer in `ProblemPanel` can render a
-hovercard later instead of routing to a separate page. Public profile may
-return as part of [Phase 4.5](client/TODO.md#45-profile-enhancements) if
-needed.
+### 1.8 ~~Basic Profile Page~~ — DROPPED (own-profile)
+Dashboard remains the single own-profile surface. A **public** profile
+shipped under [Phase 4.5](client/TODO.md#45-profile-enhancements) at
+`/profile/:username` — it is intentionally scoped to viewing *other*
+users; if you navigate to your own `/profile/:username` you redirect to
+`/dashboard`. Contributor links in `ProblemPanel` now resolve instead of
+404'ing.
 
 ---
 
@@ -666,8 +668,10 @@ starter (so users never see the contributor's reference solution).
 #### Follow-ups (deferred)
 - [ ] Dashboard "Contribute a problem" quick-action card (mirror of the
   Practice CTA so logged-in users see the entry point on home).
-- [ ] Profile "Contributions" tab listing approved contributions + pending
-  submission history (depends on Profile page work elsewhere in TODO).
+- [x] Profile "Contributions" section listing approved contributions —
+  shipped with the public profile page (uses `GET /users/:id/contributions`).
+  Pending-submission history is still a follow-up (would mirror
+  `/contribute/mine` inside the profile view).
 - [ ] Soft per-user pending cap (e.g. max 3 PENDING submissions) to
   blunt spam without locking out genuine contributors.
 - [ ] Editing reference code / signature / tests post-submit currently
@@ -727,17 +731,23 @@ starter (so users never see the contributor's reference solution).
 - [ ] Search by username in all tabs
 - [ ] **Success Criteria:** Leaderboard loads with all filters working ✅
 
-### 4.5 Profile Enhancements
-- [ ] Activity heatmap (GitHub-style):
-  - [ ] 365-day grid showing games played per day
-  - [ ] Color intensity based on activity level
-  - [ ] Tooltip on hover: "5 games on April 15, 2026"
-  - [ ] Data from `GET /api/users/:id/activity?year=2026`
-- [ ] Match history:
-  - [ ] Paginated list of all battles
-  - [ ] Each entry: opponent, result (W/L), MMR change, problem title, language, date
-  - [ ] Click to expand: see code, test results
-  - [ ] Filter by mode, result, date range
+### 4.5 Profile Enhancements (Partial)
+
+Public profile page lives at `/profile/:username` (`client/src/pages/profile/Profile.tsx`). Self-views redirect to `/dashboard`.
+
+- [x] Activity heatmap (GitHub-style):
+  - [x] Year grid showing battles + GitHub push events per day
+  - [x] Color intensity based on activity level
+  - [x] Tooltip on hover (battles + GitHub commits broken out)
+  - [x] Data from `GET /api/users/:id/github-activity?year=YYYY` — server-resolved via stored `User.githubUsername`, so it works for any user, not just the viewer
+- [x] Match history (read-only on public profile)
+  - [x] Last 10 battles via `MatchRow` (mode + opponent + W/L + MMR delta)
+  - [ ] Pagination + filters by mode/result/date range — deferred follow-up
+  - [ ] Click-to-expand showing code + test results — deferred follow-up
+- [x] Friend action button on hero (`FriendActionButton`): Add / Pending / Accept+Decline / Remove, plus a "Log in to add" CTA for anonymous viewers
+- [x] Clan info section (clan tag + name in hero when present)
+- [x] Mode breakdown + Practice stats sections (reuses `ModeBreakdown` from Dashboard)
+- [x] Contributions section listing approved problems by `Problem.contributedById` via new `GET /users/:id/contributions`
 - [ ] Favorite language stats:
   - [ ] Pie chart or bar chart of games played per language
   - [ ] Win rate per language
@@ -745,14 +755,8 @@ starter (so users never see the contributor's reference solution).
   - [ ] Upload avatar image or use Gravatar
   - [ ] Select banner color/image
   - [ ] Preview before saving
-- [ ] Clan info section (if in a clan):
-  - [ ] Clan name, tag, role
-  - [ ] Link to clan page
-  - [ ] Upload clan image jpg etc
-- [ ] Friends list section:
-  - [ ] Mutual friends (if viewing someone else's profile)
-  - [ ] "Add Friend" button
-- [ ] **Success Criteria:** Full profile with heatmap, history, stats, customization ✅
+- [ ] Mutual friends visualization
+- [x] **Success Criteria (MVP):** Public profile renders for any user with heatmap, match history, contributions, friend action — customization deferred
 
 ---
 

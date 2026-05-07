@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Check, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RankBadge } from '@/components/ui/RankBadge';
@@ -34,17 +35,23 @@ export function IncomingRequestRow({ request }: IncomingRequestRowProps) {
 
     return (
         <div className="flex items-center gap-3 rounded-md border border-border bg-background/60 px-2 py-2">
-            <FriendAvatar
-                username={request.requester.username}
-                avatarUrl={request.requester.avatarUrl}
-                online={false}
-            />
-            <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">
-                    {request.requester.username}
+            <Link
+                to={`/profile/${request.requester.username}`}
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title={`View @${request.requester.username}'s profile`}
+            >
+                <FriendAvatar
+                    username={request.requester.username}
+                    avatarUrl={request.requester.avatarUrl}
+                    online={false}
+                />
+                <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium hover:underline">
+                        {request.requester.username}
+                    </div>
+                    <RankBadge mmr={request.requester.mmr} className="mt-0.5 text-[10px]" />
                 </div>
-                <RankBadge mmr={request.requester.mmr} className="mt-0.5 text-[10px]" />
-            </div>
+            </Link>
             <div className="flex items-center gap-1">
                 <Button
                     size="icon"

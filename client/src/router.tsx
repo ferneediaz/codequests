@@ -11,6 +11,7 @@ import { clanRoutes } from '@/routes/clan';
 import { dashboardRoutes } from '@/routes/dashboard';
 import { protectedMarketingRoutes, publicMarketingRoutes } from '@/routes/marketing';
 import { practiceRoutes } from '@/routes/practice';
+import { publicProfileRoutes } from '@/routes/profile';
 import Messages from '@/pages/messages/Messages';
 
 export const router = createBrowserRouter([
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
         children: [
             ...publicAuthRoutes,
             ...publicBattleRoutes,
+            ...publicProfileRoutes,
             {
                 element: <ProtectedRoute />,
                 children: [

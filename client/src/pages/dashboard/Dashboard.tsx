@@ -10,7 +10,6 @@ import { AnimateIn } from '@/components/layout/AnimateIn';
 import { PageHero } from '@/components/layout/PageHero';
 import { StatTileGrid } from '@/components/layout/StatTileGrid';
 import {
-    Activity,
     ArrowRight,
     BookOpen,
     Code2,
@@ -28,6 +27,7 @@ import type {
     UserStats,
     MatchHistoryEntry,
     NewsResponse,
+    GithubActivity,
 } from '@/types/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { usersApi } from '@/services/users';
@@ -40,14 +40,8 @@ import {
     computeAverageTestsPassed,
     buildHeatmap,
 } from '@/utils/stats';
-import { supabase } from '@/services/supabase';
 import { HARD_CODED_NEWS_PREVIEW } from './constants';
-import {
-    type GithubContributionsQuery,
-    getHeatmapBounds,
-    toLocalDateKey,
-} from './utils';
-import { Heatmap } from './components/Heatmap';
+import { HeatmapCard } from '@/components/heatmap/HeatmapCard';
 import { MatchRow } from './components/MatchRow';
 import { ModeBreakdown } from './components/ModeBreakdown';
 import { NewsRow } from './components/NewsRow';
@@ -96,100 +90,25 @@ export default function Dashboard() {
         enabled: !!userId,
     });
 
-    const { data: githubActivity } = useQuery<{
-        username: string;
-        commitsByDate: Record<string, number>;
-    } | null>({
+    // Rolling-12-months always spans two calendar years, so fetch both
+    // and merge. Calendar-year mode hits a single endpoint. The server
+    // is year-scoped (GitHub's GraphQL contribution range is capped at
+    // 1 year per request), so the multi-year orchestration lives here.
+    const { data: githubActivity } = useQuery<GithubActivity | null>({
         queryKey: queryKeys.githubActivity(userId, heatmapYear),
         queryFn: async () => {
-            const {
-                data: { session },
-            } = await supabase.auth.getSession();
-            const provider = session?.user?.app_metadata?.provider;
-            if (provider !== 'github') return null;
-            const githubUsername =
-                session?.user?.user_metadata?.user_name ??
-                session?.user?.user_metadata?.preferred_username;
-            if (!githubUsername) return null;
-
-            const { from, to } = getHeatmapBounds(heatmapYear);
-            const commitsByDate: Record<string, number> = {};
-            const providerToken = session?.provider_token;
-
-            if (providerToken) {
-                const graphqlRes = await fetch('https://api.github.com/graphql', {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${providerToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        query: `
-                            query($login: String!, $from: DateTime!, $to: DateTime!) {
-                                user(login: $login) {
-                                    contributionsCollection(from: $from, to: $to) {
-                                        contributionCalendar {
-                                            weeks {
-                                                contributionDays {
-                                                    date
-                                                    contributionCount
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        `,
-                        variables: {
-                            login: githubUsername,
-                            from: from.toISOString(),
-                            to: to.toISOString(),
-                        },
-                    }),
-                });
-
-                if (graphqlRes.ok) {
-                    const gqlData = (await graphqlRes.json()) as GithubContributionsQuery;
-                    const weeks =
-                        gqlData.data?.user?.contributionsCollection?.contributionCalendar?.weeks ??
-                        [];
-                    for (const week of weeks) {
-                        for (const day of week.contributionDays ?? []) {
-                            commitsByDate[day.date] = day.contributionCount ?? 0;
-                        }
-                    }
-                    return { username: githubUsername, commitsByDate };
-                }
+            if (heatmapYear !== 'rolling') {
+                return usersApi.getGithubActivity(userId, heatmapYear);
             }
-
-            // Fallback for users without provider token (less complete than contribution calendar).
-            for (let page = 1; page <= 10; page++) {
-                const eventsRes = await fetch(
-                    `https://api.github.com/users/${githubUsername}/events/public?per_page=100&page=${page}`,
-                    {
-                        headers: {
-                            Accept: 'application/vnd.github+json',
-                        },
-                    },
-                );
-                if (!eventsRes.ok) break;
-                const events = (await eventsRes.json()) as Array<{
-                    type?: string;
-                    created_at?: string;
-                    payload?: { size?: number };
-                }>;
-                if (!events.length) break;
-                for (const event of events) {
-                    if (event.type !== 'PushEvent' || !event.created_at) continue;
-                    const dateKey = toLocalDateKey(event.created_at);
-                    const eventDate = new Date(event.created_at);
-                    if (eventDate < from || eventDate > to) continue;
-                    const commitCount = Math.max(1, event.payload?.size ?? 1);
-                    commitsByDate[dateKey] = (commitsByDate[dateKey] ?? 0) + commitCount;
-                }
-            }
-
-            return { username: githubUsername, commitsByDate };
+            const currentYear = new Date().getFullYear();
+            const [curr, prev] = await Promise.all([
+                usersApi.getGithubActivity(userId, String(currentYear)),
+                usersApi.getGithubActivity(userId, String(currentYear - 1)),
+            ]);
+            return {
+                username: curr.username ?? prev.username,
+                commitsByDate: { ...prev.commitsByDate, ...curr.commitsByDate },
+            };
         },
         enabled: !!userId,
         staleTime: 1000 * 60 * 10,
@@ -526,53 +445,43 @@ export default function Dashboard() {
                 {/* ---------------- HEATMAP + BREAKDOWN ---------------- */}
                 <div className="grid gap-6 lg:grid-cols-3">
                     <AnimateIn className="lg:col-span-2" delay={0}>
-                        <Card className="h-full">
-                            <CardContent className="p-6">
-                                <div className="mb-4 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Activity className="h-4 w-4 text-primary" />
-                                        <h2 className="text-base font-semibold">Activity</h2>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-xs text-muted-foreground">
-                                            {derived.heatmap.totalGames} battles
-                                            {derived.heatmap.totalGithubCommits > 0
-                                                ? ` · ${derived.heatmap.totalGithubCommits} GH commits`
-                                                : ''}
-                                            {longestGithubCodingStreak > 0
-                                                ? ` · ${longestGithubCodingStreak}d coding streak`
-                                                : ''}
-                                            {' · '}
-                                            {derived.heatmap.periodLabel}
-                                        </span>
-                                        <select
-                                            value={heatmapYear}
-                                            onChange={(e) => setHeatmapYear(e.target.value)}
-                                            className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-                                            aria-label="Select activity year"
-                                        >
-                                            <option value="rolling">Last 12 months</option>
-                                            {availableHeatmapYears.map((year) => (
-                                                <option key={year} value={String(year)}>
-                                                    {year}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                                {historyLoading ? (
-                                    <Skeleton className="h-[120px] w-full" />
-                                ) : (
-                                    <Heatmap
-                                        grid={derived.heatmap.grid}
-                                        dates={derived.heatmap.dates}
-                                        breakdown={derived.heatmap.breakdown}
-                                        monthLabels={derived.heatmap.monthLabels}
-                                        max={derived.heatmap.max}
-                                    />
-                                )}
-                            </CardContent>
-                        </Card>
+                        <HeatmapCard
+                            data={derived.heatmap}
+                            isLoading={historyLoading}
+                            title="Activity"
+                            githubUsername={githubActivity?.username}
+                            subtitle={
+                                <span className="text-xs text-muted-foreground">
+                                    {derived.heatmap.totalGames} battles
+                                    {derived.heatmap.totalGithubCommits > 0
+                                        ? ` · ${derived.heatmap.totalGithubCommits} GH commits`
+                                        : ''}
+                                    {longestGithubCodingStreak > 0
+                                        ? ` · ${longestGithubCodingStreak}d coding streak`
+                                        : ''}
+                                    {' · '}
+                                    {derived.heatmap.periodLabel}
+                                    {githubActivity?.username
+                                        ? ` · @${githubActivity.username}`
+                                        : ''}
+                                </span>
+                            }
+                            headerExtra={
+                                <select
+                                    value={heatmapYear}
+                                    onChange={(e) => setHeatmapYear(e.target.value)}
+                                    className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                                    aria-label="Select activity year"
+                                >
+                                    <option value="rolling">Last 12 months</option>
+                                    {availableHeatmapYears.map((year) => (
+                                        <option key={year} value={String(year)}>
+                                            {year}
+                                        </option>
+                                    ))}
+                                </select>
+                            }
+                        />
                     </AnimateIn>
 
                     <AnimateIn delay={150}>

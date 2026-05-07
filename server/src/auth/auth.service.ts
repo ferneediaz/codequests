@@ -26,6 +26,7 @@ export class AuthService {
     username?: string,
     role?: string,
     avatarUrl?: string,
+    githubUsername?: string,
   ) {
     const existingUser = await this.prisma.user.findUnique({
       where: { id: supabaseUserId },
@@ -40,6 +41,7 @@ export class AuthService {
         role?: string;
         avatarUrl?: string;
         avatarSource?: 'OAUTH';
+        githubUsername?: string;
       } = {};
       if (role && role !== existingUser.role) {
         patch.role = role;
@@ -51,6 +53,9 @@ export class AuthService {
       if (canBackfillAvatar) {
         patch.avatarUrl = avatarUrl;
         patch.avatarSource = 'OAUTH';
+      }
+      if (githubUsername && githubUsername !== existingUser.githubUsername) {
+        patch.githubUsername = githubUsername;
       }
       if (Object.keys(patch).length === 0) {
         return existingUser;
@@ -73,6 +78,7 @@ export class AuthService {
         ...(avatarUrl
           ? { avatarUrl, avatarSource: 'OAUTH' as const }
           : {}),
+        ...(githubUsername ? { githubUsername } : {}),
       },
     });
   }

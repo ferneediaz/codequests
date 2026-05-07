@@ -47,6 +47,9 @@ export type {
     CompleteOnboardingPayload,
     UserStats,
     MatchHistoryEntry,
+    PublicUser,
+    ProblemContribution,
+    GithubActivity,
 } from './user';
 export type {
     NewsItemType,

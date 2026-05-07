@@ -1,5 +1,14 @@
 import api from './api';
-import type { MatchHistoryEntry, NewsFilter, NewsResponse, UserStats } from '@/types/api';
+import type {
+    GithubActivity,
+    MatchHistoryEntry,
+    NewsFilter,
+    NewsResponse,
+    ProblemContribution,
+    PublicUser,
+    UserStats,
+} from '@/types/api';
+import type { PracticeStats } from '@/types/practice';
 
 export interface UserSearchResult {
     id: string;
@@ -49,6 +58,38 @@ export const usersApi = {
         const { data } = await api.get<NewsResponse>(`/users/${userId}/news`, {
             params,
         });
+        return data;
+    },
+
+    async getByUsername(username: string): Promise<PublicUser> {
+        const { data } = await api.get<PublicUser>(
+            `/users/username/${encodeURIComponent(username)}`,
+        );
+        return data;
+    },
+
+    async getGithubActivity(
+        userId: string,
+        year: string,
+    ): Promise<GithubActivity> {
+        const { data } = await api.get<GithubActivity>(
+            `/users/${userId}/github-activity`,
+            { params: { year } },
+        );
+        return data;
+    },
+
+    async getContributions(userId: string): Promise<ProblemContribution[]> {
+        const { data } = await api.get<ProblemContribution[]>(
+            `/users/${userId}/contributions`,
+        );
+        return data;
+    },
+
+    async getPracticeStatsForUser(userId: string): Promise<PracticeStats> {
+        const { data } = await api.get<PracticeStats>(
+            `/practice/stats/${userId}`,
+        );
         return data;
     },
 };

@@ -2,48 +2,8 @@ import { Newspaper, Skull, Swords, Trophy } from 'lucide-react';
 import type { BattleMode, NewsItem, NewsItemSeverity } from '@/types/api';
 import { MODE_META, NEWS_TYPE_ICON, SEVERITY_STYLES } from './constants';
 
-export type GithubContributionsQuery = {
-    data?: {
-        user?: {
-            contributionsCollection?: {
-                contributionCalendar?: {
-                    weeks?: Array<{
-                        contributionDays?: Array<{
-                            date: string;
-                            contributionCount: number;
-                        }>;
-                    }>;
-                };
-            };
-        };
-    };
-};
-
 export function getModeMeta(mode: string): { label: string; icon: typeof Swords } {
     return MODE_META[mode as BattleMode] ?? { label: mode || 'Unknown', icon: Swords };
-}
-
-export function toLocalDateKey(value: string): string {
-    const d = new Date(value);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-}
-
-export function getHeatmapBounds(selectedYear: string): { from: Date; to: Date } {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    if (selectedYear === 'rolling') {
-        const from = new Date(today);
-        from.setDate(today.getDate() - 364);
-        from.setHours(0, 0, 0, 0);
-        return { from, to: today };
-    }
-    const year = Number(selectedYear);
-    const from = new Date(year, 0, 1, 0, 0, 0, 0);
-    const to = new Date(year, 11, 31, 23, 59, 59, 999);
-    return { from, to };
 }
 
 export function resolveNewsPresentation(

@@ -23,6 +23,8 @@ import { UsersService } from './users.service';
 import { NewsService, NewsFilter } from './news.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { NewsResponseDto } from './dto/news-response.dto';
+import { ContributionResponseDto } from './dto/contribution-response.dto';
+import { GithubActivityResponseDto } from './dto/github-activity-response.dto';
 import { AuthedRequest } from '../common/types/authed-request';
 
 @ApiTags('users')
@@ -128,6 +130,48 @@ export class UsersController {
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     return this.usersService.getMatchHistory(id, limit);
+  }
+
+  /**
+   * Get approved problems this user has contributed.
+   */
+  @Get(':id/contributions')
+  @ApiOperation({ summary: 'Get problems contributed by user' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Approved problems contributed by this user (latest first, capped at 50)',
+    type: [ContributionResponseDto],
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  getContributions(@Param('id') id: string) {
+    return this.usersService.getContributions(id);
+  }
+
+  /**
+   * Get user's GitHub push-event activity for the heatmap.
+   * Returns `{ username: null, commitsByDate: {} }` when the user has no
+   * GH login on file (e.g., signed in with Google) — heatmap still
+   * renders battle activity.
+   */
+  @Get(':id/github-activity')
+  @ApiOperation({ summary: 'Get user GitHub push activity (for heatmap)' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiQuery({ name: 'year', required: false, type: String, example: '2026' })
+  @ApiResponse({
+    status: 200,
+    description: 'GitHub push events bucketed by date',
+    type: GithubActivityResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  getGithubActivity(
+    @Param('id') id: string,
+    @Query('year') year?: string,
+  ) {
+    return this.usersService.getGithubActivity(
+      id,
+      year ?? String(new Date().getUTCFullYear()),
+    );
   }
 
   /**

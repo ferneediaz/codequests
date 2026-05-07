@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { BattleMode, BattleStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -17,6 +17,7 @@ const PUBLIC_USER_SELECT = {
   email: true,
   username: true,
   avatarUrl: true,
+  githubUsername: true,
   role: true,
   mmr: true,
   wins: true,
@@ -49,6 +50,8 @@ function winLossForCompletedBattle(
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private prisma: PrismaService,
     private practice: PracticeService,
@@ -262,6 +265,255 @@ export class UsersService {
           mmrChange: p.mmrChange ?? undefined,
         })),
       };
+    });
+  }
+
+  /**
+   * GitHub push-event activity for a user, by year. Drives the GH overlay
+   * on the activity heatmap on both Dashboard and `/profile/:username`.
+   *
+   * When `GITHUB_TOKEN` is set we use GraphQL `contributionsCollection`,
+   * which gives the full-year contribution calendar for any public GH
+   * login (a single shared token covers every user we render). Without a
+   * token we fall back to the public events API (PushEvents only,
+   * last ~90 days) so dev still works without configuring a token.
+   */
+  async getGithubActivity(
+    userId: string,
+    year: string,
+  ): Promise<{ username: string | null; commitsByDate: Record<string, number> }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, githubUsername: true },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+    if (!user.githubUsername) {
+      // Common after the column was first introduced: the row exists
+      // but the user hasn't logged in via GitHub since the schema
+      // change, so we have no GH login on file. Heatmap will show
+      // battle activity only.
+      this.logger.debug(
+        `getGithubActivity: user ${userId} has no githubUsername on file (re-login via GitHub to populate it)`,
+      );
+      return { username: null, commitsByDate: {} };
+    }
+
+    const yearNum = parseInt(year, 10);
+    const targetYear = Number.isFinite(yearNum)
+      ? yearNum
+      : new Date().getUTCFullYear();
+    // GitHub GraphQL caps the contribution range at exactly 1 year. Use
+    // the last instant of the target year (Dec 31 23:59:59.999 UTC) so
+    // we stay under that bound — `Date.UTC(year + 1, 0, 1)` is 366 days
+    // away in leap years and gets rejected.
+    const from = new Date(Date.UTC(targetYear, 0, 1));
+    const to = new Date(Date.UTC(targetYear, 11, 31, 23, 59, 59, 999));
+
+    const ghLogin = user.githubUsername;
+    const token = process.env.GITHUB_TOKEN;
+
+    if (token) {
+      const graphqlData = await this.fetchGithubGraphqlActivity(
+        ghLogin,
+        from,
+        to,
+        token,
+      );
+      if (graphqlData) {
+        return { username: ghLogin, commitsByDate: graphqlData };
+      }
+      this.logger.warn(
+        `getGithubActivity: GraphQL returned no data for ${ghLogin} ${targetYear}; falling back to events API (90-day window)`,
+      );
+    } else {
+      this.logger.debug(
+        `getGithubActivity: GITHUB_TOKEN not set; using events-API fallback for ${ghLogin} (90-day window)`,
+      );
+    }
+
+    const eventsData = await this.fetchGithubEventsActivity(
+      ghLogin,
+      from,
+      to,
+      token,
+    );
+    return { username: ghLogin, commitsByDate: eventsData };
+  }
+
+  private async fetchGithubGraphqlActivity(
+    login: string,
+    from: Date,
+    to: Date,
+    token: string,
+  ): Promise<Record<string, number> | null> {
+    try {
+      const res = await fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'codequest-battles',
+        },
+        body: JSON.stringify({
+          query: `
+            query($login: String!, $from: DateTime!, $to: DateTime!) {
+              user(login: $login) {
+                contributionsCollection(from: $from, to: $to) {
+                  contributionCalendar {
+                    weeks {
+                      contributionDays { date contributionCount }
+                    }
+                  }
+                }
+              }
+            }
+          `,
+          variables: { login, from: from.toISOString(), to: to.toISOString() },
+        }),
+      });
+      if (!res.ok) {
+        this.logger.warn(
+          `GH GraphQL ${res.status} for ${login} (range ${from.toISOString()} → ${to.toISOString()})`,
+        );
+        return null;
+      }
+      const json = (await res.json()) as {
+        data?: {
+          user?: {
+            contributionsCollection?: {
+              contributionCalendar?: {
+                weeks?: Array<{
+                  contributionDays?: Array<{
+                    date: string;
+                    contributionCount: number;
+                  }>;
+                }>;
+              };
+            };
+          };
+        };
+        errors?: Array<{ message?: string; type?: string }>;
+      };
+      // GitHub returns HTTP 200 with an `errors` array on bad queries
+      // (invalid date range, missing user, etc). Surface those instead
+      // of silently falling back to the events API.
+      if (json.errors && json.errors.length > 0) {
+        const messages = json.errors
+          .map((e) => e.message ?? e.type ?? 'unknown error')
+          .join('; ');
+        this.logger.warn(
+          `GH GraphQL errors for ${login} (range ${from.toISOString()} → ${to.toISOString()}): ${messages}`,
+        );
+        return null;
+      }
+      const weeks =
+        json.data?.user?.contributionsCollection?.contributionCalendar?.weeks;
+      if (!weeks) {
+        this.logger.warn(
+          `GH GraphQL: no contributionCalendar.weeks for ${login} — likely a non-existent login or private profile`,
+        );
+        return null;
+      }
+      const commitsByDate: Record<string, number> = {};
+      for (const week of weeks) {
+        for (const day of week.contributionDays ?? []) {
+          if (day.contributionCount > 0) {
+            commitsByDate[day.date] = day.contributionCount;
+          }
+        }
+      }
+      this.logger.debug(
+        `GH GraphQL: ${Object.keys(commitsByDate).length} active days for ${login} in ${from.toISOString().slice(0, 4)}`,
+      );
+      return commitsByDate;
+    } catch (err) {
+      this.logger.warn(
+        `GH GraphQL failed for ${login}: ${err instanceof Error ? err.message : err}`,
+      );
+      return null;
+    }
+  }
+
+  private async fetchGithubEventsActivity(
+    login: string,
+    from: Date,
+    to: Date,
+    token: string | undefined,
+  ): Promise<Record<string, number>> {
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'codequest-battles',
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const commitsByDate: Record<string, number> = {};
+    try {
+      for (let page = 1; page <= 10; page++) {
+        const res = await fetch(
+          `https://api.github.com/users/${encodeURIComponent(login)}/events/public?per_page=100&page=${page}`,
+          { headers },
+        );
+        if (!res.ok) {
+          this.logger.warn(
+            `GH events API ${res.status} for ${login} (page ${page})`,
+          );
+          break;
+        }
+        const events = (await res.json()) as Array<{
+          type?: string;
+          created_at?: string;
+          payload?: { size?: number };
+        }>;
+        if (!events.length) break;
+        let outOfRange = 0;
+        for (const event of events) {
+          if (event.type !== 'PushEvent' || !event.created_at) continue;
+          const eventDate = new Date(event.created_at);
+          if (eventDate < from || eventDate >= to) {
+            outOfRange += 1;
+            continue;
+          }
+          const dateKey = event.created_at.slice(0, 10);
+          const commitCount = Math.max(1, event.payload?.size ?? 1);
+          commitsByDate[dateKey] = (commitsByDate[dateKey] ?? 0) + commitCount;
+        }
+        // Once a whole page's events all fall before `from`, the rest will too.
+        if (outOfRange === events.length) break;
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to fetch GH events for ${login}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+    return commitsByDate;
+  }
+
+  /**
+   * Approved problems contributed by this user. Drives the
+   * "Contributions" section on `/profile/:username`.
+   */
+  async getContributions(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    return this.prisma.problem.findMany({
+      where: { contributedById: id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        title: true,
+        difficulty: true,
+        tags: true,
+        createdAt: true,
+      },
     });
   }
 

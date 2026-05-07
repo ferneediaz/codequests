@@ -34,6 +34,14 @@ export const queryKeys = {
     practice: {
         problems: () => ['practice', 'problems'] as const,
         stats: () => ['practice', 'stats'] as const,
+        statsForUser: (userId: string) => ['practice', 'stats', userId] as const,
         problem: (id: string) => ['practice', 'problem', id] as const,
+    },
+    userByUsername: (username: string) =>
+        ['user', 'by-username', username.toLowerCase()] as const,
+    userContributions: (userId: string) =>
+        ['user', userId, 'contributions'] as const,
+    friendStatus: {
+        sent: () => ['friends', 'sent'] as const,
     },
 };

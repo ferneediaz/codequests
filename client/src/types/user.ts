@@ -1,5 +1,7 @@
 import type { BattleMode, BattleParticipant, BattleStatus } from './battle';
 import type { ClanRef } from './clan';
+import type { Difficulty } from './common';
+import type { PracticeStats } from './practice';
 
 export interface RankTier {
     name: string;
@@ -73,7 +75,47 @@ export interface UserStats {
     mmr: number;
     wins: number;
     losses: number;
+    totalGames?: number;
+    winRate?: number;
     tier?: RankTier;
+    practice?: PracticeStats;
+}
+
+/**
+ * Public user view returned by `GET /users/username/:username`. Mirrors
+ * the server `PUBLIC_USER_SELECT` projection — no Stripe IDs, no
+ * onboarding survey columns.
+ */
+export interface PublicUser {
+    id: string;
+    email: string;
+    username: string;
+    avatarUrl: string | null;
+    githubUsername: string | null;
+    role: string;
+    mmr: number;
+    wins: number;
+    losses: number;
+    clanId: string | null;
+    clan: ClanRef | null;
+    subscriptionTier: SubscriptionTier;
+    createdAt: string;
+    updatedAt: string;
+}
+
+/** Approved problem listed in `GET /users/:id/contributions`. */
+export interface ProblemContribution {
+    id: string;
+    title: string;
+    difficulty: Difficulty;
+    tags: string[];
+    createdAt: string;
+}
+
+/** Response shape from `GET /users/:id/github-activity`. */
+export interface GithubActivity {
+    username: string | null;
+    commitsByDate: Record<string, number>;
 }
 
 export interface MatchHistoryEntry {

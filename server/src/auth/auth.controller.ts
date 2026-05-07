@@ -51,6 +51,7 @@ export class AuthController {
       body.username,
       req.user.role,
       body.avatarUrl,
+      body.githubUsername,
     );
   }
 

@@ -86,6 +86,23 @@ export class PracticeController {
         return this.practice.getMyStats(req.user.id);
     }
 
+    /**
+     * Practice stats for any user — drives the practice section on the
+     * public profile page. Same exposure model as `/users/:id/history`:
+     * any authenticated viewer can read another user's solved/attempt
+     * counts.
+     */
+    @Get('stats/:userId')
+    @ApiOperation({ summary: 'Practice stats for a specific user' })
+    @ApiResponse({
+        status: 200,
+        description: 'Aggregated practice stats for the given user',
+        type: PracticeStatsDto,
+    })
+    getStatsForUser(@Param('userId') userId: string) {
+        return this.practice.getMyStats(userId);
+    }
+
     @Get('problems')
     @ApiOperation({
         summary: 'List all practice problems enriched with user progress',

@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
     MoreHorizontal,
     MessageSquare,
     Swords,
     Trash2,
     Loader2,
+    User as UserIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -82,20 +83,28 @@ export function FriendRow({ friend, online }: FriendRowProps) {
 
     return (
         <div className="group flex items-center gap-3 rounded-md border border-transparent px-2 py-2 hover:border-border hover:bg-muted/40">
-            <FriendAvatar
-                username={friend.username}
-                avatarUrl={friend.avatarUrl}
-                online={online}
-            />
-            <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{friend.username}</div>
-                <div className="mt-0.5 flex items-center gap-1.5">
-                    <RankBadge mmr={friend.mmr} className="text-[10px]" />
-                    <span className="text-[10px] text-muted-foreground">
-                        {online ? 'Online' : 'Offline'}
-                    </span>
+            <Link
+                to={`/profile/${friend.username}`}
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title={`View @${friend.username}'s profile`}
+            >
+                <FriendAvatar
+                    username={friend.username}
+                    avatarUrl={friend.avatarUrl}
+                    online={online}
+                />
+                <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium hover:underline">
+                        {friend.username}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                        <RankBadge mmr={friend.mmr} className="text-[10px]" />
+                        <span className="text-[10px] text-muted-foreground">
+                            {online ? 'Online' : 'Offline'}
+                        </span>
+                    </div>
                 </div>
-            </div>
+            </Link>
             {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : (
@@ -110,6 +119,12 @@ export function FriendRow({ friend, online }: FriendRowProps) {
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                            onClick={() => navigate(`/profile/${friend.username}`)}
+                        >
+                            <UserIcon className="h-4 w-4" />
+                            View profile
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => void handleMessage()}>
                             <MessageSquare className="h-4 w-4" />
                             Message

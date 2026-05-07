@@ -33,8 +33,15 @@ export default function AuthCallback() {
                 const providerAvatar =
                     (session.user.user_metadata?.avatar_url as string | undefined) ??
                     (session.user.user_metadata?.picture as string | undefined);
+                const provider = session.user.app_metadata?.provider as string | undefined;
+                const githubUsername =
+                    provider === 'github'
+                        ? ((session.user.user_metadata?.user_name as string | undefined) ??
+                          (session.user.user_metadata?.preferred_username as string | undefined))
+                        : undefined;
                 await api.post('/auth/sync', {
                     ...(providerAvatar ? { avatarUrl: providerAvatar } : {}),
+                    ...(githubUsername ? { githubUsername } : {}),
                 });
                 const { data: user } = await api.get<User>('/auth/me');
 

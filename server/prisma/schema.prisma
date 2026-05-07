@@ -53,11 +53,12 @@ enum AvatarSource {
 // ============================================
 
 model User {
-  id        String  @id @default(uuid())
-  email     String  @unique
-  username  String  @unique
-  avatarUrl String?
-  role      String  @default("user") // "user" or "admin"
+  id             String  @id @default(uuid())
+  email          String  @unique
+  username       String  @unique
+  avatarUrl      String?
+  githubUsername String?
+  role           String  @default("user") // "user" or "admin"
 
   // Onboarding & profile survey (null until user completes POST /auth/onboarding)
   onboardingCompletedAt DateTime?
