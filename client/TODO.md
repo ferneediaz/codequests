@@ -342,7 +342,7 @@ needed.
 - Winner celebration sequence on results page:
   1. [x] Confetti burst animation (3-5 seconds) — `pages/battle/results/components/VictoryConfetti.tsx` (4 corner-bursts over ~3s, palette `#fbbf24/#f59e0b/#3b82f6/#22c55e`)
   2. [x] MMR delta count-up in header (0 → delta with sign) — `MmrCountUp.tsx`
-  3. [x] Per-player MMR cell counts up/down — same component, in the 2x2 stat grid
+  3. [x] Per-player MMR cell counts up/down — same component, in the 2x2 stat grid for 1v1 and on each BR podium card
   4. [ ] Win streak counter displayed (if streak > 1): "🔥 3 Win Streak!" — blocked on server exposing `participant.user.currentWinStreak` (TODO marker in `Results.tsx`)
   5. [x] Rank badge animation: old badge → flash → new badge with glow — `RankUpFlash.tsx` (only triggers when tier crosses)
   6. [ ] Sound fanfare (victory jingle, ~3 seconds) — deferred to [Phase 2.7](client/TODO.md#27-sound-system)
@@ -597,7 +597,7 @@ needed.
   - [x] "FINAL ROUND" banner
   - [x] 2 players remaining
   - [x] Standard 1v1-style editor/submit format
-  - [ ] Adopt §2.3 win celebration on the BR podium (`VictoryConfetti` / `MmrCountUp` / `RankUpFlash` exist; podium card at `Results.tsx:99-235` still static)
+  - [x] Adopt §2.3 win celebration on the BR podium — `VictoryConfetti` mounts once when the viewer placed 1st; every podium card now uses `RankUpFlash` (mirrors `PlayerStatCard`'s old/new MMR derivation) and `MmrCountUp` for the MMR delta
 - [x] Overall standings at end:
   - [x] 1st, 2nd, 3rd place with podium-style display
   - [x] MMR changes for podium players

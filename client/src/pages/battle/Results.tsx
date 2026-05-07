@@ -19,6 +19,9 @@ import type {
 import { formatSeconds } from '@/pages/battle/play/utils';
 import { ResultHeader } from '@/pages/battle/results/components/ResultHeader';
 import { PlayerStatCard } from '@/pages/battle/results/components/PlayerStatCard';
+import { VictoryConfetti } from '@/pages/battle/results/components/VictoryConfetti';
+import { MmrCountUp } from '@/pages/battle/results/components/MmrCountUp';
+import { RankUpFlash } from '@/pages/battle/results/components/RankUpFlash';
 import { toast } from 'sonner';
 
 function participantName(p: BattleParticipant) {
@@ -73,9 +76,12 @@ export default function Results() {
             return aPlacement - bPlacement;
         });
         const podium = byPlacement.slice(0, 3);
+        const iWonRoyale =
+            !!userId && byPlacement.find((s) => s.userId === userId)?.placement === 1;
 
         return (
             <div className="mx-auto max-w-6xl px-4 py-8">
+                {iWonRoyale && <VictoryConfetti />}
                 <div className="mb-8 text-center">
                     <Trophy className="mx-auto mb-2 h-12 w-12 text-yellow-500" />
                     <h1 className="text-3xl font-bold text-foreground">
@@ -127,8 +133,12 @@ export default function Results() {
                                             )}
                                         </p>
                                         {participant?.user && (
-                                            <RankBadge
-                                                mmr={participant.user.mmr}
+                                            <RankUpFlash
+                                                oldMmr={
+                                                    participant.user.mmr -
+                                                    (participant.mmrChange ?? 0)
+                                                }
+                                                newMmr={participant.user.mmr}
                                                 className="mt-1 text-xs"
                                             />
                                         )}
@@ -141,8 +151,12 @@ export default function Results() {
                                                     : 'text-red-500'
                                             }`}
                                         >
-                                            {participant.mmrChange >= 0 ? '+' : ''}
-                                            {participant.mmrChange} MMR
+                                            <MmrCountUp
+                                                from={0}
+                                                to={participant.mmrChange}
+                                                formatSign
+                                            />{' '}
+                                            MMR
                                         </p>
                                     )}
                                 </CardContent>
