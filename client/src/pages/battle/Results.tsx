@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { CodeEditor } from '@/components/battle/CodeEditor';
 import { BattleChat } from '@/components/battle/BattleChat';
-import { Loader2, ArrowLeft, Trophy, RotateCcw, Frown } from 'lucide-react';
+import { Loader2, ArrowLeft, Trophy, RotateCcw } from 'lucide-react';
 import { battlesApi } from '@/services/battles';
 import { queryKeys } from '@/lib/queryKeys';
 import type {
@@ -17,34 +17,12 @@ import type {
     BattleRoundStatus,
 } from '@/types/api';
 import { formatSeconds } from '@/pages/battle/play/utils';
+import { ResultHeader } from '@/pages/battle/results/components/ResultHeader';
+import { PlayerStatCard } from '@/pages/battle/results/components/PlayerStatCard';
 import { toast } from 'sonner';
 
 function participantName(p: BattleParticipant) {
     return p.username || p.user?.username || 'Player';
-}
-
-function StatCell({ label, value }: { label: string; value: React.ReactNode }) {
-    return (
-        <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {label}
-            </p>
-            <p className="mt-0.5 text-sm font-mono">{value}</p>
-        </div>
-    );
-}
-
-function timeTakenSeconds(
-    submittedAt: string | undefined,
-    startedAt: string | undefined,
-): number | null {
-    if (!submittedAt || !startedAt) return null;
-    return Math.max(
-        0,
-        Math.round(
-            (new Date(submittedAt).getTime() - new Date(startedAt).getTime()) / 1000,
-        ),
-    );
 }
 
 export default function Results() {
@@ -255,107 +233,25 @@ export default function Results() {
 
     return (
         <div className="mx-auto max-w-5xl px-4 py-8">
-            {/* Result header */}
-            <div className="mb-8 text-center">
-                {isDraw ? (
-                    <h1 className="text-3xl font-bold text-muted-foreground">Draw</h1>
-                ) : iWon ? (
-                    <div>
-                        <Trophy className="mx-auto mb-2 h-12 w-12 text-yellow-500" />
-                        <h1 className="text-3xl font-bold text-green-500">Victory!</h1>
-                    </div>
-                ) : (
-                    <div>
-                        <Frown className="mx-auto mb-2 h-12 w-12 text-muted-foreground" />
-                        <h1 className="text-3xl font-bold text-red-500">Defeat</h1>
-                    </div>
-                )}
-                {myMmrDelta != null && !isDraw && (
-                    <p
-                        className={`mt-2 text-2xl font-mono font-semibold ${
-                            myMmrDelta >= 0 ? 'text-green-500' : 'text-red-500'
-                        }`}
-                    >
-                        {myMmrDelta >= 0 ? '+' : ''}
-                        {myMmrDelta} MMR
-                    </p>
-                )}
-            </div>
+            <ResultHeader
+                outcome={isDraw ? 'draw' : iWon ? 'win' : 'loss'}
+                mmrDelta={isDraw ? null : (myMmrDelta ?? null)}
+            />
+            {/* TODO(2.3): render WinStreakBadge once server exposes participant.user.currentWinStreak */}
 
             {/* Player cards */}
             <div className="mb-8 grid gap-4 md:grid-cols-2">
                 {[me, opponent].map((player) => {
                     if (!player) return null;
-                    const isWinner = battle.winnerId === player.userId;
-                    const isMe = player.userId === userId;
-
                     return (
-                        <Card
+                        <PlayerStatCard
                             key={player.userId}
-                            className={
-                                isWinner
-                                    ? 'border-green-500/50'
-                                    : isDraw
-                                        ? 'border-border'
-                                        : 'border-red-500/30'
-                            }
-                        >
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center justify-between">
-                                    <span className="flex flex-wrap items-center gap-2">
-                                        {participantName(player)}
-                                        {player.user && (
-                                            <RankBadge
-                                                mmr={player.user.mmr}
-                                                className="text-xs"
-                                            />
-                                        )}
-                                        {isMe && (
-                                            <span className="text-xs text-muted-foreground">(you)</span>
-                                        )}
-                                    </span>
-                                    {isWinner && <Trophy className="h-5 w-5 text-yellow-500" />}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <StatCell
-                                        label="Tests"
-                                        value={`${player.testsPassed}/${player.totalTests}`}
-                                    />
-                                    <StatCell
-                                        label="Time"
-                                        value={(() => {
-                                            const seconds = timeTakenSeconds(
-                                                player.submittedAt,
-                                                battle.startedAt,
-                                            );
-                                            return seconds != null ? formatSeconds(seconds) : '—';
-                                        })()}
-                                    />
-                                    <StatCell label="Language" value={player.language ?? '—'} />
-                                    <StatCell
-                                        label="MMR"
-                                        value={
-                                            player.mmrChange != null ? (
-                                                <span
-                                                    className={
-                                                        player.mmrChange >= 0
-                                                            ? 'text-green-500'
-                                                            : 'text-red-500'
-                                                    }
-                                                >
-                                                    {player.mmrChange >= 0 ? '+' : ''}
-                                                    {player.mmrChange}
-                                                </span>
-                                            ) : (
-                                                '—'
-                                            )
-                                        }
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
+                            player={player}
+                            isMe={player.userId === userId}
+                            isWinner={battle.winnerId === player.userId}
+                            isDraw={isDraw}
+                            battleStartedAt={battle.startedAt}
+                        />
                     );
                 })}
             </div>

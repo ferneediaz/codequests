@@ -77,9 +77,9 @@
 
 1. **Battle Royale UI ([Phase 4.1](client/TODO.md#client-phase-4-1-battle-royale-ui))** — in-game multi-round BR flow is in place.
    Follow up with manual 6-8 player playtesting once enough clients are available.
-2. **Push notifications ([3.5](client/TODO.md#client-phase-3-5-in-app-notifications))** — next social/system follow-up after BR playtesting.
+2. **Win Celebrations ([Phase 2.3](client/TODO.md#23-win-celebrations))** — confetti + MMR count-up + rank-up flash on Results landed; sound + win streak deferred (sound waits on §2.7, streak waits on a server `currentWinStreak` field).
 
-Avoid Achievements until their server TODOs close out.
+Avoid Achievements until their server TODOs close out. Web push (out-of-app browser notifications) is not yet scoped — §3.5 covers in-app only.
 
 ---
 
@@ -188,7 +188,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 ### 1.4 Dashboard Page ✅
 - [x] Quick Play button (prominent, top of page → navigates to `/play`)
 - [x] Stats overview card: MMR, rank badge (with icon + color via `RankBadge` component), W/L record
-- [ ] Activity heatmap component (GitHub-style, placeholder data initially until backend supports it)
+- [x] Activity heatmap component (GitHub-style, real battle history + GitHub commits via `getHeatmapBounds` / `buildHeatmap`, year selector)
 - [x] Recent activity feed (last 5 battles from `GET /api/users/:id/history`)
 - [ ] Remaining free games badge (if free tier, shows "1 game remaining today" or "Pro ∞")
 - [x] **Success Criteria:** Dashboard loads with real user data after login ✅
@@ -336,19 +336,20 @@ needed.
   - [x] Skill descriptions on hover
 - [x] **Success Criteria:** Skills work in-battle: use on opponent → they see effect → skill greys out ✅
 
-### 2.3 Win Celebrations
-- [ ] Install confetti library (e.g., `canvas-confetti` or `react-confetti`)
-- [ ] Install animation library (e.g., `framer-motion`)
-- [ ] Winner celebration sequence on results page:
-  1. [ ] Confetti burst animation (3-5 seconds)
-  2. [ ] MMR counter animation: old MMR → new MMR counting up digit by digit
-  3. [ ] Opponent's MMR counter going down
-  4. [ ] Win streak counter displayed (if streak > 1): "🔥 3 Win Streak!"
-  5. [ ] Rank badge animation: if rank changed, old badge → flash → new badge with glow
-  6. [ ] Sound fanfare (victory jingle, ~3 seconds)
-- [ ] Loser screen: muted colors, MMR going down, "Better luck next time" message
-- [ ] Stats summary card with animation (tests passed, time taken, language)
-- [ ] **Success Criteria:** Winning feels satisfying — confetti, numbers counting up, rank glow, sound ✅
+### 2.3 Win Celebrations (Partial)
+- [x] Install confetti library — `canvas-confetti` already in deps; reused the SubmissionFeedback pattern
+- [x] No animation library — `framer-motion` not needed; rAF count-up + Tailwind utilities cover the required animations
+- Winner celebration sequence on results page:
+  1. [x] Confetti burst animation (3-5 seconds) — `pages/battle/results/components/VictoryConfetti.tsx` (4 corner-bursts over ~3s, palette `#fbbf24/#f59e0b/#3b82f6/#22c55e`)
+  2. [x] MMR delta count-up in header (0 → delta with sign) — `MmrCountUp.tsx`
+  3. [x] Per-player MMR cell counts up/down — same component, in the 2x2 stat grid
+  4. [ ] Win streak counter displayed (if streak > 1): "🔥 3 Win Streak!" — blocked on server exposing `participant.user.currentWinStreak` (TODO marker in `Results.tsx`)
+  5. [x] Rank badge animation: old badge → flash → new badge with glow — `RankUpFlash.tsx` (only triggers when tier crosses)
+  6. [ ] Sound fanfare (victory jingle, ~3 seconds) — deferred to [Phase 2.7](client/TODO.md#27-sound-system)
+- [x] Loser screen: muted Frown header, "Better luck next time." line, MMR counts down via negative delta — `ResultHeader.tsx`
+- [x] Honor `prefers-reduced-motion` — all animations snap to final state; confetti suppressed
+- [x] Stats summary card already present (TestsPassed / Time / Language / MMR 2x2 grid from §1.7) — animation now wraps the MMR cell
+- [ ] **Success Criteria:** Winning feels satisfying — confetti, numbers counting up, rank glow ✅ ; sound fanfare still pending §2.7
 
 ### 2.4 Game Creation Wizard ✅
 - [x] Step 1: **Mode Selection**
@@ -596,7 +597,7 @@ needed.
   - [x] "FINAL ROUND" banner
   - [x] 2 players remaining
   - [x] Standard 1v1-style editor/submit format
-  - [ ] Full win celebration for champion ([Phase 2.3](client/TODO.md#23-win-celebrations) polish)
+  - [ ] Adopt §2.3 win celebration on the BR podium (`VictoryConfetti` / `MmrCountUp` / `RankUpFlash` exist; podium card at `Results.tsx:99-235` still static)
 - [x] Overall standings at end:
   - [x] 1st, 2nd, 3rd place with podium-style display
   - [x] MMR changes for podium players
@@ -786,15 +787,8 @@ starter (so users never see the contributor's reference solution).
   - [ ] "Play CodeQuest" CTA for non-users
 - [ ] **Success Criteria:** Share card generates, looks good on Twitter/Discord, link has OG preview ✅
 
-### 5.2 Quick Play Presets
-- [ ] Preset manager (accessible from dashboard or `/play`):
-  - [ ] List saved presets (name, settings summary)
-  - [ ] "Play" button per preset (instant queue with those settings)
-  - [ ] Edit preset name
-  - [ ] Delete preset
-- [ ] Default preset: "Quick 1v1" (1v1, 1 problem, 5 min, any difficulty, no skills)
-- [ ] Store presets in localStorage (sync to backend later)
-- [ ] **Success Criteria:** Can save, load, and play from presets ✅
+### 5.2 ~~Quick Play Presets~~ — DUPLICATE
+Shipped as [Phase 2.5](client/TODO.md#25-quick-play): `/play/quick` lists/renames/deletes presets, the built-in "Quick 1v1" default is uneditable, and presets persist via `useQuickPlayPresets` localStorage hook. Server sync remains as a 2.5 follow-up.
 
 ### 5.3 Rank Display Polish
 - [ ] Rank badges with custom icons (not emoji — designed SVGs or icons):
