@@ -7,12 +7,11 @@
 ## Context Reference Rules
 
 - When referencing a numbered section outside its own section, always include a markdown link.
-- Preferred format: `Feature name ([3.5](client/TODO.md#client-phase-3-5-in-app-notifications))` or `Module ([Push Notifications](server/TODO.md#server-todo-push-notifications))`.
+- Preferred format: `Feature name ([3.5](client/TODO.md#client-phase-3-5-in-app-notifications))` or `Module ([Battle Royale Elimination](server/TODO.md#server-completed-battle-royale-elimination))`.
 - Do not write bare references like `3.5` in summaries, issue templates, or import notes.
 
 **Quick context links (for issue bodies):**
 - Client Phase 3.5 In-app Notifications: [client/TODO.md#client-phase-3-5-in-app-notifications](client/TODO.md#client-phase-3-5-in-app-notifications)
-- Server Push Notifications TODO: [server/TODO.md#server-todo-push-notifications](server/TODO.md#server-todo-push-notifications)
 - Server Battle Royale Elimination (completed): [server/TODO.md#server-completed-battle-royale-elimination](server/TODO.md#server-completed-battle-royale-elimination)
 
 ---
@@ -941,65 +940,41 @@ Multi-round elimination for Battle Royale mode.
 
 ---
 
-## 📋 TODO - Advanced Rankings (MEDIUM PRIORITY)
+## ✅ Advanced Rankings - COMPLETED
 
-Enhanced leaderboard features.
+Time-windowed leaderboards with language filter and friends scope.
 
-### Task Breakdown:
+### Completed:
 
-#### 1. Time-based Rankings
-- [ ] Daily leaderboard (filter by games played today)
-- [ ] Weekly leaderboard
-- [ ] Monthly leaderboard
-- [ ] All-time leaderboard (already exists)
-- [ ] **Success Criteria:** Time-based queries working ✅
+#### 1. Time-based Rankings ✅
+- [x] Daily / Weekly / Monthly / All-time periods (UTC calendar boundaries — daily = today 00:00Z, weekly = ISO Monday 00:00Z, monthly = month-1st 00:00Z)
+- [x] Filter on `Battle.endedAt` (not `createdAt`) — matches when stats are finalized
 
-#### 2. Ranking APIs
-- [ ] `GET /api/rankings/global?period=daily|weekly|monthly|alltime`
-- [ ] `GET /api/rankings/clans`
-- [ ] `GET /api/rankings/friends` — Leaderboard among friends (requires friends system)
-- [ ] Filter by language (most wins with specific language)
-- [ ] **Success Criteria:** API tests passing ✅
+#### 2. Ranking APIs ✅
+- [x] `GET /api/rankings/global?period=daily|weekly|monthly|alltime&language=&limit=&offset=` (public)
+- [x] `GET /api/rankings/clans?period=...` (public)
+- [x] `GET /api/rankings/friends?period=...` (auth required; always includes the viewer)
+- [x] `?language=` query param: case-insensitive match against `BattleParticipant.language`; sort flips to `winsInLanguage DESC` with `mmrGained` tiebreaker
+- [x] Swagger documentation under the `rankings` tag
 
-#### 3. Tests
-- [ ] Time-based filter tests
-- [ ] Clan ranking tests
-- [ ] Friends ranking tests
-- [ ] Language filter tests
-- [ ] **Success Criteria:** All ranking tests passing ✅
+#### 3. Implementation Notes ✅
+- [x] Sort metric for time-windowed user rankings: `SUM(BattleParticipant.mmrChange) DESC` (mmrGained), with `wins` as tiebreaker
+- [x] Sort metric for time-windowed clan rankings: `winsInPeriod DESC`, with `clan.mmr DESC` tiebreaker
+- [x] Clan team→clan resolution: prefer `Battle.teamOneClanId`/`teamTwoClanId` (Clan Wars), fall back to `participant.user.clanId` (legacy CLAN_VS_CLAN). Skip temp-clan Clan Wars battles
+- [x] Aggregation done in JS (single `findMany` round-trip + reduce) — `groupBy` can't compute conditional W/L counts derived from `(mode, teamId, winnerId, winningTeam)` plus per-language wins
+- [x] Limit capped at 100; default 50; offset-based pagination matches `/users` and `/clans`
+- [x] Caveat documented in service: `GROUP` and `CLAN_VS_CLAN` write `mmrChange=0` server-side and so don't contribute to `mmrGained` totals
 
----
-
-<a id="server-todo-push-notifications"></a>
-## 📋 TODO - Push Notifications (MEDIUM PRIORITY)
-
-Browser push notifications for key events.
-
-### Task Breakdown:
-
-#### 1. Prisma Schema Updates
-- [ ] Add `PushSubscription` model (id, userId, endpoint, p256dh, auth, createdAt)
-- [ ] Run migration
-- [ ] **Success Criteria:** Schema compiles ✅
-
-#### 2. Push Service
-- [ ] Create `notifications/` module
-- [ ] `subscribe(userId, subscription)` — Store push subscription
-- [ ] `unsubscribe(userId, endpoint)` — Remove push subscription
-- [ ] `sendNotification(userId, title, body, data?)` — Send push to user
-- [ ] Generate VAPID keys for web push
-- [ ] **Success Criteria:** Push notifications delivered ✅
-
-#### 3. Integration Points
-- [ ] Notify on: match found, battle invite received, friend request, clan challenge
-- [ ] `POST /api/notifications/subscribe` — Register push subscription
-- [ ] `DELETE /api/notifications/subscribe` — Unregister
-- [ ] **Success Criteria:** Notifications fire for all triggers ✅
-
-#### 4. Tests
-- [ ] Subscription storage tests
-- [ ] Notification delivery tests
-- [ ] **Success Criteria:** All notification tests passing ✅
+#### 4. Tests ✅
+- [x] 22 tests in `rankings.service.spec.ts`
+  - [x] `periodToWindow` boundary cases including ISO Monday on a Sunday/Monday
+  - [x] Global alltime fast path (sort, tier, rank, offset, limit cap)
+  - [x] Global period window (mmrGained sort, wins/losses derivation, draws, empty case)
+  - [x] Language filter (case-insensitive equals, sort by winsInLanguage, optional field)
+  - [x] Clan alltime sort + tier
+  - [x] Clan period: CLAN_VS_CLAN via `participant.user.clanId`, CLAN_WARS via team-clan columns, temp-clan skip, draws excluded
+  - [x] Friends rankings always include viewer; restrict participant query to viewer + friends
+- [x] **Success Criteria:** All 22 rankings tests passing; full server suite (787 tests) green ✅
 
 ---
 
@@ -1178,11 +1153,11 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [x] **Chat: All tests passing ✅ (38 tests - 19 service + 19 gateway)**
 - [x] **Clan Challenges: All tests passing ✅ (30 service + 4 gateway = 34 tests)**
 - [x] **Battle Royale Elimination: All tests passing** ✅
+- [x] **Rankings: All tests passing ✅ (22 tests)**
 - [ ] **Achievements: All tests passing** ⏳
-- [ ] **Notifications: All tests passing** ⏳
 - [ ] **E2E Tests: Full flow working** ⏳
 
-**Total: 432 tests passing** ✅
+**Total: 787 tests passing** ✅
 
 ### E2E Test Scenarios:
 - [ ] User signs up → syncs to DB → appears on leaderboard
@@ -1278,14 +1253,13 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [x] Friends system working (request/accept/remove, online status) ✅
 - [x] Chat system working (battle, lobby, DM) ✅
 - [x] Clan challenges working (send/accept/decline/counter, negotiable settings) ✅
-- [ ] Push notifications working
-- [ ] **All tests passing**
+- [x] **All tests passing** ✅
 
 ### Phase 5: Advanced Game Modes
 - [x] Battle Royale elimination rounds working (configurable rounds and eliminations)
 - [x] Configurable BR formats (same problem + score attack)
-- [ ] Advanced rankings (time-based, by language, friends, clans)
-- [ ] **All tests passing**
+- [x] Advanced rankings (time-based, by language, friends, clans) ✅
+- [x] **All tests passing** ✅
 
 ### Phase 6: Content & Polish
 - [ ] Achievements system working (11 achievement types)
@@ -1317,9 +1291,8 @@ Track daily activity for GitHub-style heatmap on profiles.
 | Friends System | MEDIUM | — |
 | Chat System | MEDIUM | WebSockets (done) |
 | Clan Challenges | ~~MEDIUM~~ ✅ | Clans (done) |
-| Push Notifications | MEDIUM | — |
 | Battle Royale Elimination | ~~MEDIUM~~ ✅ | Battles (done) |
-| Advanced Rankings | MEDIUM | Friends |
+| Advanced Rankings | ~~MEDIUM~~ ✅ | Friends (done) |
 | Achievements | LOW | Battles (done) |
 | Problem Contribution | LOW | Problems (done) |
 | Share Image | LOW | Battles (done) |

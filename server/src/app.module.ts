@@ -18,6 +18,7 @@ import { AuthoringModule } from './problems/authoring/authoring.module';
 import { LobbyModule } from './lobby/lobby.module';
 import { ProblemSubmissionsModule } from './problem-submissions/problem-submissions.module';
 import { AchievementsModule } from './achievements/achievements.module';
+import { RankingsModule } from './rankings/rankings.module';
 
 @Module({
     imports: [
@@ -55,8 +56,8 @@ import { AchievementsModule } from './achievements/achievements.module';
         // Achievements (catalog + per-user unlocks). Definitions seed on boot.
         AchievementsModule,
 
-        // TODO: Add these modules as we build them
-        // RankingsModule,
+        // Time-windowed leaderboards (global / clans / friends).
+        RankingsModule,
     ],
 })
 export class AppModule { }
