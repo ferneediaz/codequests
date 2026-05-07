@@ -48,4 +48,5 @@ export const queryKeys = {
         mine: () => ['achievements', 'mine'] as const,
         forUser: (userId: string) => ['achievements', userId] as const,
     },
+    leaderboard: (limit: number) => ['leaderboard', limit] as const,
 };

@@ -1,6 +1,7 @@
 import api from './api';
 import type {
     GithubActivity,
+    LeaderboardUser,
     MatchHistoryEntry,
     NewsFilter,
     NewsResponse,
@@ -24,6 +25,13 @@ export async function searchUsers(
 ): Promise<UserSearchResult[]> {
     const { data } = await api.get<UserSearchResult[]>('/users/search', {
         params: { q, limit },
+    });
+    return data;
+}
+
+export async function getLeaderboard(limit = 10): Promise<LeaderboardUser[]> {
+    const { data } = await api.get<LeaderboardUser[]>('/users', {
+        params: { limit },
     });
     return data;
 }

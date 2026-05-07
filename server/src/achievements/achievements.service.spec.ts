@@ -105,18 +105,65 @@ describe('AchievementsService', () => {
     });
 
     describe('seedDefinitions', () => {
-        it('upserts every definition exactly once', async () => {
+        it('upserts every definition with id-matching where + full create + full update payloads', async () => {
             prisma.achievement.upsert.mockResolvedValue({});
+
             await service.seedDefinitions();
+
             expect(prisma.achievement.upsert).toHaveBeenCalledTimes(
                 ACHIEVEMENT_DEFINITIONS.length,
             );
-            // Spot-check that we passed slug + title in the create payload.
-            const firstCall = prisma.achievement.upsert.mock.calls[0][0];
-            expect(firstCall.where.id).toBe(ACHIEVEMENT_DEFINITIONS[0].id);
-            expect(firstCall.create.title).toBe(
-                ACHIEVEMENT_DEFINITIONS[0].title,
+
+            // Per-definition exact-shape assertion — catches partial misses
+            // (skipped definitions), drift between `create` and `update`
+            // payloads, and any field accidentally dropped from `update`
+            // (which would silently leave stale catalog rows in prod).
+            for (const def of ACHIEVEMENT_DEFINITIONS) {
+                expect(prisma.achievement.upsert).toHaveBeenCalledWith({
+                    where: { id: def.id },
+                    create: {
+                        id: def.id,
+                        title: def.title,
+                        description: def.description,
+                        icon: def.icon,
+                        category: def.category,
+                        tier: def.tier,
+                        sortOrder: def.sortOrder,
+                    },
+                    update: {
+                        title: def.title,
+                        description: def.description,
+                        icon: def.icon,
+                        category: def.category,
+                        tier: def.tier,
+                        sortOrder: def.sortOrder,
+                    },
+                });
+            }
+        });
+
+        it('propagates upsert failures (so missing tables / DB outages fail boot loudly)', async () => {
+            // Regression guard against a "lazy fix" that wraps seedDefinitions
+            // in try/catch — schema drift (e.g. Achievement table missing)
+            // must crash boot, not silently degrade the catalog.
+            const dbError = new Error(
+                'P2021: The table `public.Achievement` does not exist',
             );
+            prisma.achievement.upsert.mockRejectedValue(dbError);
+
+            await expect(service.seedDefinitions()).rejects.toBe(dbError);
+        });
+
+        it('onModuleInit awaits seedDefinitions and surfaces its failure', async () => {
+            // Guard the boot path itself: forgetting `await` or swallowing
+            // the error in onModuleInit would re-introduce the silent-failure
+            // mode this test suite is here to prevent.
+            const dbError = new Error(
+                'P2021: The table `public.Achievement` does not exist',
+            );
+            prisma.achievement.upsert.mockRejectedValue(dbError);
+
+            await expect(service.onModuleInit()).rejects.toBe(dbError);
         });
     });
 

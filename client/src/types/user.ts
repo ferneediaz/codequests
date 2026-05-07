@@ -82,6 +82,21 @@ export interface UserStats {
 }
 
 /**
+ * Public row shape returned by `GET /users?limit=N`. Mirrors the projection
+ * in `users.service.ts#findAll` — only `clan.tag` + `clan.name`, no `clan.id`.
+ */
+export interface LeaderboardUser {
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+    mmr: number;
+    wins: number;
+    losses: number;
+    clan: { tag: string; name: string } | null;
+    tier: RankTier;
+}
+
+/**
  * Public user view returned by `GET /users/username/:username`. Mirrors
  * the server `PUBLIC_USER_SELECT` projection — no Stripe IDs, no
  * onboarding survey columns.

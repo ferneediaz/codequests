@@ -50,6 +50,7 @@ export type {
     PublicUser,
     ProblemContribution,
     GithubActivity,
+    LeaderboardUser,
 } from './user';
 export type {
     NewsItemType,

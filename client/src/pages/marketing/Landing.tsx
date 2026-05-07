@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
+import { TopLeaderboard } from './components/TopLeaderboard';
 import {
     Swords,
     Zap,
@@ -617,6 +618,7 @@ export default function Landing() {
             <Features />
             <Stats />
             <RankShowcase />
+            <TopLeaderboard />
             <FAQ />
             <FinalCTA />
             <Footer />

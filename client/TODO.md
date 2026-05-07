@@ -176,7 +176,7 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 ### 1.3 Landing Page ✅
 - [x] Clean minimal hero section with tagline + CTA button ("Start Battling" → `/login` or `/dashboard`)
 - [x] Brief feature highlights section (3-4 cards: battle, compete, climb ranks)
-- [ ] Top 10 leaderboard preview (public, fetched from `GET /api/users?limit=10`)
+- [x] Top 10 leaderboard preview (public, fetched from `GET /api/users?limit=10`) — `pages/marketing/components/TopLeaderboard.tsx` rendered between RankShowcase and FAQ
 - [x] Footer with links
 - [x] Redirect logged-in users from `/` to `/dashboard`
 - [x] Scroll-triggered fade/slide/scale animations using IntersectionObserver
