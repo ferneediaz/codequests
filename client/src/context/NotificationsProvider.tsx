@@ -42,7 +42,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     }, [notifications]);
 
     const push = useCallback(
-        (notification: Omit<InAppNotification, 'id' | 'createdAt' | 'read'>) => {
+        (
+            notification: Omit<InAppNotification, 'id' | 'createdAt' | 'read'>,
+            options?: { silent?: boolean },
+        ) => {
             const item: InAppNotification = {
                 ...notification,
                 id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -50,6 +53,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
                 read: false,
             };
             setNotifications((prev) => [item, ...prev].slice(0, 30));
+            if (options?.silent) return;
             toast(item.title, {
                 description: item.body,
                 action: item.href
@@ -157,12 +161,18 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             void queryClient.invalidateQueries({
                 queryKey: queryKeys.achievements.mine(),
             });
-            push({
-                kind: 'ACHIEVEMENT_UNLOCKED',
-                title: `Achievement unlocked: ${data.title}`,
-                body: data.description,
-                href: '/dashboard',
-            });
+            // Battle-scoped unlocks are owned by the on-Results popup; we
+            // still record them in the bell history so the user has a trail,
+            // but skip the duplicate sonner toast.
+            push(
+                {
+                    kind: 'ACHIEVEMENT_UNLOCKED',
+                    title: `Achievement unlocked: ${data.title}`,
+                    body: data.description,
+                    href: '/dashboard',
+                },
+                { silent: !!data.battleId },
+            );
         };
 
         socket.on('friend.request_received', onFriendRequest);

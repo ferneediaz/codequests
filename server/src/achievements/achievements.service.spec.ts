@@ -512,6 +512,37 @@ describe('AchievementsService', () => {
             expect(payload.tier).toBe('bronze');
             expect(payload.unlockedAt).toBeInstanceOf(Date);
         });
+
+        it('includes battleId on the payload when ctx has a battle', async () => {
+            await service.runChecks(buildBattleCtx({ userWins: 1 }));
+            const calls = (
+                events.emitAchievementUnlocked as jest.Mock
+            ).mock.calls;
+            expect(calls.length).toBeGreaterThan(0);
+            for (const [, payload] of calls) {
+                expect(payload.battleId).toBe('battle-1');
+            }
+        });
+
+        it('omits battleId when ctx has no battle (e.g. season-top runs)', async () => {
+            prisma.user.findUnique.mockResolvedValue({
+                wins: 50,
+                losses: 50,
+                mmr: 1500,
+            });
+            await service.runChecksForSeasonTop({
+                userId: 'user-1',
+                seasonId: 'season-1',
+                placement: 42,
+            });
+            const calls = (
+                events.emitAchievementUnlocked as jest.Mock
+            ).mock.calls;
+            expect(calls.length).toBeGreaterThan(0);
+            for (const [, payload] of calls) {
+                expect(payload.battleId).toBeUndefined();
+            }
+        });
     });
 
     describe('runChecksForSeasonTop', () => {

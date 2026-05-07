@@ -193,6 +193,7 @@ export class AchievementsService implements OnModuleInit {
                 icon: def.icon,
                 tier: def.tier,
                 unlockedAt: now,
+                ...(ctxInput.battle ? { battleId: ctxInput.battle.id } : {}),
             });
         }
 

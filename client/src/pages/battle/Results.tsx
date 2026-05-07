@@ -22,6 +22,7 @@ import { PlayerStatCard } from '@/pages/battle/results/components/PlayerStatCard
 import { VictoryConfetti } from '@/pages/battle/results/components/VictoryConfetti';
 import { MmrCountUp } from '@/pages/battle/results/components/MmrCountUp';
 import { RankUpFlash } from '@/pages/battle/results/components/RankUpFlash';
+import { AchievementUnlockOverlay } from '@/pages/battle/results/components/AchievementUnlockOverlay';
 import { toast } from 'sonner';
 
 function participantName(p: BattleParticipant) {
@@ -82,6 +83,7 @@ export default function Results() {
         return (
             <div className="mx-auto max-w-6xl px-4 py-8">
                 {iWonRoyale && <VictoryConfetti />}
+                <AchievementUnlockOverlay battleId={battle.id} />
                 <div className="mb-8 text-center">
                     <Trophy className="mx-auto mb-2 h-12 w-12 text-yellow-500" />
                     <h1 className="text-3xl font-bold text-foreground">
@@ -247,6 +249,7 @@ export default function Results() {
 
     return (
         <div className="mx-auto max-w-5xl px-4 py-8">
+            <AchievementUnlockOverlay battleId={battle.id} />
             <ResultHeader
                 outcome={isDraw ? 'draw' : iWon ? 'win' : 'loss'}
                 mmrDelta={isDraw ? null : (myMmrDelta ?? null)}

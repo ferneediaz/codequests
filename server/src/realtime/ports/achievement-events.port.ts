@@ -6,6 +6,12 @@ export interface AchievementUnlockedPayload {
     icon: string;
     tier: string;
     unlockedAt: Date | string;
+    /**
+     * Set when the unlock fired from a battle-completion check. Lets the
+     * client scope the on-Results unlock popup to the active battle and
+     * suppress its duplicate sonner toast.
+     */
+    battleId?: string;
 }
 
 export interface AchievementEventsPort {

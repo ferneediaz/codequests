@@ -136,4 +136,10 @@ export interface AchievementUnlockedPayload {
     icon: string;
     tier: string;
     unlockedAt: string;
+    /**
+     * Set when the unlock fired from a battle. The Results page filters its
+     * unlock-popup queue on this; the global notifications toast suppresses
+     * itself when this is present (popup owns the surface).
+     */
+    battleId?: string;
 }

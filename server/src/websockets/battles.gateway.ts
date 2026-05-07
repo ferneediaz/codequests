@@ -16,6 +16,7 @@ import { BattlesService } from '../battles/battles.service';
 import { JwtVerificationService } from '../auth/jwt-verification.service';
 import { FriendsService } from '../friends/friends.service';
 import { BattleRoundEndReason, BattleStatus, SkillType } from '@prisma/client';
+import { AchievementUnlockedPayload } from '../realtime/ports/achievement-events.port';
 
 interface AuthenticatedSocket extends Socket {
     data: {
@@ -905,15 +906,7 @@ export class BattlesGateway
      */
     emitAchievementUnlocked(
         userId: string,
-        data: {
-            userId: string;
-            achievementId: string;
-            title: string;
-            description: string;
-            icon: string;
-            tier: string;
-            unlockedAt: Date | string;
-        },
+        data: AchievementUnlockedPayload,
     ): boolean {
         const socket = this.getSocketByUserId(userId);
         if (!socket) return false;

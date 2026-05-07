@@ -694,8 +694,8 @@ starter (so users never see the contributor's reference solution).
   - [ ] Progress indicators where applicable ("7/10 Python wins") — deferred; expose `progress: { current, target }` from `listForUser` then read it in `AchievementBadge`
 - [x] Achievements grid on dashboard inside the Play Breakdown card (matches profile)
 - [x] Achievement unlock notification:
-  - [x] In-app toast via `NotificationsProvider` (`achievement.unlocked` socket event → sonner toast + grid query invalidation)
-  - [ ] Animation: badge appears with glow/shine effect — deferred (see "Achievement Unlock Popup" below)
+  - [x] In-app toast via `NotificationsProvider` (`achievement.unlocked` socket event → sonner toast + grid query invalidation). Battle-scoped unlocks (payload carries `battleId`) now skip the toast — the on-Results popup owns that surface; the bell history still records them.
+  - [x] Animation: badge appears with glow/shine effect — shipped via the on-Results popup below
   - [ ] Sound effect for unlock — deferred to [Phase 2.7](client/TODO.md#27-sound-system)
 - [x] Achievement definitions (21 total — code-defined in `server/src/achievements/achievement-definitions.ts`, upserted on app boot):
   | Slug | Title | Trigger |
@@ -724,23 +724,25 @@ starter (so users never see the contributor's reference solution).
 - [x] Listen to `achievement.unlocked` WebSocket event (`NotificationsProvider`)
 - [ ] **Comeback King** — deferred. Requires a new `SubmissionSnapshot` table to track mid-battle test counts so we can detect "opponent was ever ahead" rather than just "opponent ended ahead". Out of MVP scope.
 
-#### Achievement Unlock Popup (Phase 2 polish — follow-up)
-Goal: when a user wins a battle AND the win unlocks one or more achievements, show a celebratory popup on the Results screen instead of (or in addition to) the global toast.
+#### Achievement Unlock Popup ✅ (text-only share menu)
+Celebratory popup on Results when a battle unlocks one or more achievements.
+Server now stamps `battleId` on `achievement.unlocked` payloads so the Results
+page filters precisely and the global toast suppresses its duplicate.
 
-- [ ] Modal/overlay on `client/src/pages/battle/Results.tsx` that mounts when `achievement.unlocked` events arrive while the user is on the results screen for the just-finished battle.
-- [ ] Animation:
-  - [ ] Badge zoom-in with glow/shine effect (tier-colored: bronze/silver/gold)
-  - [ ] Particle burst — reuse `client/src/pages/battle/results/components/VictoryConfetti.tsx`
-  - [ ] Sustained tier-colored glow that mirrors `RankUpFlash`'s tier-cross feel
-  - [ ] Honor `prefers-reduced-motion` (snap to final state, suppress confetti)
-- [ ] "Share" button opens a social-share menu:
-  - [ ] Twitter/X intent URL
-  - [ ] Discord (copy formatted text)
-  - [ ] Reddit submit URL
-  - [ ] Copy link
-  - [ ] Share content includes: achievement title, description, username, and a pre-rendered share image (server-side OpenGraph image OR a static `og-image` template that interpolates the badge)
-- [ ] Trigger surface: listen on the Results page (battle-id-scoped), so the popup fires only in-context. The global `NotificationsProvider` toast remains for unlocks that fire outside a battle screen (clan-wars finalize, problem approval, season end).
-- [ ] Multi-unlock handling: if a single battle unlocks 2+ achievements, queue them so each gets its own popup beat (or render a single popup that cycles through them).
+- [x] Modal/overlay on `client/src/pages/battle/Results.tsx` (`AchievementUnlockOverlay`) that mounts on both 1v1 and BR branches; renders nothing while idle.
+- [x] Animation:
+  - [x] Badge zoom-in with tier-colored glow (bronze/silver/gold) — `AchievementUnlockPopup` mirrors the `RankUpFlash` two-phase pattern (flash 600ms → settled glow).
+  - [x] Particle burst — overlay calls the shared `burstFromCorners()` helper extracted from `VictoryConfetti.tsx` (one burst per battle, even with multiple unlocks).
+  - [x] Sustained tier-colored `drop-shadow` after the flash phase.
+  - [x] Honor `prefers-reduced-motion` — popup snaps in, no confetti.
+- [x] "Share" button opens a social-share menu (`AchievementShareMenu`):
+  - [x] Twitter/X intent URL (text + profile link)
+  - [x] Discord (copy formatted markdown to clipboard)
+  - [x] Reddit submit URL (profile link as URL, achievement text as title)
+  - [x] Copy link (user's `/profile/:username`)
+  - [ ] Pre-rendered share image (OG card) — deferred to [Phase 5.1](client/TODO.md#51-share-system); v1 ships text-only.
+- [x] Trigger surface: overlay listens for `achievement.unlocked` and filters on `payload.battleId === currentBattleId`. The global `NotificationsProvider` toast is suppressed when `battleId` is present; the bell history still records the unlock.
+- [x] Multi-unlock handling: arrivals are queued and shown one popup beat at a time (~4.5s auto-advance, dismiss button, "Continue (N more)" hint).
 
 ### 4.4 Full Leaderboard Page
 - [ ] Tab navigation: Global | Friends | Clans
