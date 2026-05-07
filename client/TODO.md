@@ -246,15 +246,17 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 - [x] Handle battle states: WAITING (show BattleLobby), IN_PROGRESS (play), COMPLETED (redirect to results)
 - [x] **Success Criteria:** Full 1v1 battle playable: see problem → write code → run/submit → see results → battle ends ✅
 
-### 1.7 Post-Battle Results (Partial)
+### 1.7 Post-Battle Results ✅
 - [x] Basic results page exists (`Results.tsx`)
-- [ ] Winner/loser announcement with visual distinction
-- [ ] MMR change display (number going up for winner, down for loser)
-- [ ] Stats summary: time taken, tests passed, language used
-- [ ] Both players' code side by side (read-only Monaco editors)
-- [ ] Rematch button (creates new battle with same opponent, redirects)
+- [x] Winner/loser announcement with visual distinction (Trophy + green "Victory!" / Frown + red "Defeat" / muted "Draw")
+- [x] MMR change display (prominent delta in header + per-player MMR cells, color-coded green/red)
+- [x] Stats summary: tests passed, time taken (via `formatSeconds`), language, MMR — 2x2 grid per player
+- [x] Both players' code side by side (read-only Monaco editors, with a clean placeholder when no code was submitted)
+- [x] Rematch button (creates new battle with same opponent, redirects) — 1v1/Group/Clan modes only
 - [x] Return to dashboard button
-- [ ] **Success Criteria:** Results screen shows all battle data, navigation back to dashboard works ✅
+- [x] **Success Criteria:** Results screen shows all battle data, navigation back to dashboard works ✅
+
+Animated polish (MMR count-up, confetti, rank-up flash, sound) is owned by [Phase 2.3](client/TODO.md#23-win-celebrations).
 
 ### 1.8 Basic Profile Page
 - [ ] Fetch user data from `GET /api/users/:username` or `GET /api/users/:id`

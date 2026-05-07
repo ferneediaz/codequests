@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAppSelector } from '@/store/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,15 +8,13 @@ import { Separator } from '@/components/ui/separator';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { CodeEditor } from '@/components/battle/CodeEditor';
 import { BattleChat } from '@/components/battle/BattleChat';
-import { Loader2, ArrowLeft, Trophy, RotateCcw } from 'lucide-react';
+import { Loader2, ArrowLeft, Trophy, RotateCcw, Frown } from 'lucide-react';
 import { battlesApi } from '@/services/battles';
+import { queryKeys } from '@/lib/queryKeys';
 import type {
-    BattleResponse,
     BattleParticipant,
     BattleRoundEndReason,
-    BattleRoundResponse,
     BattleRoundStatus,
-    BattleRoyaleStandingsEntry,
 } from '@/types/api';
 import { formatSeconds } from '@/pages/battle/play/utils';
 import { toast } from 'sonner';
@@ -24,42 +23,58 @@ function participantName(p: BattleParticipant) {
     return p.username || p.user?.username || 'Player';
 }
 
+function StatCell({ label, value }: { label: string; value: React.ReactNode }) {
+    return (
+        <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {label}
+            </p>
+            <p className="mt-0.5 text-sm font-mono">{value}</p>
+        </div>
+    );
+}
+
+function timeTakenSeconds(
+    submittedAt: string | undefined,
+    startedAt: string | undefined,
+): number | null {
+    if (!submittedAt || !startedAt) return null;
+    return Math.max(
+        0,
+        Math.round(
+            (new Date(submittedAt).getTime() - new Date(startedAt).getTime()) / 1000,
+        ),
+    );
+}
+
 export default function Results() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const userId = useAppSelector((state) => state.auth.user?.id);
-    const [battle, setBattle] = useState<BattleResponse | null>(null);
-    const [royaleRounds, setRoyaleRounds] = useState<BattleRoundResponse[]>([]);
-    const [royaleStandings, setRoyaleStandings] = useState<
-        BattleRoyaleStandingsEntry[]
-    >([]);
-    const [loading, setLoading] = useState(true);
     const [rematching, setRematching] = useState(false);
 
-    useEffect(() => {
-        async function load() {
-            if (!id) return;
-            try {
-                const data = await battlesApi.getBattle(id);
-                setBattle(data);
-                if (data.mode === 'BATTLE_ROYALE') {
-                    const [rounds, standings] = await Promise.all([
-                        battlesApi.listRounds(id),
-                        battlesApi.getStandings(id),
-                    ]);
-                    setRoyaleRounds(rounds);
-                    setRoyaleStandings(standings.standings);
-                }
-            } catch (error) {
-                console.error('Failed to load battle results:', error);
-            } finally {
-                setLoading(false);
-            }
-        }
-        load();
-    }, [id]);
+    const battleQuery = useQuery({
+        queryKey: queryKeys.battle(id ?? ''),
+        queryFn: () => battlesApi.getBattle(id as string),
+        enabled: !!id,
+    });
+    const battle = battleQuery.data;
+    const isBattleRoyale = battle?.mode === 'BATTLE_ROYALE';
 
-    if (loading || !battle) {
+    const roundsQuery = useQuery({
+        queryKey: queryKeys.battleRounds(id ?? ''),
+        queryFn: () => battlesApi.listRounds(id as string),
+        enabled: !!id && isBattleRoyale,
+    });
+    const standingsQuery = useQuery({
+        queryKey: queryKeys.battleStandings(id ?? ''),
+        queryFn: () => battlesApi.getStandings(id as string),
+        enabled: !!id && isBattleRoyale,
+    });
+    const royaleRounds = roundsQuery.data ?? [];
+    const royaleStandings = standingsQuery.data?.standings ?? [];
+
+    if (battleQuery.isLoading || !battle) {
         return (
             <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -236,6 +251,8 @@ export default function Results() {
         }
     };
 
+    const myMmrDelta = me?.mmrChange;
+
     return (
         <div className="mx-auto max-w-5xl px-4 py-8">
             {/* Result header */}
@@ -248,7 +265,20 @@ export default function Results() {
                         <h1 className="text-3xl font-bold text-green-500">Victory!</h1>
                     </div>
                 ) : (
-                    <h1 className="text-3xl font-bold text-red-500">Defeat</h1>
+                    <div>
+                        <Frown className="mx-auto mb-2 h-12 w-12 text-muted-foreground" />
+                        <h1 className="text-3xl font-bold text-red-500">Defeat</h1>
+                    </div>
+                )}
+                {myMmrDelta != null && !isDraw && (
+                    <p
+                        className={`mt-2 text-2xl font-mono font-semibold ${
+                            myMmrDelta >= 0 ? 'text-green-500' : 'text-red-500'
+                        }`}
+                    >
+                        {myMmrDelta >= 0 ? '+' : ''}
+                        {myMmrDelta} MMR
+                    </p>
                 )}
             </div>
 
@@ -288,42 +318,41 @@ export default function Results() {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Tests Passed</span>
-                                        <span className="font-mono">
-                                            {player.testsPassed}/{player.totalTests}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Language</span>
-                                        <span>{player.language ?? 'N/A'}</span>
-                                    </div>
-                                    {player.mmrChange != null && (
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">MMR Change</span>
-                                            <span
-                                                className={`font-semibold ${player.mmrChange >= 0 ? 'text-green-500' : 'text-red-500'
-                                                    }`}
-                                            >
-                                                {player.mmrChange >= 0 ? '+' : ''}
-                                                {player.mmrChange}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {player.submittedAt && battle.startedAt && (
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Time</span>
-                                            <span className="font-mono">
-                                                {Math.round(
-                                                    (new Date(player.submittedAt).getTime() -
-                                                        new Date(battle.startedAt).getTime()) /
-                                                    1000,
-                                                )}
-                                                s
-                                            </span>
-                                        </div>
-                                    )}
+                                <div className="grid grid-cols-2 gap-2">
+                                    <StatCell
+                                        label="Tests"
+                                        value={`${player.testsPassed}/${player.totalTests}`}
+                                    />
+                                    <StatCell
+                                        label="Time"
+                                        value={(() => {
+                                            const seconds = timeTakenSeconds(
+                                                player.submittedAt,
+                                                battle.startedAt,
+                                            );
+                                            return seconds != null ? formatSeconds(seconds) : '—';
+                                        })()}
+                                    />
+                                    <StatCell label="Language" value={player.language ?? '—'} />
+                                    <StatCell
+                                        label="MMR"
+                                        value={
+                                            player.mmrChange != null ? (
+                                                <span
+                                                    className={
+                                                        player.mmrChange >= 0
+                                                            ? 'text-green-500'
+                                                            : 'text-red-500'
+                                                    }
+                                                >
+                                                    {player.mmrChange >= 0 ? '+' : ''}
+                                                    {player.mmrChange}
+                                                </span>
+                                            ) : (
+                                                '—'
+                                            )
+                                        }
+                                    />
                                 </div>
                             </CardContent>
                         </Card>
@@ -354,14 +383,22 @@ export default function Results() {
                                 )}
                             </div>
                             <div className="h-80 overflow-hidden rounded-lg border border-border">
-                                <CodeEditor
-                                    language={player.language ?? 'javascript'}
-                                    onLanguageChange={() => { }}
-                                    code={player.code ?? '// No code submitted'}
-                                    onCodeChange={() => { }}
-                                    starterCode="{}"
-                                    readOnly
-                                />
+                                {player.code ? (
+                                    <CodeEditor
+                                        language={player.language ?? 'javascript'}
+                                        onLanguageChange={() => { }}
+                                        code={player.code}
+                                        onCodeChange={() => { }}
+                                        starterCode="{}"
+                                        readOnly
+                                    />
+                                ) : (
+                                    <div className="flex h-full items-center justify-center bg-muted/20">
+                                        <p className="text-sm text-muted-foreground">
+                                            No code submitted
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     );
