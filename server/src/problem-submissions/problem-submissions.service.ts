@@ -31,6 +31,7 @@ import {
     RejectSubmissionDto,
     RequestChangesDto,
 } from './dto/review-action.dto';
+import { AchievementsService } from '../achievements/achievements.service';
 
 const SUBMITTER_SELECT = {
     id: true,
@@ -47,6 +48,7 @@ export class ProblemSubmissionsService {
         private readonly codeExecution: CodeExecutionService,
         @Inject(SUBMISSION_EVENTS_PORT)
         private readonly events: SubmissionEventsPort,
+        private readonly achievementsService: AchievementsService,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -319,6 +321,25 @@ export class ProblemSubmissionsService {
             });
         } catch (err) {
             this.logger.error(`approve emit failed: ${(err as Error).message}`);
+        }
+
+        // Achievement: Problem Setter (and any future contribution-based ones)
+        try {
+            const contributor = await this.prisma.user.findUnique({
+                where: { id: existing.submittedById },
+                select: { wins: true, losses: true, mmr: true },
+            });
+            if (contributor) {
+                await this.achievementsService.runChecks({
+                    userId: existing.submittedById,
+                    user: contributor,
+                    approvedProblemSubmissionId: id,
+                });
+            }
+        } catch (err) {
+            this.logger.warn(
+                `Achievement checks failed for approved submission ${id}: ${(err as Error).message}`,
+            );
         }
 
         return result;

@@ -46,60 +46,58 @@ export function Heatmap({
                             </div>
                         ))}
                     </div>
-                    <div className="flex gap-2">
-                        <div
-                            className="grid flex-1 grid-rows-7 gap-1"
-                            style={{
-                                gridTemplateColumns: `repeat(${grid.length}, minmax(0, 1fr))`,
-                                // Fill each week top-to-bottom before moving right,
-                                // matching GitHub's contribution heatmap orientation.
-                                gridAutoFlow: 'column',
-                            }}
-                        >
-                            {grid.map((week, wi) =>
-                                week.map((count, di) => {
-                                    const date = dates[wi]?.[di] ?? null;
-                                    const cell = breakdown[wi]?.[di] ?? {
-                                        battles: 0,
-                                        githubCommits: 0,
-                                        total: 0,
-                                    };
-                                    const labelParts = [
-                                        `${cell.total} activit${cell.total === 1 ? 'y' : 'ies'}`,
-                                        `on ${date?.toLocaleDateString() ?? ''}`,
-                                    ];
-                                    if (cell.battles > 0) {
-                                        labelParts.push(
-                                            `${cell.battles} battle${cell.battles === 1 ? '' : 's'}`,
-                                        );
-                                    }
-                                    if (cell.githubCommits > 0) {
-                                        labelParts.push(
-                                            `${cell.githubCommits} GitHub commit${cell.githubCommits === 1 ? '' : 's'}`,
-                                        );
-                                    }
-                                    const title = date ? labelParts.join(' - ') : '';
-                                    return (
-                                        <div
-                                            key={`${wi}-${di}`}
-                                            className={`aspect-square w-full rounded-[3px] transition-colors ${date ? intensity(count) : 'bg-transparent'}`}
-                                            title={title}
-                                        />
+                    <div
+                        className="grid grid-rows-7 gap-1"
+                        style={{
+                            gridTemplateColumns: `repeat(${grid.length}, minmax(0, 1fr))`,
+                            // Fill each week top-to-bottom before moving right,
+                            // matching GitHub's contribution heatmap orientation.
+                            gridAutoFlow: 'column',
+                        }}
+                    >
+                        {grid.map((week, wi) =>
+                            week.map((count, di) => {
+                                const date = dates[wi]?.[di] ?? null;
+                                const cell = breakdown[wi]?.[di] ?? {
+                                    battles: 0,
+                                    githubCommits: 0,
+                                    total: 0,
+                                };
+                                const labelParts = [
+                                    `${cell.total} activit${cell.total === 1 ? 'y' : 'ies'}`,
+                                    `on ${date?.toLocaleDateString() ?? ''}`,
+                                ];
+                                if (cell.battles > 0) {
+                                    labelParts.push(
+                                        `${cell.battles} battle${cell.battles === 1 ? '' : 's'}`,
                                     );
-                                }),
-                            )}
+                                }
+                                if (cell.githubCommits > 0) {
+                                    labelParts.push(
+                                        `${cell.githubCommits} GitHub commit${cell.githubCommits === 1 ? '' : 's'}`,
+                                    );
+                                }
+                                const title = date ? labelParts.join(' - ') : '';
+                                return (
+                                    <div
+                                        key={`${wi}-${di}`}
+                                        className={`aspect-square w-full rounded-[3px] transition-colors ${date ? intensity(count) : 'bg-transparent'}`}
+                                        title={title}
+                                    />
+                                );
+                            }),
+                        )}
+                    </div>
+                    <div className="mt-3 flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
+                        <span>Less</span>
+                        <div className="flex gap-0.5">
+                            <div className="h-2.5 w-2.5 rounded-sm bg-muted/40" />
+                            <div className="h-2.5 w-2.5 rounded-sm bg-primary/25" />
+                            <div className="h-2.5 w-2.5 rounded-sm bg-primary/50" />
+                            <div className="h-2.5 w-2.5 rounded-sm bg-primary/75" />
+                            <div className="h-2.5 w-2.5 rounded-sm bg-primary" />
                         </div>
-                        <div className="flex shrink-0 flex-col justify-end gap-1 text-[10px] text-muted-foreground">
-                            <span>Less</span>
-                            <div className="flex gap-0.5">
-                                <div className="h-2.5 w-2.5 rounded-sm bg-muted/40" />
-                                <div className="h-2.5 w-2.5 rounded-sm bg-primary/25" />
-                                <div className="h-2.5 w-2.5 rounded-sm bg-primary/50" />
-                                <div className="h-2.5 w-2.5 rounded-sm bg-primary/75" />
-                                <div className="h-2.5 w-2.5 rounded-sm bg-primary" />
-                            </div>
-                            <span>More</span>
-                        </div>
+                        <span>More</span>
                     </div>
                 </div>
             </div>

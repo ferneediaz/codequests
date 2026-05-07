@@ -899,6 +899,29 @@ export class BattlesGateway
     }
 
     /**
+     * Notify a user that they unlocked an achievement. Emitted at most once
+     * per (user, achievement) pair — the persistence layer's unique index is
+     * what guarantees the "once" property; this method just delivers.
+     */
+    emitAchievementUnlocked(
+        userId: string,
+        data: {
+            userId: string;
+            achievementId: string;
+            title: string;
+            description: string;
+            icon: string;
+            tier: string;
+            unlockedAt: Date | string;
+        },
+    ): boolean {
+        const socket = this.getSocketByUserId(userId);
+        if (!socket) return false;
+        socket.emit('achievement.unlocked', data);
+        return true;
+    }
+
+    /**
      * Notify a user's friends about their online/offline status
      */
     private async notifyFriendsPresence(userId: string, username: string, online: boolean) {

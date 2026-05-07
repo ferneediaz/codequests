@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SeasonsService } from '../seasons/seasons.service';
+import { AchievementsService } from '../achievements/achievements.service';
 import { ProblemsService } from '../problems/problems.service';
 import { BATTLE_EVENTS_PORT } from '../realtime/ports/battle-events.port';
 import {
@@ -36,6 +37,7 @@ describe('BattlesService', () => {
         emitBattleCompleted: jest.Mock;
         emitBattleStatusUpdate: jest.Mock;
     };
+    let achievementsService: { runChecks: jest.Mock };
 
     // Mock data
     const mockUser1 = {
@@ -202,6 +204,15 @@ describe('BattlesService', () => {
                         emitBattleStatusUpdate: jest.fn(),
                     },
                 },
+                {
+                    provide: AchievementsService,
+                    useValue: {
+                        runChecks: jest.fn().mockResolvedValue([]),
+                        runChecksForSeasonTop: jest.fn().mockResolvedValue([]),
+                        listForUser: jest.fn().mockResolvedValue([]),
+                        seedDefinitions: jest.fn().mockResolvedValue(undefined),
+                    },
+                },
             ],
         }).compile();
 
@@ -211,6 +222,7 @@ describe('BattlesService', () => {
         subscriptionsService = module.get(SubscriptionsService);
         battleRoyaleService = module.get(BattleRoyaleService) as any;
         battlesGateway = module.get(BATTLE_EVENTS_PORT) as any;
+        achievementsService = module.get(AchievementsService) as any;
     });
 
     describe('createBattle', () => {
@@ -1030,6 +1042,127 @@ describe('BattlesService', () => {
             );
             expect(loserUpdate).toBeDefined();
             expect(loserUpdate!.args.data.losses).toEqual({ increment: 1 });
+        });
+
+        it('runs achievement checks once per participant with the right context', async () => {
+            const battleWithSubmissions = {
+                ...mockBattle,
+                status: BattleStatus.IN_PROGRESS,
+                startedAt: new Date('2024-01-01T10:00:00Z'),
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: mockUser1.id,
+                        teamId: null,
+                        language: 'python',
+                        user: { ...mockUser1, clan: null },
+                        testsPassed: 10,
+                        totalTests: 10,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:01:00Z'),
+                        mmrChange: null,
+                    },
+                    {
+                        id: 'p2',
+                        userId: mockUser2.id,
+                        teamId: null,
+                        language: 'javascript',
+                        user: { ...mockUser2, clan: null },
+                        testsPassed: 4,
+                        totalTests: 10,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:01:30Z'),
+                        mmrChange: null,
+                    },
+                ],
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(battleWithSubmissions)
+                .mockResolvedValueOnce({
+                    ...battleWithSubmissions,
+                    status: BattleStatus.COMPLETED,
+                    winnerId: mockUser1.id,
+                });
+            prisma.$transaction.mockImplementation(async (cb) => cb(prisma));
+
+            await service.completeBattle(mockBattle.id);
+
+            expect(achievementsService.runChecks).toHaveBeenCalledTimes(2);
+            const calls = achievementsService.runChecks.mock.calls;
+            const winnerCall = calls.find(
+                (c) => c[0].userId === mockUser1.id,
+            )?.[0];
+            const loserCall = calls.find(
+                (c) => c[0].userId === mockUser2.id,
+            )?.[0];
+
+            expect(winnerCall).toBeDefined();
+            expect(winnerCall.battle.isWinner).toBe(true);
+            expect(winnerCall.battle.mode).toBe(BattleMode.ONE_V_ONE);
+            expect(winnerCall.battle.participant.language).toBe('python');
+            expect(winnerCall.battle.participant.testsPassed).toBe(10);
+            expect(winnerCall.battle.participant.totalTests).toBe(10);
+            expect(winnerCall.battle.opponent).toEqual({
+                preBattleMmr: mockUser2.mmr,
+                testsPassed: 4,
+                totalTests: 10,
+            });
+            // Wins increment for the winner
+            expect(winnerCall.user.wins).toBe(mockUser1.wins + 1);
+            expect(winnerCall.user.losses).toBe(mockUser1.losses);
+
+            expect(loserCall).toBeDefined();
+            expect(loserCall.battle.isWinner).toBe(false);
+            expect(loserCall.user.wins).toBe(mockUser2.wins);
+            expect(loserCall.user.losses).toBe(mockUser2.losses + 1);
+        });
+
+        it('completion succeeds even if achievement checks throw', async () => {
+            achievementsService.runChecks.mockRejectedValueOnce(
+                new Error('boom'),
+            );
+            const battleWithSubmissions = {
+                ...mockBattle,
+                status: BattleStatus.IN_PROGRESS,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: mockUser1.id,
+                        teamId: null,
+                        language: 'python',
+                        user: { ...mockUser1, clan: null },
+                        testsPassed: 10,
+                        totalTests: 10,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:05'),
+                        mmrChange: null,
+                    },
+                    {
+                        id: 'p2',
+                        userId: mockUser2.id,
+                        teamId: null,
+                        language: 'javascript',
+                        user: { ...mockUser2, clan: null },
+                        testsPassed: 1,
+                        totalTests: 10,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:10'),
+                        mmrChange: null,
+                    },
+                ],
+            };
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(battleWithSubmissions)
+                .mockResolvedValueOnce({
+                    ...battleWithSubmissions,
+                    status: BattleStatus.COMPLETED,
+                    winnerId: mockUser1.id,
+                });
+            prisma.$transaction.mockImplementation(async (cb) => cb(prisma));
+
+            const result = await service.completeBattle(mockBattle.id);
+            expect(result.status).toBe(BattleStatus.COMPLETED);
         });
     });
 

@@ -12,6 +12,7 @@ import {
     SeasonEventsPort,
 } from '../realtime/ports/season-events.port';
 import { getRankTier } from '../common/utils/rank-tiers';
+import { AchievementsService } from '../achievements/achievements.service';
 
 @Injectable()
 export class SeasonsService {
@@ -21,6 +22,7 @@ export class SeasonsService {
         private prisma: PrismaService,
         @Inject(SEASON_EVENTS_PORT)
         private seasonEvents: SeasonEventsPort,
+        private achievementsService: AchievementsService,
     ) {}
 
     /**
@@ -252,6 +254,15 @@ export class SeasonsService {
             throw new BadRequestException('Season is not active');
         }
 
+        // Top 100 by peak MMR — used to award the Seasonal Glory achievement
+        // before we hard-reset MMR/stats below.
+        const topHundred = await this.prisma.seasonRecord.findMany({
+            where: { seasonId },
+            orderBy: { peakMmr: 'desc' },
+            take: 100,
+            select: { userId: true },
+        });
+
         // Get all users who played during this season (have season records)
         const records = await this.prisma.seasonRecord.findMany({
             where: { seasonId },
@@ -291,6 +302,23 @@ export class SeasonsService {
                 data: { isActive: false },
             });
         });
+
+        // Award Seasonal Glory to the top 100 (post-reset is fine — the
+        // achievement is about placement, not current MMR). Failures here
+        // don't roll back the season end.
+        for (let i = 0; i < topHundred.length; i++) {
+            try {
+                await this.achievementsService.runChecksForSeasonTop({
+                    userId: topHundred[i].userId,
+                    seasonId,
+                    placement: i + 1,
+                });
+            } catch (err) {
+                this.logger.warn(
+                    `Seasonal Glory check failed for ${topHundred[i].userId}: ${(err as Error).message}`,
+                );
+            }
+        }
 
         this.logger.log(`Ended ${season.name}. All MMR reset to 1000.`);
         return season;

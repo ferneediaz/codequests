@@ -23,6 +23,7 @@ import {
     BattleEventsPort,
 } from '../realtime/ports/battle-events.port';
 import { SubmissionResult } from './types/battle-submission.types';
+import { AchievementsService } from '../achievements/achievements.service';
 
 // K-factor for Elo calculation (higher = more volatile ratings)
 const ELO_K_FACTOR = 16;
@@ -69,6 +70,7 @@ export class BattlesService {
         private clanWarsService: ClanWarsService,
         @Inject(BATTLE_EVENTS_PORT)
         private gateway: BattleEventsPort,
+        private achievementsService: AchievementsService,
     ) { }
 
     /**
@@ -976,6 +978,70 @@ export class BattlesService {
                     }
                 }
             }
+        }
+
+        // Achievement checks — runs once per participant. Failures here are
+        // logged inside the service and never block the completion path.
+        try {
+            for (const participant of battle.participants) {
+                const mmrChange = mmrChanges.get(participant.userId) || 0;
+                const isWinner = isTeam
+                    ? !!winningTeam && participant.teamId === winningTeam
+                    : participant.userId === winnerId;
+                const newMmr = isTeam
+                    ? participant.user.mmr
+                    : Math.max(MIN_MMR, participant.user.mmr + mmrChange);
+                const newWins =
+                    participant.user.wins +
+                    (winnerId && isWinner && !isTeam ? 1 : 0);
+                const newLosses =
+                    participant.user.losses +
+                    (winnerId && !isWinner && !isTeam ? 1 : 0);
+
+                // For 1v1 we can describe the opponent — needed by Underdog
+                // and No Mercy. Other modes don't surface a single opponent.
+                let opponent: {
+                    preBattleMmr: number;
+                    testsPassed: number;
+                    totalTests: number;
+                } | null = null;
+                if (battle.mode === BattleMode.ONE_V_ONE) {
+                    const other = battle.participants.find(
+                        (p) => p.userId !== participant.userId,
+                    );
+                    if (other) {
+                        opponent = {
+                            preBattleMmr: other.user.mmr,
+                            testsPassed: other.testsPassed,
+                            totalTests: other.totalTests,
+                        };
+                    }
+                }
+
+                await this.achievementsService.runChecks({
+                    userId: participant.userId,
+                    user: { wins: newWins, losses: newLosses, mmr: newMmr },
+                    battle: {
+                        id: battleId,
+                        mode: battle.mode,
+                        isWinner,
+                        preBattleMmr: participant.user.mmr,
+                        participant: {
+                            language: participant.language,
+                            testsPassed: participant.testsPassed,
+                            totalTests: participant.totalTests,
+                            submittedAt: participant.submittedAt,
+                        },
+                        opponent,
+                        startedAt: battle.startedAt,
+                        endedAt: new Date(),
+                    },
+                });
+            }
+        } catch (err) {
+            this.logger.warn(
+                `Achievement checks failed for battle ${battleId}: ${(err as Error).message}`,
+            );
         }
 
         // Return updated battle and broadcast to the battle room so every

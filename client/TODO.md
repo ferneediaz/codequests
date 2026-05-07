@@ -80,7 +80,7 @@
 2. **Win Celebrations ([Phase 2.3](client/TODO.md#23-win-celebrations))** — confetti + MMR count-up + rank-up flash on Results landed; sound + win streak deferred (sound waits on §2.7, streak waits on a server `currentWinStreak` field).
 3. **Public profile page ([Phase 4.5](client/TODO.md#45-profile-enhancements-partial))** — `/profile/:username` shipped (other-users-only, self-redirects to /dashboard); `User.githubUsername` captured at auth sync, server-resolved GH heatmap + contributions list now feed both Profile and Dashboard.
 
-Avoid Achievements until their server TODOs close out. Web push (out-of-app browser notifications) is not yet scoped — §3.5 covers in-app only.
+Achievements MVP shipped — see §4.3 below for the active set and deferred follow-ups (Comeback King, progress bars, unlock popup with social share). Web push (out-of-app browser notifications) is not yet scoped — §3.5 covers in-app only.
 
 ---
 
@@ -686,32 +686,61 @@ starter (so users never see the contributor's reference solution).
 - [ ] **Success Criteria:** Admin can create, test, and publish problems;
   community problems can be reviewed ✅
 
-### 4.3 Achievements System
-- [ ] Achievements grid on profile page:
-  - [ ] All achievements displayed as cards/badges
-  - [ ] Unlocked: full color with unlock date
-  - [ ] Locked: greyed out with description of how to unlock
-  - [ ] Progress indicators where applicable (e.g., "7/10 Python wins")
-- [ ] Achievement unlock notification:
-  - [ ] In-game toast: "🏆 Achievement Unlocked: Speed Demon!"
-  - [ ] Animation: badge appears with glow/shine effect
-  - [ ] Sound effect for unlock
-- [ ] Achievement definitions:
-  | Achievement | Description |
-  |-------------|-------------|
-  | First Blood | Win your first battle |
-  | On Fire (5) | Win 5 battles in a row |
-  | Unstoppable (10) | Win 10 battles in a row |
-  | Legendary (25) | Win 25 battles in a row |
-  | Speed Demon | Solve a problem in under 2 minutes |
-  | Comeback King | Win after opponent passed more tests first |
-  | Pythonista | Win 10 battles using Python |
-  | JS Wizard | Win 10 battles using JavaScript |
-  | Clan Champion | Win 10 clan wars |
-  | Problem Setter | Contribute a problem that gets approved |
-  | Seasonal Glory | Finish a season in top 100 |
-- [ ] Listen to `achievement.unlocked` WebSocket event
-- [ ] **Success Criteria:** Achievements show on profile, unlock notification fires ✅
+### 4.3 Achievements System ✅ (MVP)
+- [x] Achievements grid on profile page:
+  - [x] All achievements displayed as cards/badges (`AchievementsGrid` + `AchievementBadge`)
+  - [x] Unlocked: tier-colored ring + unlock date in tooltip
+  - [x] Locked: greyscaled with description in tooltip
+  - [ ] Progress indicators where applicable ("7/10 Python wins") — deferred; expose `progress: { current, target }` from `listForUser` then read it in `AchievementBadge`
+- [x] Achievements grid on dashboard inside the Play Breakdown card (matches profile)
+- [x] Achievement unlock notification:
+  - [x] In-app toast via `NotificationsProvider` (`achievement.unlocked` socket event → sonner toast + grid query invalidation)
+  - [ ] Animation: badge appears with glow/shine effect — deferred (see "Achievement Unlock Popup" below)
+  - [ ] Sound effect for unlock — deferred to [Phase 2.7](client/TODO.md#27-sound-system)
+- [x] Achievement definitions (21 total — code-defined in `server/src/achievements/achievement-definitions.ts`, upserted on app boot):
+  | Slug | Title | Trigger |
+  |------|-------|---------|
+  | first_blood | First Blood | First win |
+  | centurion | Centurion | 100 total wins |
+  | marathon | Marathon | 100 total games |
+  | on_fire | On Fire | 5-win streak |
+  | unstoppable | Unstoppable | 10-win streak |
+  | legendary | Legendary | 25-win streak |
+  | speed_demon | Speed Demon | Win in <2 min |
+  | flash | Flash | Win in <60s |
+  | perfectionist | Perfectionist | Win at 100% tests |
+  | flawless | Flawless | 10 wins at 100% tests |
+  | pythonista | Pythonista | 10 Python wins |
+  | js_wizard | JS Wizard | 10 JavaScript wins |
+  | polyglot | Polyglot | Win in 3+ languages |
+  | royale_survivor | Royale Survivor | Win a Battle Royale |
+  | clan_champion | Clan Champion | 10 Clan Wars wins |
+  | top_1000 | Top 1000 | Reach 2000 MMR |
+  | mythic | Mythic | Reach 2500 MMR |
+  | underdog | Underdog | Beat higher-MMR 1v1 opponent |
+  | no_mercy | No Mercy | Win 1v1 vs 0-test opponent |
+  | problem_setter | Problem Setter | Contributed problem approved |
+  | seasonal_glory | Seasonal Glory | Top 100 by peak MMR |
+- [x] Listen to `achievement.unlocked` WebSocket event (`NotificationsProvider`)
+- [ ] **Comeback King** — deferred. Requires a new `SubmissionSnapshot` table to track mid-battle test counts so we can detect "opponent was ever ahead" rather than just "opponent ended ahead". Out of MVP scope.
+
+#### Achievement Unlock Popup (Phase 2 polish — follow-up)
+Goal: when a user wins a battle AND the win unlocks one or more achievements, show a celebratory popup on the Results screen instead of (or in addition to) the global toast.
+
+- [ ] Modal/overlay on `client/src/pages/battle/Results.tsx` that mounts when `achievement.unlocked` events arrive while the user is on the results screen for the just-finished battle.
+- [ ] Animation:
+  - [ ] Badge zoom-in with glow/shine effect (tier-colored: bronze/silver/gold)
+  - [ ] Particle burst — reuse `client/src/pages/battle/results/components/VictoryConfetti.tsx`
+  - [ ] Sustained tier-colored glow that mirrors `RankUpFlash`'s tier-cross feel
+  - [ ] Honor `prefers-reduced-motion` (snap to final state, suppress confetti)
+- [ ] "Share" button opens a social-share menu:
+  - [ ] Twitter/X intent URL
+  - [ ] Discord (copy formatted text)
+  - [ ] Reddit submit URL
+  - [ ] Copy link
+  - [ ] Share content includes: achievement title, description, username, and a pre-rendered share image (server-side OpenGraph image OR a static `og-image` template that interpolates the badge)
+- [ ] Trigger surface: listen on the Results page (battle-id-scoped), so the popup fires only in-context. The global `NotificationsProvider` toast remains for unlocks that fire outside a battle screen (clan-wars finalize, problem approval, season end).
+- [ ] Multi-unlock handling: if a single battle unlocks 2+ achievements, queue them so each gets its own popup beat (or render a single popup that cycles through them).
 
 ### 4.4 Full Leaderboard Page
 - [ ] Tab navigation: Global | Friends | Clans

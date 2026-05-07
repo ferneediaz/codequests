@@ -17,8 +17,10 @@ import { AnimateIn } from '@/components/layout/AnimateIn';
 import { StatTileGrid } from '@/components/layout/StatTileGrid';
 import { DataState } from '@/components/layout/DataState';
 import { HeatmapCard } from '@/components/heatmap/HeatmapCard';
+import { AchievementsGrid } from '@/components/achievements';
 import { queryKeys } from '@/lib/queryKeys';
 import { usersApi } from '@/services/users';
+import { achievementsApi } from '@/services/achievements';
 import {
     buildHeatmap,
     computeFavoriteLanguage,
@@ -26,6 +28,7 @@ import {
     computeWinRate,
 } from '@/utils/stats';
 import type {
+    Achievement,
     GithubActivity,
     MatchHistoryEntry,
     ProblemContribution,
@@ -98,6 +101,14 @@ function ProfileContent({ username }: { username: string }) {
     const { data: practice } = useQuery<PracticeStats>({
         queryKey: queryKeys.practice.statsForUser(profileId ?? ''),
         queryFn: () => usersApi.getPracticeStatsForUser(profileId!),
+        enabled: !!profileId,
+    });
+
+    const { data: achievements, isLoading: achievementsLoading } = useQuery<
+        Achievement[]
+    >({
+        queryKey: queryKeys.achievements.forUser(profileId ?? ''),
+        queryFn: () => achievementsApi.listForUser(profileId!),
         enabled: !!profileId,
     });
 
@@ -210,6 +221,17 @@ function ProfileContent({ username }: { username: string }) {
                         isLoading={historyLoading}
                         githubUsername={githubActivity?.username}
                     />
+                </AnimateIn>
+
+                <AnimateIn direction="up" delay={175}>
+                    <Card>
+                        <CardContent className="p-6">
+                            <AchievementsGrid
+                                achievements={achievements ?? []}
+                                isLoading={achievementsLoading}
+                            />
+                        </CardContent>
+                    </Card>
                 </AnimateIn>
 
                 <div className="grid gap-6 lg:grid-cols-2">

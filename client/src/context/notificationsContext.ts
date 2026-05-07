@@ -12,7 +12,8 @@ export interface InAppNotification {
         | 'PROBLEM_SUBMITTED'
         | 'PROBLEM_APPROVED'
         | 'PROBLEM_REJECTED'
-        | 'PROBLEM_CHANGES_REQUESTED';
+        | 'PROBLEM_CHANGES_REQUESTED'
+        | 'ACHIEVEMENT_UNLOCKED';
     title: string;
     body?: string;
     href?: string;

@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CodeExecutionService } from '../code-execution/code-execution.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { SeasonsService } from '../seasons/seasons.service';
+import { AchievementsService } from '../achievements/achievements.service';
 import { ProblemsService } from '../problems/problems.service';
 import { BATTLE_EVENTS_PORT } from '../realtime/ports/battle-events.port';
 import { CreateClanWarsBattleDto } from './dto/create-clan-wars-battle.dto';
@@ -128,6 +129,15 @@ describe('ClanWarsService', () => {
                 { provide: ProblemsService, useValue: mockProblems },
                 { provide: SchedulerRegistry, useValue: scheduler },
                 { provide: BATTLE_EVENTS_PORT, useValue: gateway },
+                {
+                    provide: AchievementsService,
+                    useValue: {
+                        runChecks: jest.fn().mockResolvedValue([]),
+                        runChecksForSeasonTop: jest.fn().mockResolvedValue([]),
+                        listForUser: jest.fn().mockResolvedValue([]),
+                        seedDefinitions: jest.fn().mockResolvedValue(undefined),
+                    },
+                },
             ],
         }).compile();
 

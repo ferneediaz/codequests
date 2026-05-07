@@ -10,6 +10,7 @@ import {
     MockPrismaService,
 } from '../__mocks__/prisma.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { AchievementsService } from '../achievements/achievements.service';
 
 describe('SeasonsService', () => {
     let service: SeasonsService;
@@ -52,6 +53,15 @@ describe('SeasonsService', () => {
                     provide: SEASON_EVENTS_PORT,
                     useValue: {
                         emitSeasonEnded: jest.fn(),
+                    },
+                },
+                {
+                    provide: AchievementsService,
+                    useValue: {
+                        runChecks: jest.fn().mockResolvedValue([]),
+                        runChecksForSeasonTop: jest.fn().mockResolvedValue([]),
+                        listForUser: jest.fn().mockResolvedValue([]),
+                        seedDefinitions: jest.fn().mockResolvedValue(undefined),
                     },
                 },
             ],

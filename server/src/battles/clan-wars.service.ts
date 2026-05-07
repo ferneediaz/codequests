@@ -29,6 +29,7 @@ import { CreateClanWarsBattleDto } from './dto/create-clan-wars-battle.dto';
 import { ClanWarsPresetDto } from './dto/clan-wars-preset.dto';
 import { SubmissionResult } from './types/battle-submission.types';
 import { getRankTier, RankTier } from '../common/utils/rank-tiers';
+import { AchievementsService } from '../achievements/achievements.service';
 
 // ============================================
 // Constants
@@ -112,6 +113,7 @@ export class ClanWarsService {
         private scheduler: SchedulerRegistry,
         @Inject(BATTLE_EVENTS_PORT)
         private gateway: BattleEventsPort,
+        private achievementsService: AchievementsService,
     ) { }
 
     // ========================================
@@ -1503,6 +1505,50 @@ export class ClanWarsService {
         });
 
         await this.applyClanWarsMmr(battleId, winningTeam);
+
+        // Achievement checks (Clan Champion + any mode/streak/MMR ones).
+        // BattlesService.completeBattle is NOT called for clan wars — they
+        // run their own finalize path — so we trigger here too.
+        try {
+            const updated = await this.prisma.battle.findUnique({
+                where: { id: battleId },
+                include: {
+                    participants: { include: { user: true } },
+                },
+            });
+            if (updated) {
+                for (const p of updated.participants) {
+                    const isWinner = !!winningTeam && p.teamId === winningTeam;
+                    await this.achievementsService.runChecks({
+                        userId: p.userId,
+                        user: {
+                            wins: p.user.wins,
+                            losses: p.user.losses,
+                            mmr: p.user.mmr,
+                        },
+                        battle: {
+                            id: battleId,
+                            mode: updated.mode,
+                            isWinner,
+                            preBattleMmr: p.user.mmr - (p.mmrChange ?? 0),
+                            participant: {
+                                language: p.language,
+                                testsPassed: p.testsPassed,
+                                totalTests: p.totalTests,
+                                submittedAt: p.submittedAt,
+                            },
+                            opponent: null,
+                            startedAt: updated.startedAt,
+                            endedAt: new Date(),
+                        },
+                    });
+                }
+            }
+        } catch (err) {
+            this.logger.warn(
+                `Achievement checks failed for clan-wars ${battleId}: ${(err as Error).message}`,
+            );
+        }
 
         const finalBattle = await this.getClanWarsDetails(battleId);
         this.gateway.emitBattleCompleted(battleId, finalBattle);

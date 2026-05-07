@@ -28,9 +28,12 @@ import type {
     MatchHistoryEntry,
     NewsResponse,
     GithubActivity,
+    Achievement,
 } from '@/types/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { usersApi } from '@/services/users';
+import { achievementsApi } from '@/services/achievements';
+import { AchievementsGrid } from '@/components/achievements';
 import { getRankTier, getRankProgress, getRankTiers, getMmrToNextRankFloor } from '@/utils/rank';
 import {
     computeStreak,
@@ -68,6 +71,14 @@ export default function Dashboard() {
     const { data: history, isLoading: historyLoading } = useQuery<MatchHistoryEntry[]>({
         queryKey: queryKeys.matchHistory(userId, 20),
         queryFn: () => usersApi.getMatchHistory(userId, { limit: 20 }),
+        enabled: !!userId,
+    });
+
+    const { data: achievements, isLoading: achievementsLoading } = useQuery<
+        Achievement[]
+    >({
+        queryKey: queryKeys.achievements.mine(),
+        queryFn: () => achievementsApi.listMine(),
         enabled: !!userId,
     });
 
@@ -442,59 +453,61 @@ export default function Dashboard() {
                     />
                 </StatTileGrid>
 
-                {/* ---------------- HEATMAP + BREAKDOWN ---------------- */}
-                <div className="grid gap-6 lg:grid-cols-3">
-                    <AnimateIn className="lg:col-span-2" delay={0}>
-                        <HeatmapCard
-                            data={derived.heatmap}
-                            isLoading={historyLoading}
-                            title="Activity"
-                            githubUsername={githubActivity?.username}
-                            subtitle={
-                                <span className="text-xs text-muted-foreground">
-                                    {derived.heatmap.totalGames} battles
-                                    {derived.heatmap.totalGithubCommits > 0
-                                        ? ` · ${derived.heatmap.totalGithubCommits} GH commits`
-                                        : ''}
-                                    {longestGithubCodingStreak > 0
-                                        ? ` · ${longestGithubCodingStreak}d coding streak`
-                                        : ''}
-                                    {' · '}
-                                    {derived.heatmap.periodLabel}
-                                    {githubActivity?.username
-                                        ? ` · @${githubActivity.username}`
-                                        : ''}
-                                </span>
-                            }
-                            headerExtra={
-                                <select
-                                    value={heatmapYear}
-                                    onChange={(e) => setHeatmapYear(e.target.value)}
-                                    className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-                                    aria-label="Select activity year"
-                                >
-                                    <option value="rolling">Last 12 months</option>
-                                    {availableHeatmapYears.map((year) => (
-                                        <option key={year} value={String(year)}>
-                                            {year}
-                                        </option>
-                                    ))}
-                                </select>
-                            }
-                        />
-                    </AnimateIn>
+                {/* ---------------- HEATMAP ---------------- */}
+                <AnimateIn delay={0}>
+                    <HeatmapCard
+                        data={derived.heatmap}
+                        isLoading={historyLoading}
+                        title="Activity"
+                        githubUsername={githubActivity?.username}
+                        subtitle={
+                            <span className="text-xs text-muted-foreground">
+                                {derived.heatmap.totalGames} battles
+                                {derived.heatmap.totalGithubCommits > 0
+                                    ? ` · ${derived.heatmap.totalGithubCommits} GH commits`
+                                    : ''}
+                                {longestGithubCodingStreak > 0
+                                    ? ` · ${longestGithubCodingStreak}d coding streak`
+                                    : ''}
+                                {' · '}
+                                {derived.heatmap.periodLabel}
+                                {githubActivity?.username
+                                    ? ` · @${githubActivity.username}`
+                                    : ''}
+                            </span>
+                        }
+                        headerExtra={
+                            <select
+                                value={heatmapYear}
+                                onChange={(e) => setHeatmapYear(e.target.value)}
+                                className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                                aria-label="Select activity year"
+                            >
+                                <option value="rolling">Last 12 months</option>
+                                {availableHeatmapYears.map((year) => (
+                                    <option key={year} value={String(year)}>
+                                        {year}
+                                    </option>
+                                ))}
+                            </select>
+                        }
+                    />
+                </AnimateIn>
 
-                    <AnimateIn delay={150}>
-                        <Card className="h-full">
-                            <CardContent className="space-y-5 p-6">
-                                <div className="flex items-center gap-2">
-                                    <Target className="h-4 w-4 text-primary" />
-                                    <h2 className="text-base font-semibold">Play Breakdown</h2>
+                {/* ---------------- PLAY BREAKDOWN + ACHIEVEMENTS ---------------- */}
+                <AnimateIn delay={150}>
+                    <Card>
+                        <CardContent className="space-y-6 p-6">
+                            <div className="flex items-center gap-2">
+                                <Target className="h-4 w-4 text-primary" />
+                                <h2 className="text-base font-semibold">Play Breakdown</h2>
+                            </div>
+
+                            <div className="grid gap-6 md:grid-cols-3">
+                                <div className="md:col-span-2">
+                                    <ModeBreakdown dist={derived.modeDist} />
                                 </div>
-
-                                <ModeBreakdown dist={derived.modeDist} />
-
-                                <div className="grid grid-cols-2 gap-3 border-t border-border/60 pt-2">
+                                <div className="grid grid-cols-2 gap-4 md:grid-cols-1 md:border-l md:border-border/60 md:pl-6">
                                     <div>
                                         <p className="mb-1 text-xs text-muted-foreground">
                                             Favorite Lang
@@ -513,10 +526,17 @@ export default function Dashboard() {
                                         </div>
                                     </div>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </AnimateIn>
-                </div>
+                            </div>
+
+                            <div className="border-t border-border/60 pt-5">
+                                <AchievementsGrid
+                                    achievements={achievements ?? []}
+                                    isLoading={achievementsLoading}
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+                </AnimateIn>
 
                 {/* ---------------- NEWS ---------------- */}
                 <AnimateIn>

@@ -44,4 +44,8 @@ export const queryKeys = {
     friendStatus: {
         sent: () => ['friends', 'sent'] as const,
     },
+    achievements: {
+        mine: () => ['achievements', 'mine'] as const,
+        forUser: (userId: string) => ['achievements', userId] as const,
+    },
 };

@@ -6,12 +6,14 @@ import { CLAN_EVENTS_PORT } from './ports/clan-events.port';
 import { SEASON_EVENTS_PORT } from './ports/season-events.port';
 import { PRESENCE_PORT } from './ports/presence.port';
 import { SUBMISSION_EVENTS_PORT } from './ports/submission-events.port';
+import { ACHIEVEMENT_EVENTS_PORT } from './ports/achievement-events.port';
 import { BattleEventsGatewayAdapter } from './adapters/battle-events.gateway-adapter';
 import { FriendEventsGatewayAdapter } from './adapters/friend-events.gateway-adapter';
 import { ClanEventsGatewayAdapter } from './adapters/clan-events.gateway-adapter';
 import { SeasonEventsGatewayAdapter } from './adapters/season-events.gateway-adapter';
 import { PresenceGatewayAdapter } from './adapters/presence.gateway-adapter';
 import { SubmissionEventsGatewayAdapter } from './adapters/submission-events.gateway-adapter';
+import { AchievementEventsGatewayAdapter } from './adapters/achievement-events.gateway-adapter';
 
 // Ports module: domain features import this to emit websocket events without
 // pulling in `WebsocketsModule` directly. Each port is a narrow interface
@@ -30,6 +32,10 @@ import { SubmissionEventsGatewayAdapter } from './adapters/submission-events.gat
         { provide: SEASON_EVENTS_PORT, useClass: SeasonEventsGatewayAdapter },
         { provide: PRESENCE_PORT, useClass: PresenceGatewayAdapter },
         { provide: SUBMISSION_EVENTS_PORT, useClass: SubmissionEventsGatewayAdapter },
+        {
+            provide: ACHIEVEMENT_EVENTS_PORT,
+            useClass: AchievementEventsGatewayAdapter,
+        },
     ],
     exports: [
         BATTLE_EVENTS_PORT,
@@ -38,6 +44,7 @@ import { SubmissionEventsGatewayAdapter } from './adapters/submission-events.gat
         SEASON_EVENTS_PORT,
         PRESENCE_PORT,
         SUBMISSION_EVENTS_PORT,
+        ACHIEVEMENT_EVENTS_PORT,
     ],
 })
 export class RealtimeModule {}

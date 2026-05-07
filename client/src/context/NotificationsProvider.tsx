@@ -6,9 +6,14 @@ import {
     type ReactNode,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getChatSocket, getSocket } from '@/services/socket';
-import type { ChatMessagePayload } from '@/types/socket';
+import type {
+    AchievementUnlockedPayload,
+    ChatMessagePayload,
+} from '@/types/socket';
+import { queryKeys } from '@/lib/queryKeys';
 import {
     NotificationsContext,
     type InAppNotification,
@@ -19,6 +24,7 @@ const STORAGE_KEY = 'codequest.notifications';
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [notifications, setNotifications] = useState<InAppNotification[]>(() => {
         if (typeof window === 'undefined') return [];
         try {
@@ -145,6 +151,19 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
                     : '/contribute/mine',
             });
         };
+        const onAchievementUnlocked = (data: AchievementUnlockedPayload) => {
+            // Invalidate so the dashboard / profile grids re-fetch and the
+            // newly unlocked badge flips from greyscale to colored.
+            void queryClient.invalidateQueries({
+                queryKey: queryKeys.achievements.mine(),
+            });
+            push({
+                kind: 'ACHIEVEMENT_UNLOCKED',
+                title: `Achievement unlocked: ${data.title}`,
+                body: data.description,
+                href: '/dashboard',
+            });
+        };
 
         socket.on('friend.request_received', onFriendRequest);
         socket.on('clan.challenge_received', onClanChallenge);
@@ -155,6 +174,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         socket.on('submission.approved', onSubmissionApproved);
         socket.on('submission.rejected', onSubmissionRejected);
         socket.on('submission.changes_requested', onSubmissionChangesRequested);
+        socket.on('achievement.unlocked', onAchievementUnlocked);
         return () => {
             socket.off('friend.request_received', onFriendRequest);
             socket.off('clan.challenge_received', onClanChallenge);
@@ -165,8 +185,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             socket.off('submission.approved', onSubmissionApproved);
             socket.off('submission.rejected', onSubmissionRejected);
             socket.off('submission.changes_requested', onSubmissionChangesRequested);
+            socket.off('achievement.unlocked', onAchievementUnlocked);
         };
-    }, [push]);
+    }, [push, queryClient]);
 
     useEffect(() => {
         const socket = getChatSocket();

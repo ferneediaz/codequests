@@ -17,6 +17,7 @@ import { PracticeModule } from './practice/practice.module';
 import { AuthoringModule } from './problems/authoring/authoring.module';
 import { LobbyModule } from './lobby/lobby.module';
 import { ProblemSubmissionsModule } from './problem-submissions/problem-submissions.module';
+import { AchievementsModule } from './achievements/achievements.module';
 
 @Module({
     imports: [
@@ -50,6 +51,9 @@ import { ProblemSubmissionsModule } from './problem-submissions/problem-submissi
 
         // Community problem contributions + admin review (always available).
         ProblemSubmissionsModule,
+
+        // Achievements (catalog + per-user unlocks). Definitions seed on boot.
+        AchievementsModule,
 
         // TODO: Add these modules as we build them
         // RankingsModule,

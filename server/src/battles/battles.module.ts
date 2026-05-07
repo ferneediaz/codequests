@@ -10,6 +10,7 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { SeasonsModule } from '../seasons/seasons.module';
 import { ProblemsModule } from '../problems/problems.module';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { AchievementsModule } from '../achievements/achievements.module';
 
 @Module({
     imports: [
@@ -24,6 +25,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
         // inside WebsocketsModule, where the gateway needs BattlesService
         // for socket commands (useSkill, readyUp).
         RealtimeModule,
+        AchievementsModule,
     ],
     controllers: [BattlesController],
     providers: [BattlesService, BattleRoyaleService, ClanWarsService],

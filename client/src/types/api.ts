@@ -62,3 +62,8 @@ export type {
     NewsResponse,
 } from './news';
 export type { QuickPlayPreset } from './preset';
+export type {
+    Achievement,
+    AchievementCategory,
+    AchievementTier,
+} from './achievement';

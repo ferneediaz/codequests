@@ -127,3 +127,13 @@ export interface FriendRequestDeclinedPayload {
     addresseeId: string;
     addresseeUsername: string;
 }
+
+export interface AchievementUnlockedPayload {
+    userId: string;
+    achievementId: string;
+    title: string;
+    description: string;
+    icon: string;
+    tier: string;
+    unlockedAt: string;
+}
