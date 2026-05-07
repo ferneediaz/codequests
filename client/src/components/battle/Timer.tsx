@@ -2,33 +2,42 @@ import { useState, useEffect, useRef } from 'react';
 
 interface TimerProps {
     startedAt: string;
-    timeLimitMinutes: number;
+    timeLimitMinutes?: number;
+    timeLimitSeconds?: number;
     onTimeUp: () => void;
 }
 
-export function Timer({ startedAt, timeLimitMinutes, onTimeUp }: TimerProps) {
+export function Timer({ startedAt, timeLimitMinutes, timeLimitSeconds, onTimeUp }: TimerProps) {
+    const totalSeconds = timeLimitSeconds ?? (timeLimitMinutes ?? 0) * 60;
     const [secondsLeft, setSecondsLeft] = useState<number>(() => {
         const start = new Date(startedAt).getTime();
-        const end = start + timeLimitMinutes * 60 * 1000;
+        const end = start + totalSeconds * 1000;
         return Math.max(0, Math.floor((end - Date.now()) / 1000));
     });
+    // Read `onTimeUp` from a ref so callers can pass an inline lambda without
+    // re-creating the interval (and resetting `timeUpFired`) every render.
+    const onTimeUpRef = useRef(onTimeUp);
+    useEffect(() => {
+        onTimeUpRef.current = onTimeUp;
+    }, [onTimeUp]);
     const timeUpFired = useRef(false);
 
     useEffect(() => {
+        timeUpFired.current = false;
         const interval = setInterval(() => {
             const start = new Date(startedAt).getTime();
-            const end = start + timeLimitMinutes * 60 * 1000;
+            const end = start + totalSeconds * 1000;
             const remaining = Math.max(0, Math.floor((end - Date.now()) / 1000));
             setSecondsLeft(remaining);
 
             if (remaining <= 0 && !timeUpFired.current) {
                 timeUpFired.current = true;
-                onTimeUp();
+                onTimeUpRef.current();
             }
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [startedAt, timeLimitMinutes, onTimeUp]);
+    }, [startedAt, totalSeconds]);
 
     const minutes = Math.floor(secondsLeft / 60);
     const seconds = secondsLeft % 60;

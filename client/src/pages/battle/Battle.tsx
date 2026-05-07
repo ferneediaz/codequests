@@ -16,6 +16,7 @@ import { SubmissionFeedback } from '@/components/feedback/SubmissionFeedback';
 import { Button } from '@/components/ui/button';
 import { Loader2, Play, Send } from 'lucide-react';
 import { parseStarterCode } from '@/lib/starterCode';
+import { BattleRoyale } from './royale/BattleRoyale';
 
 export default function Battle() {
     const { id } = useParams<{ id: string }>();
@@ -154,6 +155,10 @@ export default function Battle() {
                 onUnready={unready}
             />
         );
+    }
+
+    if (battle.mode === 'BATTLE_ROYALE') {
+        return <BattleRoyale battle={battle} currentUserId={userId} />;
     }
 
     if (!problem) {

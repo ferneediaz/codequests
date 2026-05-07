@@ -73,12 +73,14 @@ export function useBattleSocket(battleId: string, userId: string | undefined) {
                 ...current,
                 status: data.status,
                 startedAt: data.startedAt,
-                problemId: current.problemId ?? data.problem.id,
+                problemId: current.problemId ?? data.problem?.id,
             }));
-            queryClient.setQueryData(
-                queryKeys.problem(data.problem.id),
-                data.problem as ProblemResponse,
-            );
+            if (data.problem) {
+                queryClient.setQueryData(
+                    queryKeys.problem(data.problem.id),
+                    data.problem as ProblemResponse,
+                );
+            }
         };
 
         const handleSubmission = (data: BattleSubmissionPayload) => {

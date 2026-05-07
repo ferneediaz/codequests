@@ -6,6 +6,8 @@ export type MatchmakingStatus = 'QUEUED' | 'MATCHED' | 'EXPIRED';
 export type SkillType = 'FREEZE' | 'SCRAMBLE' | 'BLIND' | 'TIME_STEAL' | 'FOG_OF_WAR';
 export type BattleRoyaleFormat = 'SAME_PROBLEM' | 'SCORE_ATTACK';
 export type ClanWarsFormat = 'SAME_PROBLEM' | 'SCORE_ATTACK';
+export type BattleRoundStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+export type BattleRoundEndReason = 'EARLY_ALL_PASSED' | 'TIMER' | 'NO_PLAYERS';
 
 /**
  * Configuration for a single Battle Royale round.
@@ -113,6 +115,15 @@ export interface BattleParticipant {
     };
 }
 
+export interface ProblemPoolItem {
+    id: string;
+    problemId: string;
+    title: string;
+    difficulty: Difficulty;
+    pointValue: number;
+    problem?: ProblemResponse;
+}
+
 export interface BattleResponse {
     id: string;
     mode: BattleMode;
@@ -130,6 +141,10 @@ export interface BattleResponse {
     enabledSkills?: SkillType[];
     inviteCode?: string;
     inviteExpiresAt?: string;
+    battleRoyaleFormat?: BattleRoyaleFormat;
+    maxPlayers?: number;
+    currentRound?: number;
+    problemPool?: ProblemPoolItem[] | { items: ProblemPoolItem[] };
 }
 
 export interface TestCaseResult {
@@ -191,4 +206,86 @@ export interface QueueStatusResponse {
     status?: MatchmakingStatus;
     queuedAt?: string;
     battleId?: string;
+}
+
+export interface BattleRoundSubmission {
+    id?: string;
+    roundId?: string;
+    battleId?: string;
+    userId: string;
+    problemId?: string | null;
+    code?: string | null;
+    language?: string | null;
+    testsPassed: number;
+    totalTests: number;
+    pointsEarned?: number;
+    allPassed?: boolean;
+    submittedAt?: string | null;
+}
+
+export interface BattleRoundResponse {
+    id: string;
+    battleId: string;
+    roundNumber: number;
+    status: BattleRoundStatus;
+    timeLimitSeconds: number;
+    eliminateCount: number;
+    problemId?: string | null;
+    startedAt?: string | null;
+    endedAt?: string | null;
+    endedReason?: BattleRoundEndReason | null;
+    submissions?: BattleRoundSubmission[];
+}
+
+export interface BattleRoyaleStandingsEntry {
+    userId: string;
+    username?: string;
+    avatarUrl?: string | null;
+    mmr?: number;
+    isEliminated: boolean;
+    placement?: number | null;
+    eliminatedInRound?: number | null;
+    cumulativePoints: number;
+    roundPoints: number;
+    testsPassed: number;
+    totalTests: number;
+    lastSubmittedAt?: string | null;
+}
+
+export interface BattleRoyaleStandingsResponse {
+    battleId: string;
+    currentRound: number;
+    standings: BattleRoyaleStandingsEntry[];
+}
+
+export interface BattleRoyaleRoundStartPayload {
+    battleId: string;
+    roundNumber: number;
+    totalRounds: number;
+    problemId: string | null;
+    timeLimitSeconds: number;
+    eliminateCount: number;
+    remainingUserIds: string[];
+    startedAt: string;
+}
+
+export interface BattleRoyaleRoundEndPayload {
+    battleId: string;
+    roundNumber: number;
+    endedReason: BattleRoundEndReason;
+    eliminatedUserIds: string[];
+    standings: BattleRoyaleStandingsEntry[];
+}
+
+export interface BattleRoyaleEliminationPayload {
+    battleId: string;
+    userId: string;
+    roundNumber: number;
+    placement: number;
+}
+
+export interface BattleRoyaleStandingsPayload {
+    battleId: string;
+    roundNumber: number;
+    standings: BattleRoyaleStandingsEntry[];
 }

@@ -15,7 +15,7 @@ export interface BattleStartedPayload {
     battleId: string;
     status: BattleStatus;
     startedAt: string;
-    problem: ProblemResponse;
+    problem?: ProblemResponse;
     participants: Pick<BattleParticipant, 'userId' | 'username' | 'isReady'>[];
 }
 

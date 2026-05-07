@@ -6,6 +6,11 @@ export const queryKeys = {
     githubActivity: (userId: string, year: string) =>
         ['githubActivity', userId, year] as const,
     battle: (battleId: string) => ['battle', battleId] as const,
+    battleRounds: (battleId: string) => ['battle', battleId, 'rounds'] as const,
+    battleRound: (battleId: string, roundNumber: number) =>
+        ['battle', battleId, 'rounds', roundNumber] as const,
+    battleStandings: (battleId: string) =>
+        ['battle', battleId, 'standings'] as const,
     problem: (problemId: string) => ['problem', problemId] as const,
     battlePresets: {
         royale: () => ['battles', 'royale', 'presets'] as const,

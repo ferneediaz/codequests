@@ -1,6 +1,8 @@
 import api from './api';
 import type {
     BattleResponse,
+    BattleRoundResponse,
+    BattleRoyaleStandingsResponse,
     ClanWarsPreset,
     CreateBattleRequest,
     CreateClanWarsRequest,
@@ -22,6 +24,27 @@ export const battlesApi = {
 
     async getRoyalePresets(): Promise<RoyalePreset[]> {
         const { data } = await api.get<RoyalePreset[]>('/battles/royale/presets');
+        return data;
+    },
+
+    async listRounds(battleId: string): Promise<BattleRoundResponse[]> {
+        const { data } = await api.get<BattleRoundResponse[]>(
+            `/battles/${battleId}/rounds`,
+        );
+        return data;
+    },
+
+    async getRound(battleId: string, roundNumber: number): Promise<BattleRoundResponse> {
+        const { data } = await api.get<BattleRoundResponse>(
+            `/battles/${battleId}/rounds/${roundNumber}`,
+        );
+        return data;
+    },
+
+    async getStandings(battleId: string): Promise<BattleRoyaleStandingsResponse> {
+        const { data } = await api.get<BattleRoyaleStandingsResponse>(
+            `/battles/${battleId}/standings`,
+        );
         return data;
     },
 
@@ -63,7 +86,7 @@ export const battlesApi = {
 
     async submitCode(
         battleId: string,
-        payload: { code: string; language: string },
+        payload: { code: string; language: string; problemId?: string },
     ): Promise<SubmissionResult> {
         const { data } = await api.post<SubmissionResult>(
             `/battles/${battleId}/submit`,

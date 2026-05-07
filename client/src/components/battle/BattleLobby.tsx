@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { RankBadge } from '@/components/ui/RankBadge';
 import { Separator } from '@/components/ui/separator';
 import {
     Copy,
@@ -29,7 +30,17 @@ export function BattleLobby({ battle, currentUserId, onReady, onUnready }: Battl
 
     const currentParticipant = battle.participants.find((p) => p.userId === currentUserId);
     const isReady = currentParticipant?.isReady ?? false;
-    const allReady = battle.participants.length >= 2 && battle.participants.every((p) => p.isReady);
+    // Battle Royale lobbies must be FULL before the server lets anyone ready
+    // up (see BattlesService). For non-BR modes, the server only requires 2.
+    const isRoyale = battle.mode === 'BATTLE_ROYALE';
+    const requiredPlayers = isRoyale ? battle.maxPlayers : 2;
+    const lobbyIsFull =
+        requiredPlayers != null && battle.participants.length >= requiredPlayers;
+    const allReady = lobbyIsFull && battle.participants.every((p) => p.isReady);
+    const playersNeeded =
+        requiredPlayers != null
+            ? Math.max(0, requiredPlayers - battle.participants.length)
+            : null;
 
     const handleCopyCode = async () => {
         if (!battle.inviteCode) return;
@@ -63,7 +74,9 @@ export function BattleLobby({ battle, currentUserId, onReady, onUnready }: Battl
                     <div className="text-center">
                         <h2 className="text-2xl font-bold text-foreground">Battle Lobby</h2>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Waiting for all players to ready up
+                            {battle.mode === 'BATTLE_ROYALE'
+                                ? 'Fill the lobby, then ready up for round one'
+                                : 'Waiting for all players to ready up'}
                         </p>
                     </div>
 
@@ -91,7 +104,11 @@ export function BattleLobby({ battle, currentUserId, onReady, onUnready }: Battl
                     {/* Players */}
                     <div className="space-y-3">
                         <h3 className="text-sm font-medium text-muted-foreground">
-                            Players ({battle.participants.length})
+                            Players ({battle.participants.length}
+                            {isRoyale && requiredPlayers != null
+                                ? `/${requiredPlayers}`
+                                : ''}
+                            )
                         </h3>
                         {battle.participants.map((p) => {
                             const username = p.username || p.user?.username || 'Unknown';
@@ -101,13 +118,29 @@ export function BattleLobby({ battle, currentUserId, onReady, onUnready }: Battl
                                 className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-bold">
-                                        {username.charAt(0).toUpperCase()}
-                                    </div>
-                                    <span className="font-medium text-foreground">
-                                        {username}
-                                        {p.userId === currentUserId && (
-                                            <span className="ml-1 text-xs text-muted-foreground">(you)</span>
+                                    {p.user?.avatarUrl ? (
+                                        <img
+                                            src={p.user.avatarUrl}
+                                            alt=""
+                                            className="h-8 w-8 rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-bold">
+                                            {username.charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
+                                    <span className="min-w-0 font-medium text-foreground">
+                                        <span>
+                                            {username}
+                                            {p.userId === currentUserId && (
+                                                <span className="ml-1 text-xs text-muted-foreground">(you)</span>
+                                            )}
+                                        </span>
+                                        {p.user?.mmr != null && (
+                                            <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                                                {p.user.mmr} MMR
+                                                <RankBadge mmr={p.user.mmr} className="text-[10px]" />
+                                            </span>
                                         )}
                                     </span>
                                 </div>
@@ -132,14 +165,18 @@ export function BattleLobby({ battle, currentUserId, onReady, onUnready }: Battl
                         className="w-full h-12 text-base"
                         variant={isReady ? 'outline' : 'default'}
                         onClick={isReady ? onUnready : onReady}
-                        disabled={battle.participants.length < 2 && !isReady}
+                        disabled={!lobbyIsFull && !isReady}
                     >
                         {isReady ? 'Cancel Ready' : 'Ready Up'}
                     </Button>
 
-                    {battle.participants.length < 2 && (
+                    {!lobbyIsFull && (
                         <p className="text-center text-xs text-muted-foreground">
-                            Need at least 2 players to start
+                            {isRoyale && playersNeeded != null
+                                ? `Need ${playersNeeded} more player${playersNeeded === 1 ? '' : 's'} to fill this Battle Royale lobby`
+                                : isRoyale
+                                  ? 'Waiting for the lobby size to load…'
+                                  : 'Need at least 2 players to start'}
                         </p>
                     )}
 

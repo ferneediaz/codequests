@@ -63,13 +63,11 @@
 
 **Current focus queue:**
 
-1. **Chat completion (Phase 3.2)** — realtime battle/lobby/DM chat is in place.
-   Finish remaining history + full DM inbox UX.
-2. **Clan pages/challenges (Phase 3.3/3.4)** — next major social feature set
-   once chat follow-ups are done.
+1. **Battle Royale UI (Phase 4.1)** — in-game multi-round BR flow is in place.
+   Follow up with manual 6-8 player playtesting once enough clients are available.
+2. **Push notifications (3.5)** — next social/system follow-up after BR playtesting.
 
-Push notifications (3.5) comes after clans/challenges. Avoid Battle Royale UI
-and Achievements until their server TODOs close out.
+Avoid Achievements until their server TODOs close out.
 
 ---
 
@@ -554,33 +552,33 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
 **Depends on backend:** BR elimination module, Achievements module, Problem import pipeline.
 
 ### 4.1 Battle Royale UI
-- [ ] Pre-game lobby:
-  - [ ] Show all joined players (avatars, usernames, MMR, rank)
-  - [ ] Player count: "4/6 players joined"
-  - [ ] Creator can start early or wait for full lobby
-  - [ ] Chat in lobby
-- [ ] Round system:
-  - [ ] Round indicator: "Round 1 of 3"
-  - [ ] Problem loads at round start
-  - [ ] Code editor + submit (same as 1v1)
-  - [ ] Live standings board (who passed how many tests, sorted by progress)
-  - [ ] Round timer
-- [ ] Elimination between rounds:
-  - [ ] Round end screen: standings + eliminated players highlighted in red
-  - [ ] "X players eliminated" announcement
-  - [ ] Transition animation to next round (3-second countdown)
-  - [ ] Eliminated players become spectators (view-only mode)
-- [ ] Final round:
-  - [ ] "FINAL ROUND" banner
-  - [ ] 2 players remaining
-  - [ ] Standard 1v1 format
-  - [ ] Full win celebration for champion
-- [ ] Overall standings at end:
-  - [ ] 1st, 2nd, 3rd place with podium-style display
-  - [ ] MMR changes for all players
-  - [ ] Round-by-round breakdown
-- [ ] WebSocket events:
-  - [ ] Listen `battle.round_start`, `battle.round_end`, `battle.elimination`, `battle.royale_standings`
+- [x] Pre-game lobby:
+  - [x] Show all joined players (avatars/usernames via existing lobby rows)
+  - [x] Player count: "4/6 players joined"
+  - [x] Start follows server full-lobby ready-up rules
+  - [x] Chat in lobby via existing battle chat room
+- [x] Round system:
+  - [x] Round indicator: "Round 1 of 3"
+  - [x] Problem loads at round start
+  - [x] Code editor + submit (same as 1v1)
+  - [x] Live standings board (tests/points, sorted by progress)
+  - [x] Round timer
+- [x] Elimination between rounds:
+  - [x] Round end screen: standings + eliminated players highlighted in red
+  - [x] "X players eliminated" announcement
+  - [x] Transition animation to next round (3-second countdown)
+  - [x] Eliminated players become spectators (view-only mode)
+- [x] Final round:
+  - [x] "FINAL ROUND" banner
+  - [x] 2 players remaining
+  - [x] Standard 1v1-style editor/submit format
+  - [ ] Full win celebration for champion (Phase 2.3 polish)
+- [x] Overall standings at end:
+  - [x] 1st, 2nd, 3rd place with podium-style display
+  - [x] MMR changes for podium players
+  - [x] Round-by-round breakdown
+- [x] WebSocket events:
+  - [x] Listen `battle.round_start`, `battle.round_end`, `battle.elimination`, `battle.royale_standings`
 - [ ] **Success Criteria:** Full 6-8 player BR plays through all elimination rounds to winner ✅
 
 ### 4.2 Problem Contribution & Admin
