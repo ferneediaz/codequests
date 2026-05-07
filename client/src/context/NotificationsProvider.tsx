@@ -96,18 +96,75 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
                 href: data.battleId ? `/battle/${data.battleId}` : '/matchmaking',
             });
         };
+        const onSubmissionForReview = (data: {
+            submissionId?: string;
+            title?: string;
+            submitterUsername?: string;
+        }) => {
+            push({
+                kind: 'PROBLEM_SUBMITTED',
+                title: `${data.submitterUsername ?? 'Someone'} submitted a problem`,
+                body: data.title,
+                href: data.submissionId
+                    ? `/admin/review/${data.submissionId}`
+                    : '/admin/review',
+            });
+        };
+        const onSubmissionApproved = (data: {
+            title?: string;
+            linkedProblemId?: string | null;
+        }) => {
+            push({
+                kind: 'PROBLEM_APPROVED',
+                title: 'Your problem was approved',
+                body: data.title,
+                href: data.linkedProblemId
+                    ? `/practice/${data.linkedProblemId}`
+                    : '/contribute/mine',
+            });
+        };
+        const onSubmissionRejected = (data: { title?: string; reviewNotes?: string | null }) => {
+            push({
+                kind: 'PROBLEM_REJECTED',
+                title: 'Your submission was rejected',
+                body: data.reviewNotes ?? data.title,
+                href: '/contribute/mine',
+            });
+        };
+        const onSubmissionChangesRequested = (data: {
+            title?: string;
+            reviewNotes?: string | null;
+            submissionId?: string;
+        }) => {
+            push({
+                kind: 'PROBLEM_CHANGES_REQUESTED',
+                title: 'Changes requested on your submission',
+                body: data.reviewNotes ?? data.title,
+                href: data.submissionId
+                    ? `/contribute/${data.submissionId}/edit`
+                    : '/contribute/mine',
+            });
+        };
 
         socket.on('friend.request_received', onFriendRequest);
         socket.on('clan.challenge_received', onClanChallenge);
         socket.on('clan.join_request_received', onJoinRequest);
         socket.on('battle.invite_received', onInvite);
         socket.on('matchmaking.matched', onMatched);
+        socket.on('submission.new_for_review', onSubmissionForReview);
+        socket.on('submission.approved', onSubmissionApproved);
+        socket.on('submission.rejected', onSubmissionRejected);
+        socket.on('submission.changes_requested', onSubmissionChangesRequested);
         return () => {
             socket.off('friend.request_received', onFriendRequest);
             socket.off('clan.challenge_received', onClanChallenge);
             socket.off('clan.join_request_received', onJoinRequest);
             socket.off('battle.invite_received', onInvite);
             socket.off('matchmaking.matched', onMatched);
+            socket.off('submission.new_for_review', onSubmissionForReview);
+            socket.off('submission.approved', onSubmissionApproved);
+            socket.off('submission.rejected', onSubmissionRejected);
+            socket.off('submission.changes_requested', onSubmissionChangesRequested);
         };
     }, [push]);
 

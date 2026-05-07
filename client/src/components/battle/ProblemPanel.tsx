@@ -1,4 +1,5 @@
 import type { ProblemResponse } from '@/types/api';
+import { Link } from 'react-router-dom';
 import { MarkdownContent } from '@/components/MarkdownContent';
 
 interface ProblemPanelProps {
@@ -12,16 +13,29 @@ export function ProblemPanel({ problem }: ProblemPanelProps) {
         <div className="flex flex-col p-4">
             <div className="mb-4">
                 <h2 className="text-xl font-bold text-foreground">{problem.title}</h2>
-                <span
-                    className={`mt-1 inline-block rounded px-2 py-0.5 text-xs font-medium ${problem.difficulty === 'EASY'
-                        ? 'bg-green-500/20 text-green-400'
-                        : problem.difficulty === 'MEDIUM'
-                            ? 'bg-yellow-500/20 text-yellow-400'
-                            : 'bg-red-500/20 text-red-400'
-                        }`}
-                >
-                    {problem.difficulty}
-                </span>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span
+                        className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${problem.difficulty === 'EASY'
+                            ? 'bg-green-500/20 text-green-400'
+                            : problem.difficulty === 'MEDIUM'
+                                ? 'bg-yellow-500/20 text-yellow-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}
+                    >
+                        {problem.difficulty}
+                    </span>
+                    {problem.contributedBy && (
+                        <span className="text-[11px] text-muted-foreground">
+                            Contributed by{' '}
+                            <Link
+                                to={`/profile/${problem.contributedBy.username}`}
+                                className="font-medium text-primary hover:underline"
+                            >
+                                @{problem.contributedBy.username}
+                            </Link>
+                        </span>
+                    )}
+                </div>
             </div>
 
             <div className="mb-6 max-w-none">

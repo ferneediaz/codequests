@@ -1,5 +1,6 @@
+import { useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useAuthorForm } from './new/useAuthorForm';
+import { useAuthorForm, type AuthorFormMode } from './new/useAuthorForm';
 import { AuthorHeader } from './new/components/AuthorHeader';
 import { DescriptionSection } from './new/components/DescriptionSection';
 import { HintsSection } from './new/components/HintsSection';
@@ -10,20 +11,40 @@ import { StarterSection } from './new/components/StarterSection';
 import { TestsSection } from './new/components/TestsSection';
 import { YamlPreview } from './new/components/YamlPreview';
 
+interface AuthorNewProps {
+    /** Defaults to dev YAML mode. `/contribute` passes 'submit'; `/contribute/:id/edit` passes 'edit'. */
+    mode?: AuthorFormMode;
+}
+
 /**
- * Dev-only blank-slate problem authoring page. Two-column workbench with a
- * pinned live YAML preview: left column is the structured form, center
- * column is the starter-code editor + ad-hoc tests, right column renders
- * the current YAML on every keystroke.
+ * Structured problem authoring shell. Renders the same form in three modes:
+ *
+ *   - 'yaml-copy': dev iteration. Copy YAML for manual placement in
+ *     `server/problems/`. Mounted at `/author/new` (dev builds only).
+ *   - 'submit': community contribution. POSTs to `/problem-submissions`.
+ *     Mounted at `/contribute`.
+ *   - 'edit': contributor revising a NEEDS_CHANGES submission. PATCHes the
+ *     existing row. Mounted at `/contribute/:id/edit`.
  */
-export default function AuthorNew() {
-    const form = useAuthorForm();
+export default function AuthorNew({ mode = 'yaml-copy' }: AuthorNewProps) {
+    const params = useParams<{ id?: string }>();
+    const form = useAuthorForm({ mode, submissionId: params.id });
+
+    if (mode === 'edit' && !form.prefillLoaded) {
+        return (
+            <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center text-sm text-muted-foreground">
+                {form.prefillError ?? 'Loading submission…'}
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-[calc(100vh-3.5rem)] flex-col">
             <AuthorHeader
+                mode={mode}
                 state={form.state}
                 isRunning={form.isRunning}
+                isSubmitting={form.isSubmitting}
                 copied={form.copied}
                 yamlOpen={form.yamlOpen}
                 errors={form.liveYaml.errors}
@@ -31,6 +52,8 @@ export default function AuthorNew() {
                 effectiveActiveLang={form.effectiveActiveLang}
                 onRun={form.handleRun}
                 onCopy={form.handleCopy}
+                onSubmit={form.handleSubmit}
+                onSubmitEdit={form.handleSubmitEdit}
                 onToggleYaml={() => form.setYamlOpen((v) => !v)}
             />
 
@@ -82,6 +105,7 @@ export default function AuthorNew() {
 
                 <div className="grid grid-rows-[1.8fr_1fr] overflow-hidden border-r border-border">
                     <StarterSection
+                        mode={mode}
                         state={form.state}
                         effectiveActiveLang={form.effectiveActiveLang}
                         availableLangs={form.availableLangs}

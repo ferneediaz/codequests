@@ -39,6 +39,9 @@ export class ProblemsService {
             },
             include: {
                 testCases: true,
+                contributedBy: {
+                    select: { id: true, username: true, avatarUrl: true },
+                },
             },
         });
         return stripPracticeOnlyFields(created);
@@ -66,6 +69,9 @@ export class ProblemsService {
                     testCases: {
                         where: { isHidden: false }, // Only include visible test cases
                     },
+                    contributedBy: {
+                        select: { id: true, username: true, avatarUrl: true },
+                    },
                 },
             }),
             this.prisma.problem.count({ where }),
@@ -90,6 +96,9 @@ export class ProblemsService {
             where: { id },
             include: {
                 testCases: includeHidden ? true : { where: { isHidden: false } },
+                contributedBy: {
+                    select: { id: true, username: true, avatarUrl: true },
+                },
             },
         });
 
@@ -126,6 +135,9 @@ export class ProblemsService {
                 testCases: {
                     where: { isHidden: false }, // Only visible test cases
                 },
+                contributedBy: {
+                    select: { id: true, username: true, avatarUrl: true },
+                },
             },
         });
 
@@ -149,6 +161,9 @@ export class ProblemsService {
             },
             include: {
                 testCases: true,
+                contributedBy: {
+                    select: { id: true, username: true, avatarUrl: true },
+                },
             },
         });
         return stripPracticeOnlyFields(updated);

@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronRight, Copy, Loader2, Play } from 'lucide-react';
+import { ArrowLeft, Check, ChevronRight, Copy, Loader2, Play, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { AuthoringLanguage, BuilderState } from '../types';
+import type { AuthorFormMode } from '../useAuthorForm';
 
 interface AuthorHeaderProps {
+    mode: AuthorFormMode;
     state: BuilderState;
     isRunning: boolean;
+    isSubmitting: boolean;
     copied: boolean;
     yamlOpen: boolean;
     errors: string[];
@@ -14,12 +17,28 @@ interface AuthorHeaderProps {
     effectiveActiveLang: AuthoringLanguage;
     onRun: () => void;
     onCopy: () => void;
+    onSubmit: () => void;
+    onSubmitEdit: () => void;
     onToggleYaml: () => void;
 }
 
+const BACK_LINK_BY_MODE: Record<AuthorFormMode, { to: string; label: string }> = {
+    'yaml-copy': { to: '/author', label: 'All drafts' },
+    submit: { to: '/contribute/mine', label: 'My submissions' },
+    edit: { to: '/contribute/mine', label: 'My submissions' },
+};
+
+const TITLE_FALLBACK_BY_MODE: Record<AuthorFormMode, string> = {
+    'yaml-copy': 'New problem',
+    submit: 'Contribute a problem',
+    edit: 'Edit submission',
+};
+
 export function AuthorHeader({
+    mode,
     state,
     isRunning,
+    isSubmitting,
     copied,
     yamlOpen,
     errors,
@@ -27,19 +46,26 @@ export function AuthorHeader({
     effectiveActiveLang,
     onRun,
     onCopy,
+    onSubmit,
+    onSubmitEdit,
     onToggleYaml,
 }: AuthorHeaderProps) {
+    const back = BACK_LINK_BY_MODE[mode];
+    const titleFallback = TITLE_FALLBACK_BY_MODE[mode];
+    const showCopyYaml = mode === 'yaml-copy';
+    const showSubmit = mode === 'submit' || mode === 'edit';
+    const submitLabel = mode === 'edit' ? 'Resubmit for review' : 'Submit for review';
     return (
         <div className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-2">
             <div className="flex items-center gap-3">
-                <Link to="/author">
+                <Link to={back.to}>
                     <Button variant="ghost" size="sm">
-                        <ArrowLeft className="mr-1.5 h-4 w-4" /> All drafts
+                        <ArrowLeft className="mr-1.5 h-4 w-4" /> {back.label}
                     </Button>
                 </Link>
                 <div>
                     <div className="text-sm font-semibold">
-                        {state.title || 'New problem'}
+                        {state.title || titleFallback}
                     </div>
                     <div className="text-[11px] text-muted-foreground">
                         {state.id || '(auto-slug)'} · {state.difficulty} ·{' '}
@@ -61,23 +87,44 @@ export function AuthorHeader({
                     )}
                     Run tests ({effectiveActiveLang})
                 </Button>
-                <Button
-                    onClick={onCopy}
-                    size="sm"
-                    disabled={errors.length > 0}
-                    title={
-                        errors.length > 0
-                            ? 'Fix validation errors first'
-                            : 'Copy YAML to clipboard'
-                    }
-                >
-                    {copied ? (
-                        <Check className="mr-1.5 h-3.5 w-3.5" />
-                    ) : (
-                        <Copy className="mr-1.5 h-3.5 w-3.5" />
-                    )}
-                    Copy YAML
-                </Button>
+                {showCopyYaml && (
+                    <Button
+                        onClick={onCopy}
+                        size="sm"
+                        disabled={errors.length > 0}
+                        title={
+                            errors.length > 0
+                                ? 'Fix validation errors first'
+                                : 'Copy YAML to clipboard'
+                        }
+                    >
+                        {copied ? (
+                            <Check className="mr-1.5 h-3.5 w-3.5" />
+                        ) : (
+                            <Copy className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        Copy YAML
+                    </Button>
+                )}
+                {showSubmit && (
+                    <Button
+                        onClick={mode === 'edit' ? onSubmitEdit : onSubmit}
+                        size="sm"
+                        disabled={isSubmitting || errors.length > 0}
+                        title={
+                            errors.length > 0
+                                ? 'Fix validation errors first'
+                                : "We'll run your reference solution against every test before publishing."
+                        }
+                    >
+                        {isSubmitting ? (
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <Send className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        {submitLabel}
+                    </Button>
+                )}
                 <Button onClick={onToggleYaml} size="sm" variant="ghost">
                     <ChevronRight
                         className={cn(

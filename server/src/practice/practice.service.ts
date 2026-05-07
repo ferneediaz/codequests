@@ -128,6 +128,9 @@ export class PracticeService {
             where: { id: problemId },
             include: {
                 testCases: { where: { isHidden: false } },
+                contributedBy: {
+                    select: { id: true, username: true, avatarUrl: true },
+                },
             },
         });
         if (!problem) {

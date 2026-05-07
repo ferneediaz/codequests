@@ -186,6 +186,15 @@ export interface ProblemResponse {
         expectedOutput: string;
         isHidden: boolean;
     }[];
+    /**
+     * Set when this problem was promoted from a community submission. Used
+     * by the problem panel to credit the contributor inline.
+     */
+    contributedBy?: {
+        id: string;
+        username: string;
+        avatarUrl: string | null;
+    } | null;
     createdAt: string;
     updatedAt: string;
 }

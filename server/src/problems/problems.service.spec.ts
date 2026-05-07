@@ -26,6 +26,14 @@ describe('ProblemsService', () => {
     prisma = module.get<MockPrismaService>(PrismaService);
   });
 
+  // Shared shape: every read/write surface that returns a Problem now also
+  // includes the contributor relation so the client can render
+  // "Contributed by @username". Pinned here so any silent drop of the
+  // include in the service trips a test.
+  const CONTRIBUTED_BY_INCLUDE = {
+    select: { id: true, username: true, avatarUrl: true },
+  } as const;
+
   describe('create', () => {
     it('should create a problem with test cases', async () => {
       const createDto = {
@@ -66,6 +74,7 @@ describe('ProblemsService', () => {
         },
         include: {
           testCases: true,
+          contributedBy: CONTRIBUTED_BY_INCLUDE,
         },
       });
       expect(result).toEqual(createdProblem);
@@ -97,6 +106,7 @@ describe('ProblemsService', () => {
           testCases: {
             where: { isHidden: false },
           },
+          contributedBy: CONTRIBUTED_BY_INCLUDE,
         },
       });
       expect(result.data).toEqual(problems);
@@ -138,6 +148,7 @@ describe('ProblemsService', () => {
         where: { id: 'problem-1' },
         include: {
           testCases: { where: { isHidden: false } },
+          contributedBy: CONTRIBUTED_BY_INCLUDE,
         },
       });
       expect(result).toEqual(problem);
@@ -161,6 +172,7 @@ describe('ProblemsService', () => {
         where: { id: 'problem-1' },
         include: {
           testCases: true,
+          contributedBy: CONTRIBUTED_BY_INCLUDE,
         },
       });
       expect(result.testCases).toHaveLength(2);
@@ -196,6 +208,7 @@ describe('ProblemsService', () => {
           testCases: {
             where: { isHidden: false },
           },
+          contributedBy: CONTRIBUTED_BY_INCLUDE,
         },
       });
       expect(result).toEqual(problem);
@@ -249,6 +262,7 @@ describe('ProblemsService', () => {
         },
         include: {
           testCases: true,
+          contributedBy: CONTRIBUTED_BY_INCLUDE,
         },
       });
       expect(result.title).toBe('New Title');
@@ -303,9 +317,14 @@ describe('ProblemsService', () => {
       const result = await service.getTestCases('problem-1');
 
       expect(result).toHaveLength(2);
+      // getTestCases delegates to findOne(true), which now also pulls
+      // contributedBy alongside the hidden-test-case include.
       expect(prisma.problem.findUnique).toHaveBeenCalledWith({
         where: { id: 'problem-1' },
-        include: { testCases: true },
+        include: {
+          testCases: true,
+          contributedBy: CONTRIBUTED_BY_INCLUDE,
+        },
       });
     });
 
@@ -315,6 +334,70 @@ describe('ProblemsService', () => {
       await expect(service.getTestCases('nonexistent')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('contributor attribution', () => {
+    // Pins the contract that contributor metadata produced by the new
+    // ProblemSubmission approval flow is preserved on read paths. Without
+    // this test, dropping the include in the service would only fail the
+    // toHaveBeenCalledWith assertions above — this also catches a
+    // mistakenly-stripped field on the way out (e.g. via a future
+    // projection/select change).
+    it('preserves contributedBy on findOne responses', async () => {
+      const contributedBy = {
+        id: 'user-42',
+        username: 'sleepysloth',
+        avatarUrl: null,
+      };
+      prisma.problem.findUnique.mockResolvedValue({
+        id: 'problem-1',
+        title: 'Two Sum',
+        testCases: [],
+        contributedBy,
+      });
+
+      const result = await service.findOne('problem-1');
+
+      expect(result.contributedBy).toEqual(contributedBy);
+    });
+
+    it('preserves contributedBy on findAll responses', async () => {
+      const contributedBy = {
+        id: 'user-42',
+        username: 'sleepysloth',
+        avatarUrl: 'https://example.com/avatar.png',
+      };
+      prisma.problem.findMany.mockResolvedValue([
+        {
+          id: 'problem-1',
+          title: 'Two Sum',
+          testCases: [],
+          contributedBy,
+        },
+      ]);
+      prisma.problem.count.mockResolvedValue(1);
+
+      const result = await service.findAll();
+
+      expect(result.data[0].contributedBy).toEqual(contributedBy);
+    });
+
+    it('returns null contributedBy for YAML-imported problems', async () => {
+      // Problems seeded from server/problems/*.yaml have no submitter, so
+      // the relation resolves to null. The shape must still surface the
+      // field (rather than being undefined) so the client can branch
+      // cleanly on `problem.contributedBy ?? null`.
+      prisma.problem.findUnique.mockResolvedValue({
+        id: 'problem-1',
+        title: 'Two Sum',
+        testCases: [],
+        contributedBy: null,
+      });
+
+      const result = await service.findOne('problem-1');
+
+      expect(result.contributedBy).toBeNull();
     });
   });
 });

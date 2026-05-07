@@ -16,6 +16,7 @@ import { ChatModule } from './chat/chat.module';
 import { PracticeModule } from './practice/practice.module';
 import { AuthoringModule } from './problems/authoring/authoring.module';
 import { LobbyModule } from './lobby/lobby.module';
+import { ProblemSubmissionsModule } from './problem-submissions/problem-submissions.module';
 
 @Module({
     imports: [
@@ -46,6 +47,9 @@ import { LobbyModule } from './lobby/lobby.module';
 
         // Dev-only routes gated by ENABLE_AUTHOR_TOOLS=true at runtime.
         AuthoringModule,
+
+        // Community problem contributions + admin review (always available).
+        ProblemSubmissionsModule,
 
         // TODO: Add these modules as we build them
         // RankingsModule,

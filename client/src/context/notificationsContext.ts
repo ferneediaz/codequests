@@ -8,7 +8,11 @@ export interface InAppNotification {
         | 'FRIEND_REQUEST'
         | 'CLAN_CHALLENGE'
         | 'CLAN_JOIN_REQUEST'
-        | 'DM';
+        | 'DM'
+        | 'PROBLEM_SUBMITTED'
+        | 'PROBLEM_APPROVED'
+        | 'PROBLEM_REJECTED'
+        | 'PROBLEM_CHANGES_REQUESTED';
     title: string;
     body?: string;
     href?: string;

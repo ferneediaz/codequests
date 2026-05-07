@@ -2,8 +2,10 @@ import Editor from '@monaco-editor/react';
 import { cn } from '@/lib/utils';
 import { LANGUAGES, MONACO_LANG } from '../constants';
 import type { AuthoringLanguage, BuilderState } from '../types';
+import type { AuthorFormMode } from '../useAuthorForm';
 
 interface StarterSectionProps {
+    mode?: AuthorFormMode;
     state: BuilderState;
     effectiveActiveLang: AuthoringLanguage;
     availableLangs: AuthoringLanguage[];
@@ -12,7 +14,23 @@ interface StarterSectionProps {
     updateStarter: (lang: AuthoringLanguage, value: string) => void;
 }
 
+const COPY_BY_MODE: Record<AuthorFormMode, { title: string; hint: string }> = {
+    'yaml-copy': {
+        title: 'Starter code',
+        hint: 'The function body players see when they start the problem.',
+    },
+    submit: {
+        title: 'Reference solution',
+        hint: "Write a working solution. We'll run it against every test before submitting; users will get a fresh stub when the problem is published.",
+    },
+    edit: {
+        title: 'Reference solution',
+        hint: "Write a working solution. We'll run it against every test on resubmit; users will get a fresh stub when the problem is published.",
+    },
+};
+
 export function StarterSection({
+    mode = 'yaml-copy',
     state,
     effectiveActiveLang,
     availableLangs,
@@ -20,14 +38,13 @@ export function StarterSection({
     toggleLang,
     updateStarter,
 }: StarterSectionProps) {
+    const copy = COPY_BY_MODE[mode];
     return (
         <div className="flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2">
                 <div>
-                    <div className="text-sm font-semibold">Starter code</div>
-                    <div className="text-[11px] text-muted-foreground">
-                        The function body players see when they start the problem.
-                    </div>
+                    <div className="text-sm font-semibold">{copy.title}</div>
+                    <div className="text-[11px] text-muted-foreground">{copy.hint}</div>
                 </div>
                 <div className="flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
                     {LANGUAGES.map((lang) => {

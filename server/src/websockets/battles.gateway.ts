@@ -887,6 +887,18 @@ export class BattlesGateway
     }
 
     /**
+     * Generic per-user emit for problem-submission lifecycle events. Returns
+     * `false` (silently) when the recipient is offline — they'll see the
+     * notification on next REST hydration.
+     */
+    emitSubmissionEvent(userId: string, event: string, data: unknown): boolean {
+        const socket = this.getSocketByUserId(userId);
+        if (!socket) return false;
+        socket.emit(event, data);
+        return true;
+    }
+
+    /**
      * Notify a user's friends about their online/offline status
      */
     private async notifyFriendsPresence(userId: string, username: string, online: boolean) {

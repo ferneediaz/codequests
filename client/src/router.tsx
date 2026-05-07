@@ -3,6 +3,8 @@ import { RootLayout } from '@/components/layout/RootLayout';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { OnboardingGate } from '@/components/layout/OnboardingGate';
 import { authorRoutes } from '@/routes/author';
+import { adminRoutes } from '@/routes/admin';
+import { contributeRoutes } from '@/routes/contribute';
 import { protectedAuthRoutes, publicAuthRoutes } from '@/routes/auth';
 import { protectedBattleRoutes, publicBattleRoutes } from '@/routes/battle';
 import { clanRoutes } from '@/routes/clan';
@@ -34,6 +36,8 @@ export const router = createBrowserRouter([
                             },
                             ...practiceRoutes,
                             ...protectedMarketingRoutes,
+                            ...contributeRoutes,
+                            ...adminRoutes,
                             ...authorRoutes,
                         ],
                     },

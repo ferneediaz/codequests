@@ -595,36 +595,81 @@ Dev-focused tooling to preview YAML-authored problems and safely edit only the f
   - [x] Listen `battle.round_start`, `battle.round_end`, `battle.elimination`, `battle.royale_standings`
 - [ ] **Success Criteria:** Full 6-8 player BR plays through all elimination rounds to winner ✅
 
-### 4.2 Problem Contribution & Admin
-- [ ] Admin problem management page (`/admin/problems`):
-  - [ ] List all problems with status (ACTIVE, DRAFT, REJECTED)
-  - [ ] Search + filter by difficulty, status, tags
-  - [ ] Create / Edit / Delete buttons
-- [ ] Problem creation form (`/admin/problems/new`):
-  - [ ] Fields: title, description (markdown editor), difficulty, tags, constraints, expected complexity, hints
-  - [ ] Test cases editor: add/remove input/output pairs, toggle hidden
-  - [ ] Starter code editors: one Monaco editor per language (tabs)
-  - [ ] Editorial/solution editor (markdown + code)
-  - [ ] Save as DRAFT or publish as ACTIVE
-- [ ] Problem testing sandbox (`/admin/problems/:id/test`):
-  - [ ] Full Monaco editor
-  - [ ] Language selector
-  - [ ] "Run Tests" button → calls `POST /api/problems/:id/execute`
-  - [ ] Shows test results (passed/failed per test case, output vs expected)
-  - [ ] Ability to test with ALL test cases (including hidden)
-  - [ ] Verify problem is solvable before publishing
-- [ ] Community review queue (`/admin/review`):
-  - [ ] List of problems in DRAFT status submitted by community
-  - [ ] Review interface: see problem + test cases + starter code
-  - [ ] "Test in Sandbox" button
-  - [ ] "Approve" / "Reject with reason" buttons
-  - [ ] Contributor attribution
-- [ ] Documentation page for contributors:
-  - [ ] How to structure a problem folder
-  - [ ] Required fields and format
-  - [ ] Example problem folder structure
-  - [ ] Link to `/problems` directory in repo
-- [ ] **Success Criteria:** Admin can create, test, and publish problems; community problems can be reviewed ✅
+### 4.2 Problem Contribution & Admin Review
+
+Community contribution flow: any signed-in user submits a problem from
+`/contribute`, admins approve/reject from `/admin/review/:id`. Approved
+submissions copy into a fresh `Problem` row with an auto-generated stub
+starter (so users never see the contributor's reference solution).
+
+**Core flow shipped:**
+- [x] Reuse existing `AuthorNew` form for `/contribute` (`mode='submit'`) and
+  `/contribute/:id/edit` (`mode='edit'`); dev `/author/*` paths stay behind
+  `import.meta.env.DEV` for YAML-copy iteration. `StarterSection` relabels
+  itself as "Reference solution" in submission/edit modes.
+- [x] `POST /problem-submissions` runs the contributor's reference solution
+  against every test (including hidden) before persisting. Failure surfaces
+  the failing test inline (toast).
+- [x] `ProblemSubmission` table with `SubmissionStatus { PENDING APPROVED
+  REJECTED NEEDS_CHANGES }`. Approved submissions create a new `Problem`
+  row in a transaction (`linkedProblemId` set on submission;
+  `contributedById` set on Problem).
+- [x] Contributor's submission list at `/contribute/mine` (status pills,
+  reviewer notes inline, "Edit & resubmit" on `NEEDS_CHANGES`, "View live
+  problem" once approved).
+- [x] Admin gate via `AdminRoute` (`user.role === 'admin'` redirect-on-deny).
+- [x] Admin review queue at `/admin/review` (filters: pending / awaiting
+  changes / history; search by title or contributor).
+- [x] Admin sandbox at `/admin/review/:id` extending `AuthorPreview`'s
+  3-column layout: description + reference writeup + hints (left), Monaco
+  editor preloaded with the contributor's reference code (center), all
+  tests with hidden tests revealed (right). "Run all tests" hits
+  `/admin/problem-submissions/:id/dry-run`.
+- [x] All four review actions implemented: **Approve**, **Reject** (notes
+  required), **Request Changes** (notes required, contributor edits and
+  resubmits, status flips back to PENDING), **Edit & Approve** (admin
+  toggles inline edit of title/description/tags/difficulty/hints/solution
+  and approves with edits — server re-validates the merged payload).
+- [x] Notifications: `submission.new_for_review` (fan-out to admins),
+  `submission.approved` / `submission.rejected` /
+  `submission.changes_requested` (to contributor) — all wired through the
+  existing `NotificationsProvider` socket events with click-target routing.
+- [x] Credit: `Problem.contributedBy` exposed on `/problems/:id`,
+  `/problems`, `/practice/problems/:id`. `ProblemPanel` renders
+  "Contributed by @username" linking to the contributor's profile.
+- [x] Practice page header CTA: "Have a problem idea? Submit a problem".
+
+**Files:**
+- Server: `prisma/schema.prisma` (`ProblemSubmission` model + enum +
+  `Problem.contributedById`), `src/problem-submissions/*`,
+  `src/realtime/{ports,adapters}/submission-events.*`,
+  `src/problems/authoring/harness-codegen.ts#generateStubBody`.
+- Client: `src/pages/author/AuthorNew.tsx` (mode-aware shell),
+  `src/pages/author/new/useAuthorForm.ts` (handleSubmit / handleSubmitEdit
+  / prefill), `src/pages/contribute/{MySubmissions,EditSubmission}.tsx`,
+  `src/pages/admin/{ReviewQueue,ReviewSandbox}.tsx`,
+  `src/components/layout/AdminRoute.tsx`,
+  `src/components/admin/SubmissionStatusBadge.tsx`,
+  `src/services/problemSubmissions.ts`, `src/types/submission.ts`.
+
+#### Follow-ups (deferred)
+- [ ] Dashboard "Contribute a problem" quick-action card (mirror of the
+  Practice CTA so logged-in users see the entry point on home).
+- [ ] Profile "Contributions" tab listing approved contributions + pending
+  submission history (depends on Profile page work elsewhere in TODO).
+- [ ] Soft per-user pending cap (e.g. max 3 PENDING submissions) to
+  blunt spam without locking out genuine contributors.
+- [ ] Editing reference code / signature / tests post-submit currently
+  requires a Request-Changes round-trip; consider an admin-side
+  "edit reference code" path if review throughput becomes an issue.
+- [ ] Add the `contributedBy` include to battle problem responses so
+  the credit line also renders inside an active battle.
+- [ ] Public contributor docs page (how to author a problem, what makes a
+  good test set, how attribution works).
+- [ ] Achievement: "Problem Setter" unlock when first submission is
+  approved (pairs with [Phase 4.3](client/TODO.md#43-achievements-system)).
+- [ ] **Success Criteria:** Admin can create, test, and publish problems;
+  community problems can be reviewed ✅
 
 ### 4.3 Achievements System
 - [ ] Achievements grid on profile page:

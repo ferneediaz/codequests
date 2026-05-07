@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import {
     Target,
     Trophy,
     Activity,
+    Sparkles,
 } from 'lucide-react';
 import { queryKeys } from '@/lib/queryKeys';
 import { practiceApi } from '@/services/practice';
@@ -116,6 +117,27 @@ export default function Practice() {
                         <UpsellBanner />
                     </AnimateIn>
                 )}
+
+                <AnimateIn delay={50}>
+                    <Card className="border-primary/30 bg-primary/5">
+                        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+                            <div className="flex items-center gap-3">
+                                <Sparkles className="h-5 w-5 text-primary" />
+                                <div>
+                                    <div className="text-sm font-semibold">
+                                        Have a problem idea?
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Author it once, get credited every time someone solves it.
+                                    </div>
+                                </div>
+                            </div>
+                            <Link to="/contribute">
+                                <Button size="sm">Submit a problem</Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+                </AnimateIn>
 
                 {/* Filters */}
                 <AnimateIn delay={75}>

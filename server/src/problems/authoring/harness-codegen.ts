@@ -203,3 +203,30 @@ function ensureTrailingNewline(s: string): string {
     if (s.length === 0) return s;
     return s.endsWith('\n') ? s : `${s}\n`;
 }
+
+/**
+ * Generate a stub function body per language from a signature. Used by the
+ * community contribution pipeline: contributors write their working code as
+ * the reference solution; on approval the published Problem ships with this
+ * stub so users see a fresh prompt rather than the answer.
+ */
+export function generateStubBody(
+    signature: SignatureDefinition,
+    language: SupportedAuthoringLanguage,
+): string {
+    const argNames = signature.params.map((p) => p.name);
+    if (language === 'javascript') {
+        const fnName = signature.name.javascript ?? 'solve';
+        return (
+            `function ${fnName}(${argNames.join(', ')}) {\n` +
+            `  // Your code here\n` +
+            `}\n`
+        );
+    }
+    const fnName = signature.name.python ?? 'solve';
+    return (
+        `def ${fnName}(${argNames.join(', ')}):\n` +
+        `    # Your code here\n` +
+        `    pass\n`
+    );
+}
