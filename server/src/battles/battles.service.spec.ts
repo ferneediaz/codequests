@@ -1198,6 +1198,35 @@ describe('BattlesService', () => {
             expect(result.id).toBe(mockBattle.id);
             expect(result.problem).toBeDefined();
             expect(result.participants).toHaveLength(1);
+
+            // Hidden test cases must never leak through getBattleDetails:
+            // BR / team modes display visible examples from this payload.
+            expect(prisma.battle.findUnique).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    include: expect.objectContaining({
+                        problem: expect.objectContaining({
+                            select: expect.objectContaining({
+                                testCases: { where: { isHidden: false } },
+                            }),
+                        }),
+                        problemPool: expect.objectContaining({
+                            include: expect.objectContaining({
+                                items: expect.objectContaining({
+                                    include: expect.objectContaining({
+                                        problem: expect.objectContaining({
+                                            select: expect.objectContaining({
+                                                testCases: {
+                                                    where: { isHidden: false },
+                                                },
+                                            }),
+                                        }),
+                                    }),
+                                }),
+                            }),
+                        }),
+                    }),
+                }),
+            );
         });
 
         it('should throw NotFoundException if battle does not exist', async () => {

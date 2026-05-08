@@ -1105,6 +1105,12 @@ export class BattlesService {
                         difficulty: true,
                         description: true,
                         starterCode: true,
+                        // Visible tests only — hidden tests stay server-side.
+                        // Required so BR / team modes that read
+                        // `battle.problemPool.items.problem.testCases` (or any
+                        // future code reading `battle.problem.testCases`)
+                        // get the example list to display.
+                        testCases: { where: { isHidden: false } },
                     },
                 },
                 problemPool: {
@@ -1118,6 +1124,7 @@ export class BattlesService {
                                         difficulty: true,
                                         description: true,
                                         starterCode: true,
+                                        testCases: { where: { isHidden: false } },
                                     },
                                 },
                             },
