@@ -1184,8 +1184,8 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [x] Health check endpoint — `GET /api/health` (`server/src/health/health.controller.ts`) returns 200 with DB ping + uptime, 503 if DB unreachable
 
 ### Deployment
-- [ ] Database migrations strategy — Prisma schema exists but `server/prisma/migrations/` is empty; Dockerfile already calls `prisma migrate deploy` on boot, so a baseline migration must be committed before first prod deploy
-- [ ] CI/CD pipeline setup
+- [x] Database migrations strategy — baseline `server/prisma/migrations/0_init/migration.sql` committed (full schema, ~670 lines) with `migration_lock.toml`; Dockerfile runs `prisma migrate deploy` on boot
+- [x] CI/CD pipeline setup — `.github/workflows/ci.yml` runs lint + tests + Prisma generate + build for both `server/` and `client/` on PR + main
 - [ ] Monitoring & logging setup
 - [ ] Production build optimization (post-soft-launch)
 
@@ -1197,7 +1197,7 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [ ] JWT validation could be more robust (audit token expiration handling in `auth/jwt.strategy.ts`)
 - [ ] Error messages could be more user-friendly
 - [x] Rate limiting wired via `@nestjs/throttler` in `AppModule` (short: 30 req/10s, long: 120 req/60s; webhook + health bypass via `@SkipThrottle()`)
-- [ ] No request logging/monitoring (request-level middleware still missing — soft-launch blocker)
+- [x] Request logging — `RequestLoggerMiddleware` (`server/src/common/middleware/request-logger.middleware.ts`) wired in `AppModule`; logs method, URL, status, duration, and `x-request-id`, with `/health` excluded
 
 ### Tech Debt:
 - [ ] jest.config.js shows deprecation warnings (ts-jest globals config)
