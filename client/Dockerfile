@@ -7,11 +7,11 @@ WORKDIR /app
 # Vite bakes VITE_* vars into the bundle at build time. Pass them through
 # `docker build --build-arg ...` or `docker compose build --build-arg ...`.
 ARG VITE_API_URL
-ARG VITE_SOCKET_URL
+ARG VITE_WS_URL
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 ENV VITE_API_URL=${VITE_API_URL} \
-    VITE_SOCKET_URL=${VITE_SOCKET_URL} \
+    VITE_WS_URL=${VITE_WS_URL} \
     VITE_SUPABASE_URL=${VITE_SUPABASE_URL} \
     VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
 

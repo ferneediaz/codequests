@@ -9,6 +9,9 @@ export default defineConfig({
         setupFiles: './src/test/setup.ts',
         globals: true,
         pool: 'threads',
+        // Vitest's default include globs into `e2e/`, where Playwright's
+        // `test()` lives — running those under vitest crashes the runner.
+        include: ['src/**/*.{test,spec}.{ts,tsx}'],
     },
     resolve: {
         alias: {

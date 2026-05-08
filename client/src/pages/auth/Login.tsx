@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Swords } from 'lucide-react';
 import { consumePendingInvite, peekPendingInvite } from '@/lib/pendingInvite';
 
@@ -10,8 +11,18 @@ export default function Login() {
 
     if (isLoading) {
         return (
-            <div className="flex h-screen items-center justify-center">
-                <div className="text-muted-foreground">Loading...</div>
+            <div className="flex min-h-screen items-center justify-center bg-background px-4">
+                <Card className="w-full max-w-sm">
+                    <CardHeader className="text-center">
+                        <Skeleton className="mx-auto mb-2 h-12 w-12 rounded-lg" />
+                        <Skeleton className="mx-auto h-7 w-48" />
+                        <Skeleton className="mx-auto mt-2 h-4 w-40" />
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-3">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                    </CardContent>
+                </Card>
             </div>
         );
     }

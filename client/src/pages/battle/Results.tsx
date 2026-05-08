@@ -5,10 +5,11 @@ import { useAppSelector } from '@/store/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { CodeEditor } from '@/components/battle/CodeEditor';
 import { BattleChat } from '@/components/battle/BattleChat';
-import { Loader2, ArrowLeft, Trophy, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Loader2, Trophy, RotateCcw } from 'lucide-react';
 import { battlesApi } from '@/services/battles';
 import { queryKeys } from '@/lib/queryKeys';
 import type {
@@ -58,8 +59,31 @@ export default function Results() {
 
     if (battleQuery.isLoading || !battle) {
         return (
-            <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="mx-auto max-w-6xl px-4 py-8">
+                <div className="mb-8 flex flex-col items-center gap-3">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <Skeleton className="h-9 w-56" />
+                    <Skeleton className="h-5 w-32" />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                    {[0, 1].map((i) => (
+                        <Card key={i}>
+                            <CardHeader className="space-y-2">
+                                <Skeleton className="h-6 w-40" />
+                                <Skeleton className="h-4 w-24" />
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Skeleton className="h-16 w-full" />
+                                    <Skeleton className="h-16 w-full" />
+                                    <Skeleton className="h-16 w-full" />
+                                    <Skeleton className="h-16 w-full" />
+                                </div>
+                                <Skeleton className="h-48 w-full" />
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
             </div>
         );
     }

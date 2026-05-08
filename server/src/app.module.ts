@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -79,4 +80,13 @@ import { validateEnv } from './config/env.validation';
         { provide: APP_GUARD, useClass: ThrottlerGuard },
     ],
 })
-export class AppModule { }
+export class AppModule implements NestModule {
+    configure(consumer: MiddlewareConsumer) {
+        // Request log line per HTTP request. Excludes /api/health since
+        // platform health probes hit it on a tight interval.
+        consumer
+            .apply(RequestLoggerMiddleware)
+            .exclude('api/health')
+            .forRoutes('*');
+    }
+}

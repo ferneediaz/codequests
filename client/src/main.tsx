@@ -4,6 +4,7 @@ import { Provider } from 'react-redux'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from 'react-router-dom'
 import { Toaster } from '@/components/ui/sonner'
+import { ErrorBoundary } from '@/components/layout/ErrorBoundary'
 import { store } from '@/store'
 import { router } from '@/router'
 import './index.css'
@@ -24,7 +25,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <ErrorBoundary>
+          <RouterProvider router={router} />
+        </ErrorBoundary>
         <Toaster />
       </QueryClientProvider>
     </Provider>

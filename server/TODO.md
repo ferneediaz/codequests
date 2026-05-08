@@ -1173,32 +1173,31 @@ Track daily activity for GitHub-style heatmap on profiles.
 
 ## 📦 Infrastructure TODOs
 
-### Docker Compose Setup (Optional)
-- [ ] Add PostgreSQL service
-- [ ] Add Redis for queue management
-- [ ] Production-ready docker-compose.yml
+### Docker Compose Setup
+- [x] PostgreSQL + server + client services in root `docker-compose.yml`
+- [x] Optional Piston service wired via compose profile
+- [ ] Add Redis for queue management (deferred — single-instance is fine for soft launch)
 
 ### Environment & Config
-- [ ] Document all environment variables
-- [ ] Add .env.example file (including STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, VAPID keys)
-- [ ] Validate environment on startup
-- [ ] Add health check endpoints
+- [x] Document all environment variables — covered by `server/.env.example` (13+ vars: `DATABASE_URL`, `SUPABASE_*`, `JWT_JWK`, `PISTON_URL`, `PORT`, `NODE_ENV`, `DEV_PRO_*`, `STRIPE_*`, `CLIENT_URL`, `ENABLE_AUTHOR_TOOLS`, `GITHUB_TOKEN`) and `client/.env.example`
+- [x] Validate environment on startup — Zod schema in `server/src/config/env.validation.ts` runs via `ConfigModule.forRoot({ validate })`
+- [x] Health check endpoint — `GET /api/health` (`server/src/health/health.controller.ts`) returns 200 with DB ping + uptime, 503 if DB unreachable
 
 ### Deployment
-- [ ] Production build optimization
-- [ ] Database migrations strategy
+- [ ] Database migrations strategy — Prisma schema exists but `server/prisma/migrations/` is empty; Dockerfile already calls `prisma migrate deploy` on boot, so a baseline migration must be committed before first prod deploy
 - [ ] CI/CD pipeline setup
 - [ ] Monitoring & logging setup
+- [ ] Production build optimization (post-soft-launch)
 
 ---
 
 ## 🐛 Known Issues & Tech Debt
 
 ### Current Issues:
-- [ ] JWT validation could be more robust (add token expiration checks)
+- [ ] JWT validation could be more robust (audit token expiration handling in `auth/jwt.strategy.ts`)
 - [ ] Error messages could be more user-friendly
-- [ ] No rate limiting on APIs
-- [ ] No request logging/monitoring
+- [x] Rate limiting wired via `@nestjs/throttler` in `AppModule` (short: 30 req/10s, long: 120 req/60s; webhook + health bypass via `@SkipThrottle()`)
+- [ ] No request logging/monitoring (request-level middleware still missing — soft-launch blocker)
 
 ### Tech Debt:
 - [ ] jest.config.js shows deprecation warnings (ts-jest globals config)

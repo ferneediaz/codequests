@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import { RootLayout } from '@/components/layout/RootLayout';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { OnboardingGate } from '@/components/layout/OnboardingGate';
@@ -14,6 +14,7 @@ import { protectedMarketingRoutes, publicMarketingRoutes } from '@/routes/market
 import { practiceRoutes } from '@/routes/practice';
 import { publicProfileRoutes } from '@/routes/profile';
 import Messages from '@/pages/messages/Messages';
+import NotFound from '@/pages/error/NotFound';
 
 export const router = createBrowserRouter([
     ...publicMarketingRoutes,
@@ -49,7 +50,7 @@ export const router = createBrowserRouter([
             },
             {
                 path: '*',
-                element: <Navigate to="/" replace />,
+                element: <NotFound />,
             },
         ],
     },
