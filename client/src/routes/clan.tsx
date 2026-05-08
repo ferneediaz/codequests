@@ -1,7 +1,9 @@
+import { lazy } from 'react';
 import { Navigate, type RouteObject } from 'react-router-dom';
-import ClansDirectory from '@/pages/clan/ClansDirectory';
-import ClanCreate from '@/pages/clan/ClanCreate';
-import ClanDetail from '@/pages/clan/ClanDetail';
+
+const ClansDirectory = lazy(() => import('@/pages/clan/ClansDirectory'));
+const ClanCreate = lazy(() => import('@/pages/clan/ClanCreate'));
+const ClanDetail = lazy(() => import('@/pages/clan/ClanDetail'));
 
 export const clanRoutes: RouteObject[] = [
     {

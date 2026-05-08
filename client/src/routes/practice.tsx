@@ -1,6 +1,8 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router-dom';
-import Practice from '@/pages/practice/Practice';
-import PracticeSolve from '@/pages/practice/PracticeSolve';
+
+const Practice = lazy(() => import('@/pages/practice/Practice'));
+const PracticeSolve = lazy(() => import('@/pages/practice/PracticeSolve'));
 
 export const practiceRoutes: RouteObject[] = [
     {

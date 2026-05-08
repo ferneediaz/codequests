@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { RootLayout } from '@/components/layout/RootLayout';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
@@ -13,8 +14,9 @@ import { leaderboardRoutes } from '@/routes/leaderboard';
 import { protectedMarketingRoutes, publicMarketingRoutes } from '@/routes/marketing';
 import { practiceRoutes } from '@/routes/practice';
 import { publicProfileRoutes } from '@/routes/profile';
-import Messages from '@/pages/messages/Messages';
 import NotFound from '@/pages/error/NotFound';
+
+const Messages = lazy(() => import('@/pages/messages/Messages'));
 
 export const router = createBrowserRouter([
     ...publicMarketingRoutes,

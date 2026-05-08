@@ -31,4 +31,13 @@ export default defineConfig([
       globals: globals.node,
     },
   },
+  {
+    // Route-config files declare React.lazy() components alongside the route
+    // arrays they wire up. They aren't component modules and aren't subject to
+    // Fast Refresh — disabling the rule here keeps the route files concise.
+    files: ['src/router.tsx', 'src/routes/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

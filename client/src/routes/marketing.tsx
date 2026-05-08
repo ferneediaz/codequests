@@ -1,6 +1,8 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router-dom';
 import Landing from '@/pages/marketing/Landing';
-import Pricing from '@/pages/marketing/Pricing';
+
+const Pricing = lazy(() => import('@/pages/marketing/Pricing'));
 
 export const publicMarketingRoutes: RouteObject[] = [
     {

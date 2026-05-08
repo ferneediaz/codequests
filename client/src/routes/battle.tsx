@@ -1,11 +1,13 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router-dom';
-import Play from '@/pages/battle/Play';
-import QuickPlay from '@/pages/battle/QuickPlay';
-import Lobby from '@/pages/battle/Lobby';
-import Matchmaking from '@/pages/battle/Matchmaking';
-import Battle from '@/pages/battle/Battle';
-import Results from '@/pages/battle/Results';
-import InviteJoin from '@/pages/battle/InviteJoin';
+
+const Play = lazy(() => import('@/pages/battle/Play'));
+const QuickPlay = lazy(() => import('@/pages/battle/QuickPlay'));
+const Lobby = lazy(() => import('@/pages/battle/Lobby'));
+const Matchmaking = lazy(() => import('@/pages/battle/Matchmaking'));
+const Battle = lazy(() => import('@/pages/battle/Battle'));
+const Results = lazy(() => import('@/pages/battle/Results'));
+const InviteJoin = lazy(() => import('@/pages/battle/InviteJoin'));
 
 export const publicBattleRoutes: RouteObject[] = [
     // Unauthenticated users see a "sign in to join" prompt; authenticated

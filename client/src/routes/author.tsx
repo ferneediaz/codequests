@@ -1,7 +1,9 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router-dom';
-import AuthorList from '@/pages/author/AuthorList';
-import AuthorNew from '@/pages/author/AuthorNew';
-import AuthorPreview from '@/pages/author/AuthorPreview';
+
+const AuthorList = lazy(() => import('@/pages/author/AuthorList'));
+const AuthorNew = lazy(() => import('@/pages/author/AuthorNew'));
+const AuthorPreview = lazy(() => import('@/pages/author/AuthorPreview'));
 
 // Dev-only problem authoring tools. Mounted only in dev builds — the
 // user-facing contribution flow lives at `/contribute` (see

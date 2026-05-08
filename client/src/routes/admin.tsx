@@ -1,7 +1,9 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router-dom';
 import { AdminRoute } from '@/components/layout/AdminRoute';
-import ReviewQueue from '@/pages/admin/ReviewQueue';
-import ReviewSandbox from '@/pages/admin/ReviewSandbox';
+
+const ReviewQueue = lazy(() => import('@/pages/admin/ReviewQueue'));
+const ReviewSandbox = lazy(() => import('@/pages/admin/ReviewSandbox'));
 
 export const adminRoutes: RouteObject[] = [
     {

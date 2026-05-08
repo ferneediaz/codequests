@@ -1,7 +1,9 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router-dom';
-import AuthorNew from '@/pages/author/AuthorNew';
-import EditSubmission from '@/pages/contribute/EditSubmission';
-import MySubmissions from '@/pages/contribute/MySubmissions';
+
+const AuthorNew = lazy(() => import('@/pages/author/AuthorNew'));
+const EditSubmission = lazy(() => import('@/pages/contribute/EditSubmission'));
+const MySubmissions = lazy(() => import('@/pages/contribute/MySubmissions'));
 
 export const contributeRoutes: RouteObject[] = [
     {

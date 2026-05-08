@@ -1,5 +1,7 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router-dom';
-import Leaderboard from '@/pages/leaderboard/Leaderboard';
+
+const Leaderboard = lazy(() => import('@/pages/leaderboard/Leaderboard'));
 
 export const leaderboardRoutes: RouteObject[] = [
     {

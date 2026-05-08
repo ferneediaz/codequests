@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from './Navbar';
+import { RouteFallback } from './RouteFallback';
 import { useClanChallengeNotifications } from '@/hooks/useClanChallengeNotifications';
 import { useInviteNotifications } from '@/hooks/useInviteNotifications';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -95,7 +96,9 @@ export function RootLayout() {
                     <Navbar />
                     <div className="relative flex min-h-0 flex-1 overflow-hidden">
                         <main className="min-w-0 flex-1 overflow-y-auto">
-                            <Outlet />
+                            <Suspense fallback={<RouteFallback />}>
+                                <Outlet />
+                            </Suspense>
                         </main>
                         {shouldRenderSidebar && (
                             <>

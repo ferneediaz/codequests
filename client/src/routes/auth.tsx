@@ -1,7 +1,9 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router-dom';
 import Login from '@/pages/auth/Login';
 import AuthCallback from '@/pages/auth/AuthCallback';
-import Onboarding from '@/pages/auth/Onboarding';
+
+const Onboarding = lazy(() => import('@/pages/auth/Onboarding'));
 
 export const publicAuthRoutes: RouteObject[] = [
     {
