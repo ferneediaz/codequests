@@ -58,6 +58,13 @@ export const createMockPrismaService = () => {
             update: jest.fn(),
             delete: jest.fn(),
         },
+        clanJoinRequest: {
+            create: jest.fn(),
+            findUnique: jest.fn(),
+            findMany: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+        },
         matchmakingEntry: {
             create: jest.fn(),
             findUnique: jest.fn(),

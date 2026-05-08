@@ -1200,7 +1200,7 @@ Track daily activity for GitHub-style heatmap on profiles.
 - [x] Request logging — `RequestLoggerMiddleware` (`server/src/common/middleware/request-logger.middleware.ts`) wired in `AppModule`; logs method, URL, status, duration, and `x-request-id`, with `/health` excluded
 
 ### Tech Debt:
-- [ ] jest.config.js shows deprecation warnings (ts-jest globals config)
+- [x] jest.config.js ts-jest globals deprecation — moved tsconfig override into the per-transform syntax
 - [ ] Some test output is verbose (could silence non-critical logs)
 
 ---

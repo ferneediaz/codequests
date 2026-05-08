@@ -4,7 +4,14 @@ module.exports = {
     roots: ['<rootDir>/src'],
     testMatch: ['**/__tests__/**/*.ts', '**/*.spec.ts', '**/*.test.ts'],
     transform: {
-        '^.+\\.ts$': 'ts-jest',
+        '^.+\\.ts$': [
+            'ts-jest',
+            {
+                tsconfig: {
+                    esModuleInterop: true,
+                },
+            },
+        ],
     },
     collectCoverageFrom: [
         'src/**/*.{ts,js}',
@@ -21,11 +28,4 @@ module.exports = {
         '^src/(.*)$': '<rootDir>/src/$1',
     },
     testTimeout: 10000,
-    globals: {
-        'ts-jest': {
-            tsconfig: {
-                esModuleInterop: true,
-            },
-        },
-    },
 };
