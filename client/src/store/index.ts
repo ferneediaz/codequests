@@ -3,6 +3,7 @@ import authReducer from './slices/authSlice';
 import battleReducer from './slices/battleSlice';
 import matchmakingReducer from './slices/matchmakingSlice';
 import subscriptionReducer from './slices/subscriptionSlice';
+import uiReducer from './slices/uiSlice';
 
 export const store = configureStore({
     reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
         battle: battleReducer,
         matchmaking: matchmakingReducer,
         subscription: subscriptionReducer,
+        ui: uiReducer,
     },
 });
 

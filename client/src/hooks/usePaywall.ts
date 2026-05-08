@@ -1,9 +1,7 @@
 import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { useAppDispatch } from '@/store/hooks';
+import { openPaywallModal } from '@/store/slices/uiSlice';
 import { useSubscription } from './useSubscription';
-
-const PAYWALL_TOAST_ID = 'paywall-blocked';
 
 /**
  * Client-side paywall gate.
@@ -11,7 +9,7 @@ const PAYWALL_TOAST_ID = 'paywall-blocked';
  * Use `requireCanPlay()` before initiating any flow that the server's
  * subscription gate would reject (matchmaking queue join, private battle
  * creation, invite acceptance). Returns true when the action should
- * proceed, otherwise shows a toast and routes the user to /pricing.
+ * proceed, otherwise opens the paywall modal and routes the user to /pricing.
  *
  * The server remains the source of truth — this hook only saves the user
  * a round-trip and surfaces a friendly upgrade CTA. If the local cache is
@@ -19,7 +17,7 @@ const PAYWALL_TOAST_ID = 'paywall-blocked';
  * fall back to its existing error handling.
  */
 export function usePaywall() {
-    const navigate = useNavigate();
+    const dispatch = useAppDispatch();
     const { status, isPro } = useSubscription();
 
     const requireCanPlay = useCallback((): boolean => {
@@ -29,17 +27,9 @@ export function usePaywall() {
         if (isPro) return true;
         if (status.gamesRemaining > 0) return true;
 
-        toast.error("You're out of free games for today.", {
-            id: PAYWALL_TOAST_ID,
-            description: 'Upgrade to Pro for unlimited battles.',
-            action: {
-                label: 'Upgrade',
-                onClick: () => navigate('/pricing'),
-            },
-            duration: 8000,
-        });
+        dispatch(openPaywallModal());
         return false;
-    }, [status, isPro, navigate]);
+    }, [status, isPro, dispatch]);
 
     /**
      * Wrap an async action with the paywall gate. Resolves to `false`

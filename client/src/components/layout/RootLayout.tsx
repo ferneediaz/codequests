@@ -13,6 +13,7 @@ import {
 } from '@/context/socialLayoutContext';
 import { FriendsSidebar } from '@/components/social/FriendsSidebar';
 import { DmDrawer } from '@/components/lobby/DmDrawer';
+import { PaywallModal } from '@/components/paywall/PaywallModal';
 import { useAppSelector } from '@/store/hooks';
 import { cn } from '@/lib/utils';
 
@@ -127,6 +128,7 @@ export function RootLayout() {
                             onClose={() => setOpenDmState(null)}
                         />
                     )}
+                    <PaywallModal />
                 </div>
                 </SocialLayoutContext.Provider>
             </FriendNotificationsProvider>

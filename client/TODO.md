@@ -307,10 +307,8 @@ users; if you navigate to your own `/profile/:username` you redirect to
 - [x] **Success Criteria:** Free user blocked after 1 game → upgrade toast shown → can subscribe → unlimited games ✅
 
 #### Follow-ups (non-blocking)
-- [ ] Replace the sonner "out of free games" toast with a dedicated modal
-  once a shared Dialog primitive lands in `components/ui/`.
-- [ ] Surface the subscription status on the Profile page when that page
-  lands.
+- [x] Replace the sonner "out of free games" toast with a dedicated modal — `client/src/components/paywall/PaywallModal.tsx`, mounted in `RootLayout`, opened via `uiSlice.openPaywallModal`.
+- [x] Surface the subscription status on the Dashboard — `SubscriptionCard` (Profile is OTHER-users-only per project memory; Dashboard is the own-profile surface).
 - [x] Quick Play preset (`/play/quick`) shares the same gate flow via `usePaywall().requireCanPlay()` on the "Play Now" button.
 
 ### 2.2 Skills System UI ✅
@@ -325,7 +323,7 @@ users; if you navigate to your own `/profile/:username` you redirect to
   - [x] **Scramble**: Editor text scramble effect with no undo recovery
   - [x] **Time Steal**: Red flash overlay + server-driven timer sync (`battle.time_updated`)
   - [x] **Fog of War**: Pulsing blur overlay (no center badge to increase disruption)
-- [ ] Skill notification toast: "🐒 CodeMonkey used Freeze on you!" with opponent's username
+- [x] Skill notification toast: "❄️ alice used Freeze on you!" with actor's username — wired in `useBattleSocket.handleSkillEffect`
 - [x] WebSocket events:
   - [x] Emit `skill.use` when activating a skill: `{ battleId, targetUserId, skillType }`
   - [x] Listen `skill.effect` for incoming skill effects: `{ skillType, fromUserId, duration }`
@@ -345,7 +343,7 @@ users; if you navigate to your own `/profile/:username` you redirect to
   1. [x] Confetti burst animation (3-5 seconds) — `pages/battle/results/components/VictoryConfetti.tsx` (4 corner-bursts over ~3s, palette `#fbbf24/#f59e0b/#3b82f6/#22c55e`)
   2. [x] MMR delta count-up in header (0 → delta with sign) — `MmrCountUp.tsx`
   3. [x] Per-player MMR cell counts up/down — same component, in the 2x2 stat grid for 1v1 and on each BR podium card
-  4. [ ] Win streak counter displayed (if streak > 1): "🔥 3 Win Streak!" — blocked on server exposing `participant.user.currentWinStreak` (TODO marker in `Results.tsx`)
+  4. [x] Win streak counter displayed (if streak > 1): "🔥 N Win Streak!" — server `User.currentWinStreak` + Results.tsx badge
   5. [x] Rank badge animation: old badge → flash → new badge with glow — `RankUpFlash.tsx` (only triggers when tier crosses)
   6. [ ] Sound fanfare (victory jingle, ~3 seconds) — deferred to [Phase 2.7](client/TODO.md#27-sound-system)
 - [x] Loser screen: muted Frown header, "Better luck next time." line, MMR counts down via negative delta — `ResultHeader.tsx`
@@ -826,32 +824,23 @@ Public profile page lives at `/profile/:username` (`client/src/pages/profile/Pro
 Shipped as [Phase 2.5](client/TODO.md#25-quick-play): `/play/quick` lists/renames/deletes presets, the built-in "Quick 1v1" default is uneditable, and presets persist via `useQuickPlayPresets` localStorage hook. Server sync remains as a 2.5 follow-up.
 
 ### 5.3 Rank Display Polish
-- [ ] Rank badges with custom icons (not emoji — designed SVGs or icons):
-  | Rank | Icon | Color | Border |
-  |------|------|-------|--------|
-  | Bug | Bug icon | `#22c55e` Green | — |
-  | Intern | Paperclip icon | `#9ca3af` Gray | — |
-  | Copy Paster | Clipboard icon | `#cd7f32` Bronze | Bronze border |
-  | Stack Overflow Andy | Search icon | `#c0c0c0` Silver | Silver border |
-  | Code Monkey | Monkey icon | `#ffd700` Gold | Gold border |
-  | 10x Dev | Lightning bolt | `#3b82f6` Diamond Blue | Blue glow |
-  | Cracked | Skull icon | `#ef4444` Red | Red animated glow |
-- [ ] Rank badge component (reusable): shows icon + name + color
-- [ ] Rank-up animation: old badge shrinks → flash → new badge grows with particles
-- [ ] Rank displayed: navbar, profile, leaderboard, battle results, match history
+- [x] Rank badge component (reusable): shows icon + name + color — `client/src/components/ui/RankBadge.tsx`
+- [x] Rank-up animation: old badge shrinks → flash → new badge grows — `client/src/pages/battle/results/components/RankUpFlash.tsx`
+- [x] Rank displayed across navbar, profile, leaderboard, battle results, match history (uses `RankBadge` and `getRankTier`)
+- [ ] Custom rank icons (designed SVGs instead of lucide icons) — deferred polish
 - [ ] **Success Criteria:** Ranks look polished with custom icons and animations ✅
 
 ### 5.4 UI/UX Polish
-- [ ] Loading skeletons for all data-fetching pages
-- [ ] Error boundary components with retry buttons
-- [ ] Empty states for: no match history, no friends, no clan, etc.
-- [ ] Toast notification system for success/error messages
-- [ ] Smooth page transitions (fade/slide)
+- [x] Loading skeletons for all data-fetching pages — `Skeleton` primitive used across 40 pages
+- [x] Error boundary with retry button — `client/src/components/layout/ErrorBoundary.tsx`, mounted in `main.tsx`
+- [x] Toast notification system — sonner mounted in `main.tsx`, used throughout
+- [x] 404 page — `client/src/pages/error/NotFound.tsx`, wired as catch-all in `router.tsx`
+- [ ] Empty states for match history, friends, clan list (Profile already has one) — partial
+- [ ] Smooth page transitions (fade/slide) — deferred
 - [ ] Keyboard shortcuts:
   - [ ] `Ctrl+Enter` to submit code in battle
   - [ ] `Escape` to close modals
-- [ ] Responsive navbar (collapse to hamburger if very narrow desktop)
-- [ ] 404 page
+- [ ] Responsive navbar (collapse to hamburger on mobile) — current `sm:flex hidden` drops links with no replacement
 - [ ] **Success Criteria:** No raw loading states, no ugly errors, everything smooth ✅
 
 ### 5.5 E2E Tests (Playwright)

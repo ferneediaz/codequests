@@ -50,6 +50,7 @@ import { ModeBreakdown } from './components/ModeBreakdown';
 import { NewsRow } from './components/NewsRow';
 import { QuickAction } from './components/QuickAction';
 import { StatTile } from './components/StatTile';
+import { SubscriptionCard } from './components/SubscriptionCard';
 
 export default function Dashboard() {
     const navigate = useNavigate();
@@ -384,6 +385,11 @@ export default function Dashboard() {
                             </div>
                         </div>
                 </PageHero>
+
+                {/* ---------------- SUBSCRIPTION ---------------- */}
+                <div className="mb-6">
+                    <SubscriptionCard />
+                </div>
 
                 {/* ---------------- STAT TILES ---------------- */}
                 <StatTileGrid>

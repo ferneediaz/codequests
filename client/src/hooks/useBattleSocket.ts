@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAppDispatch } from '@/store/hooks';
 import {
@@ -10,7 +11,7 @@ import {
     resetBattle,
 } from '@/store/slices/battleSlice';
 import { getSocket } from '@/services/socket';
-import type { BattleResponse, ProblemResponse } from '@/types/api';
+import type { BattleResponse, ProblemResponse, SkillType } from '@/types/api';
 import type {
     BattleCompletedPayload,
     BattleStartedPayload,
@@ -21,6 +22,14 @@ import type {
     SkillEffectPayload,
     SkillUsedPayload,
 } from '@/types/socket';
+
+const SKILL_TOAST_LABELS: Record<SkillType, { emoji: string; label: string }> = {
+    FREEZE: { emoji: '❄️', label: 'Freeze' },
+    SCRAMBLE: { emoji: '🔀', label: 'Scramble' },
+    BLIND: { emoji: '🙈', label: 'Blind' },
+    TIME_STEAL: { emoji: '⏱️', label: 'Time Steal' },
+    FOG_OF_WAR: { emoji: '🌫️', label: 'Fog of War' },
+};
 
 export interface OpponentProgress {
     userId: string;
@@ -161,6 +170,23 @@ export function useBattleSocket(battleId: string, userId: string | undefined) {
             setTimeout(() => {
                 dispatch(removeActiveEffect(data.skillType));
             }, durationSec * 1000);
+
+            // Surface a toast naming the actor + skill so the target user
+            // knows what just hit them. Look up actor's username from the
+            // cached battle participants.
+            const battle = queryClient.getQueryData<BattleResponse>(
+                queryKeys.battle(battleId),
+            );
+            const actor = battle?.participants.find(
+                (p) => p.userId === data.fromUserId,
+            );
+            const cfg = SKILL_TOAST_LABELS[data.skillType];
+            if (actor?.user?.username && cfg) {
+                toast(
+                    `${cfg.emoji} ${actor.user.username} used ${cfg.label} on you!`,
+                    { id: `skill-effect-${data.skillType}` },
+                );
+            }
         };
 
         const handleSkillUsed = (data: SkillUsedPayload) => {

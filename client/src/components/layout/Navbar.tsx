@@ -26,6 +26,7 @@ import {
     MessageSquare,
     ImagePlus,
     Loader2,
+    FileCode,
 } from 'lucide-react';
 import { SubscriptionBadge } from './SubscriptionBadge';
 import { NotificationBell } from './NotificationBell';
@@ -128,6 +129,14 @@ export function Navbar() {
                                     Leaderboard
                                 </Button>
                             </Link>
+                            {import.meta.env.DEV && (
+                                <Link to="/author">
+                                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                                        <FileCode className="mr-1.5 h-4 w-4" />
+                                        Author
+                                    </Button>
+                                </Link>
+                            )}
                         </div>
                     )}
                 </div>
