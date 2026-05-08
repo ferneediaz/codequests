@@ -142,6 +142,7 @@ export function ClanWarPanel({ cfg }: { cfg: PlayConfig }) {
                                         Math.max(CW_MIN_TEAM_SIZE, cfg.cwTeamSize - 1),
                                     )
                                 }
+                                aria-label="Decrease team size"
                             >
                                 <Minus className="h-4 w-4" />
                             </Button>
@@ -171,6 +172,7 @@ export function ClanWarPanel({ cfg }: { cfg: PlayConfig }) {
                                         Math.min(CW_MAX_TEAM_SIZE, cfg.cwTeamSize + 1),
                                     )
                                 }
+                                aria-label="Increase team size"
                             >
                                 <Plus className="h-4 w-4" />
                             </Button>

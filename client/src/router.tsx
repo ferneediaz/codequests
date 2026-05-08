@@ -9,6 +9,7 @@ import { protectedAuthRoutes, publicAuthRoutes } from '@/routes/auth';
 import { protectedBattleRoutes, publicBattleRoutes } from '@/routes/battle';
 import { clanRoutes } from '@/routes/clan';
 import { dashboardRoutes } from '@/routes/dashboard';
+import { leaderboardRoutes } from '@/routes/leaderboard';
 import { protectedMarketingRoutes, publicMarketingRoutes } from '@/routes/marketing';
 import { practiceRoutes } from '@/routes/practice';
 import { publicProfileRoutes } from '@/routes/profile';
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
             ...publicAuthRoutes,
             ...publicBattleRoutes,
             ...publicProfileRoutes,
+            ...leaderboardRoutes,
             {
                 element: <ProtectedRoute />,
                 children: [

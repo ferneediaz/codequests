@@ -8,15 +8,27 @@ async function bootstrap() {
     rawBody: true, // Required for Stripe webhook signature verification
   });
 
-  // Enable CORS for frontend
+  // CORS. Production: comma-separated CORS_ORIGIN. Dev: common Vite ports.
+  const corsOrigin = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean)
+    : process.env.NODE_ENV === 'production'
+      ? []
+      : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production'
-      ? 'https://your-frontend-domain.com'
-      : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+    origin: corsOrigin,
     credentials: true,
   });
 
-  // Global validation pipe - validates all incoming DTOs
+  // Trust the platform proxy (Render/Fly/etc.) so client IPs are correct
+  // for rate limiting and logging. Idempotent in dev.
+  const httpAdapter = app.getHttpAdapter();
+  const instance = httpAdapter.getInstance();
+  if (typeof instance?.set === 'function') {
+    instance.set('trust proxy', 1);
+  }
+
+  // Global API prefix + validation pipe.
+  // Health probe lives at /api/health — point your platform at that path.
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({

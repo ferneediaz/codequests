@@ -1,9 +1,39 @@
 import '../src/load-server-env';
-import { PrismaClient, UserSegment, CodingExperience, PrimaryGoal, HowHeard, AvatarSource } from '@prisma/client';
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { PrismaClient, UserSegment, CodingExperience, PrimaryGoal, HowHeard, AvatarSource, SubscriptionTier } from '@prisma/client';
 import { loadAllProblems, toImportTestCases, toStarterCodeMap } from '../src/problems/authoring/problem-loader';
 import { serializeStarterCode } from '../src/code-execution/starter-code';
 
 const prisma = new PrismaClient();
+
+// When client/e2e/.test-users.json exists (after running
+// `npm run e2e:bootstrap` in the client), use the Supabase auth UUIDs
+// it captured for User.id so server JWT validation (sub → User.id)
+// works for the same accounts. Without it we fall back to legacy
+// hardcoded ids — that path keeps non-e2e dev workflows working.
+type TestUserEntry = {
+    email: string;
+    username: string;
+    supabaseUserId: string;
+    password: string;
+};
+type TestUsersFile = Partial<Record<'alice' | 'bob' | 'carol' | 'dave', TestUserEntry>>;
+
+function loadTestUsers(): TestUsersFile {
+    const path = resolve(__dirname, '../../client/e2e/.test-users.json');
+    if (!existsSync(path)) return {};
+    try {
+        return JSON.parse(readFileSync(path, 'utf8')) as TestUsersFile;
+    } catch (err) {
+        console.warn(`⚠️ Could not parse ${path}: ${(err as Error).message}`);
+        return {};
+    }
+}
+
+const testUsers = loadTestUsers();
+const idFor = (key: keyof TestUsersFile, fallback: string): string =>
+    testUsers[key]?.supabaseUserId ?? fallback;
 
 /**
  * Seed non-problem fixtures (users, clans, seasons) and then import every
@@ -37,12 +67,24 @@ async function main() {
 
     console.log('✅ Created admin user:', admin.email);
 
+    const aliceId = idFor('alice', 'user-seed-001');
+    const bobId = idFor('bob', 'user-seed-002');
+    const carolId = idFor('carol', 'user-seed-003');
+    const daveId = idFor('dave', 'user-seed-004');
+
+    // Re-keying an existing User via upsert.update would cascade across
+    // every battle/clan/etc FK and is more trouble than it's worth — wipe
+    // the DB before re-seeding when switching auth modes.
+    //
+    // Test users are PRO so the e2e suite isn't gated by the daily
+    // free-game cap (each test creates a battle, and a single user is
+    // re-used across multiple specs).
     const users = await Promise.all([
         prisma.user.upsert({
             where: { email: 'alice@example.com' },
-            update: {},
+            update: { subscriptionTier: SubscriptionTier.PRO },
             create: {
-                id: 'user-seed-001',
+                id: aliceId,
                 email: 'alice@example.com',
                 username: 'alice_coder',
                 role: 'user',
@@ -54,13 +96,14 @@ async function main() {
                 userSegment: UserSegment.STUDENT,
                 primaryGoal: PrimaryGoal.CLASSROOM,
                 howHeard: HowHeard.SCHOOL,
+                subscriptionTier: SubscriptionTier.PRO,
             },
         }),
         prisma.user.upsert({
             where: { email: 'bob@example.com' },
-            update: {},
+            update: { subscriptionTier: SubscriptionTier.PRO },
             create: {
-                id: 'user-seed-002',
+                id: bobId,
                 email: 'bob@example.com',
                 username: 'bob_dev',
                 role: 'user',
@@ -71,6 +114,44 @@ async function main() {
                 onboardingCompletedAt: new Date(),
                 userSegment: UserSegment.HOBBYIST,
                 primaryGoal: PrimaryGoal.FUN,
+                subscriptionTier: SubscriptionTier.PRO,
+            },
+        }),
+        prisma.user.upsert({
+            where: { email: 'carol@example.com' },
+            update: { subscriptionTier: SubscriptionTier.PRO },
+            create: {
+                id: carolId,
+                email: 'carol@example.com',
+                username: 'carol_codes',
+                role: 'user',
+                mmr: 1300,
+                wins: 12,
+                losses: 8,
+                avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=carol',
+                onboardingCompletedAt: new Date(),
+                userSegment: UserSegment.STUDENT,
+                primaryGoal: PrimaryGoal.SKILL_UP,
+                howHeard: HowHeard.SCHOOL,
+                subscriptionTier: SubscriptionTier.PRO,
+            },
+        }),
+        prisma.user.upsert({
+            where: { email: 'dave@example.com' },
+            update: { subscriptionTier: SubscriptionTier.PRO },
+            create: {
+                id: daveId,
+                email: 'dave@example.com',
+                username: 'dave_debug',
+                role: 'user',
+                mmr: 1400,
+                wins: 18,
+                losses: 9,
+                avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=dave',
+                onboardingCompletedAt: new Date(),
+                userSegment: UserSegment.HOBBYIST,
+                primaryGoal: PrimaryGoal.FUN,
+                subscriptionTier: SubscriptionTier.PRO,
             },
         }),
     ]);
@@ -84,7 +165,7 @@ async function main() {
             id: 'clan-seed-001',
             name: 'MIT Hackers',
             tag: 'MIT',
-            ownerId: 'user-seed-001',
+            ownerId: aliceId,
             mmr: 1200,
         },
     });
@@ -96,23 +177,18 @@ async function main() {
             id: 'clan-seed-002',
             name: 'Harvard Coders',
             tag: 'HVD',
-            ownerId: 'user-seed-002',
+            ownerId: bobId,
             mmr: 1100,
         },
     });
 
-    await prisma.user.update({
-        where: { id: 'user-seed-001' },
-        data: { clanId: clan1.id },
-    });
-
-    await prisma.user.update({
-        where: { id: 'user-seed-002' },
-        data: { clanId: clan2.id },
-    });
+    await prisma.user.update({ where: { id: aliceId }, data: { clanId: clan1.id } });
+    await prisma.user.update({ where: { id: carolId }, data: { clanId: clan1.id } });
+    await prisma.user.update({ where: { id: bobId }, data: { clanId: clan2.id } });
+    await prisma.user.update({ where: { id: daveId }, data: { clanId: clan2.id } });
 
     console.log(
-        `✅ Created clans: ${clan1.name} [${clan1.tag}], ${clan2.name} [${clan2.tag}]`,
+        `✅ Created clans: ${clan1.name} [${clan1.tag}] (alice+carol), ${clan2.name} [${clan2.tag}] (bob+dave)`,
     );
 
     // Import problems from YAML files under server/problems/.

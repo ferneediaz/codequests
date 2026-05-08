@@ -1,0 +1,81 @@
+# Local-stack docker-compose for CodeQuest Battles.
+# - postgres: persistent DB on a named volume.
+# - server:   NestJS API; runs `prisma migrate deploy` on boot.
+# - client:   Vite SPA built into nginx-served static assets.
+# - piston:   optional Piston code execution sandbox.
+#
+# Quick start:
+#   cp server/.env.example server/.env  # fill in real values
+#   cp client/.env.example client/.env  # fill in real values (used at build time)
+#   docker compose up --build
+#
+# Notes:
+# - Vite vars (VITE_*) are baked in at build time, so changing them requires
+#   `docker compose build client`.
+# - The server's DATABASE_URL must point at the `postgres` service name to
+#   reach it from inside the compose network (set in .env).
+# - This file is intentionally minimal; production stacks should add TLS,
+#   secrets management, and managed Postgres.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-codequest}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./server/.env
+    environment:
+      # Override the .env DATABASE_URL so the server reaches Postgres via the
+      # compose network. .env's DATABASE_URL still wins for local non-Docker dev.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-codequest}
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        # These get baked into the bundle. Defaults work for a docker compose
+        # stack accessed from the host on localhost:8080.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:3000}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:

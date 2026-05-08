@@ -7,6 +7,7 @@ import {
     Logger,
 } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
+import { randomBytes } from 'crypto';
 import {
     BattleMode,
     BattleRoundEndReason,
@@ -38,6 +39,9 @@ const ELO_K_FACTOR = 16;
 const MIN_MMR = 0;
 
 const MIN_MAX_PLAYERS = 3;
+
+const INVITE_CODE_LENGTH = 8;
+const INVITE_EXPIRY_HOURS = 24;
 const MAX_MAX_PLAYERS = 50;
 const MIN_ROUND_SECONDS = 10;
 const MAX_ROUND_SECONDS = 7200;
@@ -334,6 +338,18 @@ export class BattleRoyaleService {
         // Active season
         const activeSeason = await this.seasonsService.getActiveSeason();
 
+        // BR is lobby-only — InvitePanel always sends `withInviteCode: true`
+        // and the UI renders the code after creation. Default to generating
+        // one unless the caller opts out, mirroring clan-wars.service.ts.
+        let inviteCode: string | null = null;
+        let inviteExpiresAt: Date | null = null;
+        if (dto.withInviteCode !== false) {
+            inviteCode = await this.generateInviteCode();
+            inviteExpiresAt = new Date(
+                Date.now() + INVITE_EXPIRY_HOURS * 60 * 60 * 1000,
+            );
+        }
+
         // Create battle + creator participant + rounds (all PENDING) in one call
         const battle = await this.prisma.battle.create({
             data: {
@@ -343,6 +359,8 @@ export class BattleRoyaleService {
                 currentRound: 0,
                 timeLimitMinutes: 5, // unused for BR but required by schema default
                 enabledSkills: dto.enabledSkills || [],
+                inviteCode,
+                inviteExpiresAt,
                 seasonId: activeSeason?.id || null,
                 status: BattleStatus.WAITING,
                 participants: {
@@ -1546,5 +1564,34 @@ export class BattleRoyaleService {
                 },
             })),
         };
+    }
+
+    /**
+     * Generate a unique 8-char alphanumeric invite code for a Battle Royale
+     * lobby. Mirrors BattlesService.generateInviteCode and ClanWarsService —
+     * shared alphabet so codes are interchangeable across modes.
+     */
+    private async generateInviteCode(): Promise<string> {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        const maxAttempts = 10;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const bytes = randomBytes(INVITE_CODE_LENGTH);
+            let code = '';
+            for (let i = 0; i < INVITE_CODE_LENGTH; i++) {
+                code += chars[bytes[i] % chars.length];
+            }
+            const existing = await this.prisma.battle.findFirst({
+                where: {
+                    inviteCode: code,
+                    status: { not: BattleStatus.COMPLETED },
+                },
+            });
+            if (!existing) {
+                return code;
+            }
+        }
+        throw new BadRequestException(
+            'Failed to generate unique invite code. Please try again.',
+        );
     }
 }

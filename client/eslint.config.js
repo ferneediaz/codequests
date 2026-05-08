@@ -20,4 +20,15 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Playwright's fixture API uses `use(...)` to yield values to tests;
+    // it isn't a React hook, so disable the react-hooks lint here.
+    files: ['e2e/**/*.{ts,tsx}'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+    },
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])

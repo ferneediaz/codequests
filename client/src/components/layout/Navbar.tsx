@@ -21,6 +21,7 @@ import {
     LayoutDashboard,
     Crown,
     Shield,
+    Trophy,
     Users,
     MessageSquare,
     ImagePlus,
@@ -119,6 +120,12 @@ export function Navbar() {
                                 <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                                     <Shield className="mr-1.5 h-4 w-4" />
                                     Clans
+                                </Button>
+                            </Link>
+                            <Link to="/leaderboard">
+                                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                                    <Trophy className="mr-1.5 h-4 w-4" />
+                                    Leaderboard
                                 </Button>
                             </Link>
                         </div>

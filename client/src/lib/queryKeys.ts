@@ -49,4 +49,20 @@ export const queryKeys = {
         forUser: (userId: string) => ['achievements', userId] as const,
     },
     leaderboard: (limit: number) => ['leaderboard', limit] as const,
+    rankings: {
+        global: (
+            period: string,
+            language: string,
+            limit: number,
+            offset: number,
+        ) => ['rankings', 'global', period, language, limit, offset] as const,
+        clans: (period: string, limit: number, offset: number) =>
+            ['rankings', 'clans', period, limit, offset] as const,
+        friends: (
+            period: string,
+            language: string,
+            limit: number,
+            offset: number,
+        ) => ['rankings', 'friends', period, language, limit, offset] as const,
+    },
 };

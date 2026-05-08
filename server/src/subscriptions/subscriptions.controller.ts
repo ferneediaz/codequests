@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiTags,
@@ -82,6 +83,7 @@ export class SubscriptionsController {
   }
 
   @Post('webhook')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Stripe webhook handler' })
   @ApiResponse({ status: 200, description: 'Webhook processed' })
   async handleWebhook(

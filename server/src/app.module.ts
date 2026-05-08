@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -19,14 +21,25 @@ import { LobbyModule } from './lobby/lobby.module';
 import { ProblemSubmissionsModule } from './problem-submissions/problem-submissions.module';
 import { AchievementsModule } from './achievements/achievements.module';
 import { RankingsModule } from './rankings/rankings.module';
+import { HealthModule } from './health/health.module';
+import { validateEnv } from './config/env.validation';
 
 @Module({
     imports: [
-        // Load environment variables globally
+        // Load environment variables globally; validate against the zod
+        // schema so a misconfigured boot fails fast with a useful message.
         ConfigModule.forRoot({
             isGlobal: true,
             envFilePath: '.env',
+            validate: validateEnv,
         }),
+
+        // Per-IP rate limiting. Two tiers: short burst guard + sustained ceiling.
+        // Stripe webhook + /health are decorated with @SkipThrottle().
+        ThrottlerModule.forRoot([
+            { name: 'short', ttl: 10_000, limit: 30 },
+            { name: 'long', ttl: 60_000, limit: 120 },
+        ]),
 
         // Database
         PrismaModule,
@@ -58,6 +71,12 @@ import { RankingsModule } from './rankings/rankings.module';
 
         // Time-windowed leaderboards (global / clans / friends).
         RankingsModule,
+
+        // Liveness / DB-readiness probe for hosting platforms (GET /api/health).
+        HealthModule,
+    ],
+    providers: [
+        { provide: APP_GUARD, useClass: ThrottlerGuard },
     ],
 })
 export class AppModule { }
