@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { CodeEditor } from '@/components/battle/CodeEditor';
 import { BattleChat } from '@/components/battle/BattleChat';
-import { ArrowLeft, Loader2, Trophy, RotateCcw, Flame } from 'lucide-react';
+import { ArrowLeft, Loader2, Trophy, RotateCcw, Flame, Share2 } from 'lucide-react';
 import { battlesApi } from '@/services/battles';
 import { queryKeys } from '@/lib/queryKeys';
 import type {
@@ -368,6 +368,26 @@ export default function Results() {
                             <RotateCcw className="mr-2 h-4 w-4" />
                         )}
                         Rematch
+                    </Button>
+                )}
+                {iWon && (
+                    <Button
+                        variant="outline"
+                        onClick={async () => {
+                            const apiBase =
+                                import.meta.env.VITE_API_URL ||
+                                'http://localhost:3000/api';
+                            const shareUrl = `${apiBase.replace(/\/$/, '')}/share/battles/${battle.id}`;
+                            try {
+                                await navigator.clipboard.writeText(shareUrl);
+                                toast.success('Share link copied — go roast them.');
+                            } catch {
+                                toast.error('Could not copy share link.');
+                            }
+                        }}
+                    >
+                        <Share2 className="mr-2 h-4 w-4" />
+                        Share
                     </Button>
                 )}
             </div>

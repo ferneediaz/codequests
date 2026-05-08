@@ -23,6 +23,7 @@ import { ProblemSubmissionsModule } from './problem-submissions/problem-submissi
 import { AchievementsModule } from './achievements/achievements.module';
 import { RankingsModule } from './rankings/rankings.module';
 import { HealthModule } from './health/health.module';
+import { ShareModule } from './share/share.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -75,6 +76,9 @@ import { validateEnv } from './config/env.validation';
 
         // Liveness / DB-readiness probe for hosting platforms (GET /api/health).
         HealthModule,
+
+        // Public OG share images / metadata for completed battles.
+        ShareModule,
     ],
     providers: [
         { provide: APP_GUARD, useClass: ThrottlerGuard },
