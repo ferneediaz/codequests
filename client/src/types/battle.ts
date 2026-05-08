@@ -111,6 +111,8 @@ export interface BattleParticipant {
         id: string;
         username: string;
         mmr: number;
+        currentWinStreak?: number;
+        bestWinStreak?: number;
         avatarUrl?: string;
     };
 }

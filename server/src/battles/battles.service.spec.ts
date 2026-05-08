@@ -48,6 +48,8 @@ describe('BattlesService', () => {
         mmr: 1000,
         wins: 5,
         losses: 3,
+        currentWinStreak: 0,
+        bestWinStreak: 2,
         role: 'user',
         clanId: null,
         clan: null,
@@ -69,6 +71,8 @@ describe('BattlesService', () => {
         mmr: 1100,
         wins: 8,
         losses: 2,
+        currentWinStreak: 0,
+        bestWinStreak: 4,
         role: 'user',
         clanId: null,
         clan: null,
@@ -1035,13 +1039,86 @@ describe('BattlesService', () => {
             );
             expect(winnerUpdate).toBeDefined();
             expect(winnerUpdate!.args.data.wins).toEqual({ increment: 1 });
+            // mockUser1 starts with currentWinStreak: 0, bestWinStreak: 2 →
+            // current goes 0→1 (no new best, since 1 < 2).
+            expect(winnerUpdate!.args.data.currentWinStreak).toBe(1);
+            expect(winnerUpdate!.args.data.bestWinStreak).toBeUndefined();
 
-            // Verify loser gets losses incremented
+            // Verify loser gets losses incremented and streak reset
             const loserUpdate = userUpdates.find(
                 c => c.args.where.id === mockUser2.id,
             );
             expect(loserUpdate).toBeDefined();
             expect(loserUpdate!.args.data.losses).toEqual({ increment: 1 });
+            expect(loserUpdate!.args.data.currentWinStreak).toBe(0);
+            expect(loserUpdate!.args.data.bestWinStreak).toBeUndefined();
+        });
+
+        it('should update bestWinStreak when current streak surpasses best', async () => {
+            // Winner already on a hot streak — about to set a new personal best.
+            const hotUser = { ...mockUser1, currentWinStreak: 4, bestWinStreak: 4 };
+            const battle = {
+                ...mockBattle,
+                status: BattleStatus.IN_PROGRESS,
+                participants: [
+                    {
+                        id: 'p1',
+                        userId: hotUser.id,
+                        teamId: null,
+                        user: { ...hotUser, clan: null },
+                        testsPassed: 2,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:05'),
+                        mmrChange: null,
+                    },
+                    {
+                        id: 'p2',
+                        userId: mockUser2.id,
+                        teamId: null,
+                        user: { ...mockUser2, clan: null },
+                        testsPassed: 1,
+                        totalTests: 2,
+                        pointsEarned: 0,
+                        submittedAt: new Date('2024-01-01T10:00:03'),
+                        mmrChange: null,
+                    },
+                ],
+            };
+
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(battle)
+                .mockResolvedValueOnce({
+                    ...battle,
+                    status: BattleStatus.COMPLETED,
+                    winnerId: hotUser.id,
+                });
+
+            const txCalls: { method: string; args: any }[] = [];
+            prisma.$transaction.mockImplementation(async (callback) => {
+                const mockTx = {
+                    battle: { update: jest.fn().mockResolvedValue({}) },
+                    battleParticipant: { update: jest.fn().mockResolvedValue({}) },
+                    user: {
+                        update: jest.fn().mockImplementation((args) => {
+                            txCalls.push({ method: 'user.update', args });
+                            return Promise.resolve({});
+                        }),
+                    },
+                    clan: { update: jest.fn().mockResolvedValue({}) },
+                };
+                return callback(mockTx);
+            });
+
+            await service.completeBattle(mockBattle.id);
+
+            const winnerUpdate = txCalls.find(
+                c => c.method === 'user.update' && c.args.where.id === hotUser.id,
+            );
+            expect(winnerUpdate).toBeDefined();
+            // 4 + 1 = 5, which surpasses bestWinStreak: 4.
+            expect(winnerUpdate!.args.data.currentWinStreak).toBe(5);
+            expect(winnerUpdate!.args.data.bestWinStreak).toBe(5);
         });
 
         it('runs achievement checks once per participant with the right context', async () => {

@@ -908,6 +908,27 @@ export class BattlesService {
                 // Ranked 1v1s always affect the user's visible MMR.
                 if (!isTeam) {
                     const newMmr = Math.max(MIN_MMR, participant.user.mmr + mmrChange);
+
+                    // Win-streak math: only when there was a decisive winner.
+                    // Winner: streak += 1, best = max(best, streak+1).
+                    // Loser: streak resets to 0. best left untouched.
+                    let streakUpdate:
+                        | { currentWinStreak: number; bestWinStreak?: number }
+                        | undefined;
+                    if (winnerId) {
+                        if (isWinner) {
+                            const next = participant.user.currentWinStreak + 1;
+                            streakUpdate = {
+                                currentWinStreak: next,
+                                ...(next > participant.user.bestWinStreak
+                                    ? { bestWinStreak: next }
+                                    : {}),
+                            };
+                        } else {
+                            streakUpdate = { currentWinStreak: 0 };
+                        }
+                    }
+
                     await tx.user.update({
                         where: { id: participant.userId },
                         data: {
@@ -922,6 +943,7 @@ export class BattlesService {
                                           : undefined,
                                   }
                                 : {}),
+                            ...(streakUpdate ?? {}),
                         },
                     });
                 }
@@ -1093,6 +1115,8 @@ export class BattlesService {
                                 username: true,
                                 avatarUrl: true,
                                 mmr: true,
+                                currentWinStreak: true,
+                                bestWinStreak: true,
                                 clan: { select: { tag: true, name: true } },
                             },
                         },

@@ -69,9 +69,11 @@ model User {
   avatarSource          AvatarSource?
 
   // Stats
-  mmr    Int @default(1000)
-  wins   Int @default(0)
-  losses Int @default(0)
+  mmr              Int @default(1000)
+  wins             Int @default(0)
+  losses           Int @default(0)
+  currentWinStreak Int @default(0)
+  bestWinStreak    Int @default(0)
 
   // Subscription
   subscriptionTier SubscriptionTier @default(FREE)

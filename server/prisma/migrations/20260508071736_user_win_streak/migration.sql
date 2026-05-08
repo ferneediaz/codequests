@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "bestWinStreak" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "currentWinStreak" INTEGER NOT NULL DEFAULT 0;

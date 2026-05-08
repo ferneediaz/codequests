@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { CodeEditor } from '@/components/battle/CodeEditor';
 import { BattleChat } from '@/components/battle/BattleChat';
-import { ArrowLeft, Loader2, Trophy, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Loader2, Trophy, RotateCcw, Flame } from 'lucide-react';
 import { battlesApi } from '@/services/battles';
 import { queryKeys } from '@/lib/queryKeys';
 import type {
@@ -278,7 +278,16 @@ export default function Results() {
                 outcome={isDraw ? 'draw' : iWon ? 'win' : 'loss'}
                 mmrDelta={isDraw ? null : (myMmrDelta ?? null)}
             />
-            {/* TODO(2.3): render WinStreakBadge once server exposes participant.user.currentWinStreak */}
+            {iWon && (me?.user?.currentWinStreak ?? 0) >= 2 && (
+                <div className="mb-4 flex justify-center">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-orange-500/40 bg-orange-500/10 px-4 py-1.5 text-orange-400">
+                        <Flame className="h-4 w-4" aria-hidden />
+                        <span className="text-sm font-semibold">
+                            {me!.user!.currentWinStreak} Win Streak!
+                        </span>
+                    </div>
+                </div>
+            )}
 
             {/* Player cards */}
             <div className="mb-8 grid gap-4 md:grid-cols-2">
