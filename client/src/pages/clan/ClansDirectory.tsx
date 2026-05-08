@@ -76,8 +76,17 @@ export default function ClansDirectory() {
                         {clansQuery.isLoading ? (
                             <p className="text-sm text-muted-foreground">Loading clans...</p>
                         ) : clans.length === 0 ? (
-                            <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                                No clans found.
+                            <div className="rounded-xl border border-dashed p-8 text-center">
+                                <Shield className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                                <p className="mb-4 text-sm text-muted-foreground">
+                                    {query
+                                        ? `No clans match "${query}".`
+                                        : "No clans yet. Be the first to start one."}
+                                </p>
+                                <Button onClick={() => navigate('/clans/create')}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Create a clan
+                                </Button>
                             </div>
                         ) : (
                             <div className="grid gap-3 md:grid-cols-2">

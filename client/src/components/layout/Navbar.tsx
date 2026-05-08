@@ -13,6 +13,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Dialog } from 'radix-ui';
 import {
     LogOut,
     User,
@@ -27,6 +28,8 @@ import {
     ImagePlus,
     Loader2,
     FileCode,
+    Menu,
+    X,
 } from 'lucide-react';
 import { SubscriptionBadge } from './SubscriptionBadge';
 import { NotificationBell } from './NotificationBell';
@@ -51,6 +54,7 @@ export function Navbar() {
     const dispatch = useAppDispatch();
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [uploading, setUploading] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const handlePickAvatar = () => {
         if (uploading) return;
@@ -83,10 +87,23 @@ export function Navbar() {
         }
     };
 
+    const closeMobileMenu = () => setMobileMenuOpen(false);
+
     return (
         <nav className="border-b border-border bg-card">
             <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-3 sm:gap-6">
+                    {isAuthenticated && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="sm:hidden"
+                            onClick={() => setMobileMenuOpen(true)}
+                            aria-label="Open menu"
+                        >
+                            <Menu className="h-5 w-5" />
+                        </Button>
+                    )}
                     <Link to="/dashboard" className="flex items-center gap-2 text-lg font-bold text-foreground no-underline">
                         <Swords className="h-5 w-5 text-primary" />
                         <span>CodeQuest</span>
@@ -250,6 +267,81 @@ export function Navbar() {
                     )}
                 </div>
             </div>
+
+            {/* Mobile drawer — only mounted while open. Renders via Portal so
+                it floats over the current page. */}
+            <Dialog.Root open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <Dialog.Portal>
+                    <Dialog.Overlay className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm sm:hidden" />
+                    <Dialog.Content
+                        className="fixed left-0 top-0 z-50 h-full w-72 max-w-[85vw] border-r border-border bg-card p-4 shadow-2xl sm:hidden"
+                        aria-describedby={undefined}
+                    >
+                        <div className="mb-6 flex items-center justify-between">
+                            <Dialog.Title className="flex items-center gap-2 text-lg font-bold">
+                                <Swords className="h-5 w-5 text-primary" />
+                                CodeQuest
+                            </Dialog.Title>
+                            <Dialog.Close className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close menu">
+                                <X className="h-4 w-4" />
+                            </Dialog.Close>
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                            <Link to="/dashboard" onClick={closeMobileMenu}>
+                                <Button variant="ghost" className="w-full justify-start">
+                                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                                    Dashboard
+                                </Button>
+                            </Link>
+                            <Link to="/practice" onClick={closeMobileMenu}>
+                                <Button variant="ghost" className="w-full justify-start">
+                                    <BookOpen className="mr-2 h-4 w-4" />
+                                    Practice
+                                </Button>
+                            </Link>
+                            <Link to="/play" onClick={closeMobileMenu}>
+                                <Button variant="ghost" className="w-full justify-start">
+                                    <Swords className="mr-2 h-4 w-4" />
+                                    Play
+                                </Button>
+                            </Link>
+                            <Link to="/lobby" onClick={closeMobileMenu}>
+                                <Button variant="ghost" className="w-full justify-start">
+                                    <Users className="mr-2 h-4 w-4" />
+                                    Lobby
+                                </Button>
+                            </Link>
+                            <Link to="/clans" onClick={closeMobileMenu}>
+                                <Button variant="ghost" className="w-full justify-start">
+                                    <Shield className="mr-2 h-4 w-4" />
+                                    Clans
+                                </Button>
+                            </Link>
+                            <Link to="/leaderboard" onClick={closeMobileMenu}>
+                                <Button variant="ghost" className="w-full justify-start">
+                                    <Trophy className="mr-2 h-4 w-4" />
+                                    Leaderboard
+                                </Button>
+                            </Link>
+                            <Link to="/messages" onClick={closeMobileMenu}>
+                                <Button variant="ghost" className="w-full justify-start">
+                                    <MessageSquare className="mr-2 h-4 w-4" />
+                                    Messages
+                                </Button>
+                            </Link>
+                            {import.meta.env.DEV && (
+                                <Link to="/author" onClick={closeMobileMenu}>
+                                    <Button variant="ghost" className="w-full justify-start">
+                                        <FileCode className="mr-2 h-4 w-4" />
+                                        Author
+                                    </Button>
+                                </Link>
+                            )}
+                        </div>
+                    </Dialog.Content>
+                </Dialog.Portal>
+            </Dialog.Root>
         </nav>
     );
 }

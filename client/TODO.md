@@ -835,12 +835,12 @@ Shipped as [Phase 2.5](client/TODO.md#25-quick-play): `/play/quick` lists/rename
 - [x] Error boundary with retry button — `client/src/components/layout/ErrorBoundary.tsx`, mounted in `main.tsx`
 - [x] Toast notification system — sonner mounted in `main.tsx`, used throughout
 - [x] 404 page — `client/src/pages/error/NotFound.tsx`, wired as catch-all in `router.tsx`
-- [ ] Empty states for match history, friends, clan list (Profile already has one) — partial
+- [x] Empty states across match history, friends sidebar, clans directory (CTA + icon + helpful copy)
 - [ ] Smooth page transitions (fade/slide) — deferred
 - [ ] Keyboard shortcuts:
   - [ ] `Ctrl+Enter` to submit code in battle
   - [ ] `Escape` to close modals
-- [ ] Responsive navbar (collapse to hamburger on mobile) — current `sm:flex hidden` drops links with no replacement
+- [x] Responsive navbar — hamburger drawer (radix Dialog) on `<sm`, full nav on `≥sm`
 - [ ] **Success Criteria:** No raw loading states, no ugly errors, everything smooth ✅
 
 ### 5.5 E2E Tests (Playwright)
