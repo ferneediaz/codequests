@@ -369,7 +369,7 @@ users; if you navigate to your own `/profile/:username` you redirect to
 - [x] Step 4: **Invite**
   - [x] Option A: "Find Match" → join matchmaking queue with these settings
   - [x] Option B: "Create Private Game" → generate invite code
-  - [ ] Option C: "Invite Player" → search by username, send in-app invite
+  - [x] Option C: "Invite Player" by username — autocomplete dropdown lives in `BattleLobby.tsx` once the lobby is created (uses `UserSearchInput`)
   - [x] Shareable invite code with copy button
   - [ ] QR code for invite link (nice-to-have)
 - [x] **Save Preset**: save current settings as named preset (stored in localStorage)
@@ -412,9 +412,8 @@ users; if you navigate to your own `/profile/:username` you redirect to
   - [x] "PlayerX invited you to a 1v1 battle!"
   - [x] Accept → `POST /api/battles/invite/:code/join` → redirect to `/battle/:id`
   - [x] Decline → dismiss toast
-- [ ] Nice-to-haves (deferred):
-  - [ ] Username search autocomplete in invite-by-username input
-  - [ ] Mutual friends / profile preview on invite link page
+- [x] Username search autocomplete in invite-by-username input — `UserSearchInput` wired in `BattleLobby.tsx`
+- [x] Mutual friends / profile preview on invite link page — `InviteJoin.tsx` shows "Invited by X · N mutual friends" when the API surfaces `mutualFriendsCount`
 - [x] **Success Criteria:** Both link and in-app invites work, target can accept/decline ✅
 
 ### 2.7 Sound System

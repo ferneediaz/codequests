@@ -147,6 +147,10 @@ export interface BattleResponse {
     maxPlayers?: number;
     currentRound?: number;
     problemPool?: ProblemPoolItem[] | { items: ProblemPoolItem[] };
+    /** Present on /invite/:code responses — the user who created the
+     * invite, with mutual-friends count relative to the viewer. */
+    inviter?: { id: string; username: string } | null;
+    mutualFriendsCount?: number;
 }
 
 export interface TestCaseResult {

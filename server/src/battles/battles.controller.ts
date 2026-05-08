@@ -293,8 +293,8 @@ export class BattlesController {
     @ApiResponse({ status: 200, description: 'Battle details', type: BattleResponseDto })
     @ApiResponse({ status: 404, description: 'Invalid invite code' })
     @ApiResponse({ status: 400, description: 'Invite code expired or battle started' })
-    async getByInviteCode(@Param('code') code: string) {
-        return this.battlesService.getByInviteCode(code);
+    async getByInviteCode(@Req() req: AuthedRequest, @Param('code') code: string) {
+        return this.battlesService.getByInviteCode(code, req.user.id);
     }
 
     @Post('invite/:code/join')

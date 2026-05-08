@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { BattleResponse } from '@/types/api';
 import api from '@/services/api';
+import { UserSearchInput } from '@/components/social/UserSearchInput';
 
 interface BattleLobbyProps {
     battle: BattleResponse;
@@ -215,15 +216,13 @@ export function BattleLobby({ battle, currentUserId, onReady, onUnready }: Battl
                         <h3 className="text-sm font-medium text-muted-foreground">
                             Invite Player
                         </h3>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                placeholder="Enter username"
-                                value={inviteUsername}
-                                onChange={(e) => setInviteUsername(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleInviteUser()}
-                                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                            />
+                        <UserSearchInput
+                            value={inviteUsername}
+                            onChange={setInviteUsername}
+                            onSelect={(user) => setInviteUsername(user.username)}
+                            placeholder="Search by username..."
+                        />
+                        <div className="flex justify-end">
                             <Button
                                 variant="outline"
                                 onClick={handleInviteUser}

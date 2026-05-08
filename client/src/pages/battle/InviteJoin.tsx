@@ -272,9 +272,20 @@ function ReadyBlock({
     const expiresAt = battle.inviteExpiresAt
         ? new Date(battle.inviteExpiresAt)
         : null;
+    const mutual = battle.mutualFriendsCount ?? 0;
+    const inviterName = battle.inviter?.username ?? creator?.username;
 
     return (
         <div className="space-y-6">
+            {inviterName && (mutual > 0) && (
+                <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                    Invited by <span className="font-medium text-foreground">{inviterName}</span>
+                    {' · '}
+                    <span className="text-foreground">{mutual}</span>{' '}
+                    mutual friend{mutual === 1 ? '' : 's'}
+                </div>
+            )}
+
             <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
                     <ModeIconFor mode={battle.mode} className="h-5 w-5" />

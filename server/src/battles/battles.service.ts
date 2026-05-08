@@ -1462,7 +1462,7 @@ export class BattlesService {
     /**
      * Get battle details by invite code (case-insensitive)
      */
-    async getByInviteCode(code: string) {
+    async getByInviteCode(code: string, viewerId?: string) {
         const battle = await this.prisma.battle.findUnique({
             where: { inviteCode: code.toUpperCase() },
             include: {
@@ -1501,6 +1501,13 @@ export class BattlesService {
             throw new BadRequestException('Battle is no longer accepting players');
         }
 
+        // First participant is treated as the inviter for the social preview.
+        const inviter = battle.participants[0]?.user ?? null;
+        const mutualFriendsCount =
+            viewerId && inviter && viewerId !== inviter.id
+                ? await this.countMutualFriends(viewerId, inviter.id)
+                : 0;
+
         return {
             ...battle,
             participants: battle.participants.map((p) => ({
@@ -1510,7 +1517,39 @@ export class BattlesService {
                     tier: getRankTier(p.user.mmr),
                 },
             })),
+            inviter: inviter
+                ? { id: inviter.id, username: inviter.username }
+                : null,
+            mutualFriendsCount,
         };
+    }
+
+    /**
+     * Count accepted friendships shared between two users.
+     * Two queries + a JS intersection — bounded by per-user friend count,
+     * so typical lists keep this comfortably under one round-trip's worth.
+     */
+    private async countMutualFriends(
+        viewerId: string,
+        otherId: string,
+    ): Promise<number> {
+        const friendIds = async (uid: string) => {
+            const rows = await this.prisma.friendship.findMany({
+                where: {
+                    status: 'ACCEPTED',
+                    OR: [{ requesterId: uid }, { addresseeId: uid }],
+                },
+                select: { requesterId: true, addresseeId: true },
+            });
+            return new Set(
+                rows.map((r) => (r.requesterId === uid ? r.addresseeId : r.requesterId)),
+            );
+        };
+
+        const [a, b] = await Promise.all([friendIds(viewerId), friendIds(otherId)]);
+        let count = 0;
+        for (const id of a) if (b.has(id)) count++;
+        return count;
     }
 
     /**
