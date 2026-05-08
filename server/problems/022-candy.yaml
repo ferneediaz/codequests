@@ -1,0 +1,99 @@
+id: problem-022-candy
+title: Candy
+difficulty: HARD
+tags:
+  - arrays
+  - greedy
+description: |
+  There are `n` children standing in a line. Each child is assigned a rating value given in the integer array `ratings`.
+
+  You are giving candies to these children subject to two requirements:
+
+  1. Each child must have **at least one** candy.
+  2. Children with a **higher** rating get more candies than their immediate neighbors.
+
+  Return the **minimum** number of candies you need to distribute.
+
+  **Example 1:**
+  ```
+  Input: ratings = [1,0,2]
+  Output: 5
+  Explanation: You can allocate to the first, second and third child with 2, 1, 2 candies respectively.
+  ```
+
+  **Example 2:**
+  ```
+  Input: ratings = [1,2,2]
+  Output: 4
+  Explanation: 1, 2, 1.
+  ```
+
+  **Constraints:**
+  - `n == ratings.length`
+  - `1 <= n <= 2 * 10^4`
+  - `0 <= ratings[i] <= 2 * 10^4`
+signature:
+  name:
+    javascript: candy
+    python: candy
+  params:
+    - { name: ratings, type: 'int[]' }
+  returns: int
+starter:
+  javascript: |
+    function candy(ratings) {
+      // Your code here
+      return 0;
+    }
+  python: |
+    def candy(ratings):
+        # Your code here
+        return 0
+tests:
+  - { args: [[1, 0, 2]],                   expected: 5 }
+  - { args: [[1, 2, 2]],                   expected: 4 }
+  - { args: [[1, 3, 2, 2, 1]],             expected: 7 }
+  - { args: [[1, 2, 87, 87, 87, 2, 1]],    expected: 13, hidden: true }
+  - { args: [[1, 3, 4, 5, 2]],             expected: 11, hidden: true }
+hints:
+  - The two neighbor constraints — "more than your left neighbor if your rating is higher" and "more than your right neighbor if your rating is higher" — can be satisfied independently with two passes.
+  - Pass 1 (left to right) ensures every child with a higher rating than the one **on their left** has more candy. Pass 2 (right to left) does the same for the **right** neighbor.
+  - For each child take the **maximum** of the two pass values — that satisfies both directions simultaneously and is provably minimal.
+solution: |
+  Two passes, no fancy data structures:
+
+  - Forward pass — set `candy[i] = candy[i - 1] + 1` whenever `ratings[i] > ratings[i - 1]`, otherwise `1`.
+  - Backward pass — set `candy[i] = max(candy[i], candy[i + 1] + 1)` whenever `ratings[i] > ratings[i + 1]`.
+
+  Each pass enforces one of the two neighbor constraints; the maximum at each index satisfies both at the same time, and you can't go lower without violating one.
+
+  ```javascript
+  function candy(ratings) {
+      const n = ratings.length;
+      const candies = new Array(n).fill(1);
+      for (let i = 1; i < n; i++) {
+          if (ratings[i] > ratings[i - 1]) candies[i] = candies[i - 1] + 1;
+      }
+      for (let i = n - 2; i >= 0; i--) {
+          if (ratings[i] > ratings[i + 1]) {
+              candies[i] = Math.max(candies[i], candies[i + 1] + 1);
+          }
+      }
+      return candies.reduce((a, b) => a + b, 0);
+  }
+  ```
+
+  ```python
+  def candy(ratings):
+      n = len(ratings)
+      candies = [1] * n
+      for i in range(1, n):
+          if ratings[i] > ratings[i - 1]:
+              candies[i] = candies[i - 1] + 1
+      for i in range(n - 2, -1, -1):
+          if ratings[i] > ratings[i + 1]:
+              candies[i] = max(candies[i], candies[i + 1] + 1)
+      return sum(candies)
+  ```
+
+  Two linear passes plus a sum — `O(n)` time and `O(n)` extra space.

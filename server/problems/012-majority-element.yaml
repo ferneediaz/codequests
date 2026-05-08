@@ -1,0 +1,87 @@
+id: problem-012-majority-element
+title: Majority Element
+difficulty: EASY
+tags:
+  - arrays
+  - hash-table
+  - boyer-moore
+description: |
+  Given an array `nums` of size `n`, return the **majority element** — the value that appears strictly more than `n / 2` times.
+
+  You may assume that the majority element always exists in the array.
+
+  **Example 1:**
+  ```
+  Input: nums = [3,2,3]
+  Output: 3
+  ```
+
+  **Example 2:**
+  ```
+  Input: nums = [2,2,1,1,1,2,2]
+  Output: 2
+  ```
+
+  **Constraints:**
+  - `1 <= nums.length <= 5 * 10^4`
+  - `-10^9 <= nums[i] <= 10^9`
+  - The majority element always exists.
+
+  **Follow-up:** can you do it in `O(n)` time and `O(1)` space?
+signature:
+  name:
+    javascript: majorityElement
+    python: majority_element
+  params:
+    - { name: nums, type: 'int[]' }
+  returns: int
+starter:
+  javascript: |
+    function majorityElement(nums) {
+      // Your code here
+      return 0;
+    }
+  python: |
+    def majority_element(nums):
+        # Your code here
+        return 0
+tests:
+  - { args: [[3, 2, 3]],                  expected: 3 }
+  - { args: [[2, 2, 1, 1, 1, 2, 2]],      expected: 2 }
+  - { args: [[1]],                        expected: 1 }
+  - { args: [[6, 5, 5]],                  expected: 5, hidden: true }
+  - { args: [[1, 1, 1, 2, 2]],            expected: 1, hidden: true }
+hints:
+  - A hash map of counts works in `O(n)` time and `O(n)` space — but the follow-up asks for `O(1)` space. Is there a way to "cancel out" non-majority elements as you go?
+  - Try keeping a running candidate and a count. When the count drops to zero, replace the candidate with the current element.
+  - This is the **Boyer-Moore voting algorithm**. Because the majority element appears more than half the time, every other value can pair off against it and the majority still wins.
+solution: |
+  **Boyer-Moore voting** turns the problem into a single linear pass with a candidate and a counter:
+
+  - When `count == 0`, adopt the current element as the new candidate.
+  - When the next element equals the candidate, increment `count`; otherwise decrement.
+
+  Because the majority element appears more than `n / 2` times, no matter how unfavorably we order the cancellations, the candidate at the end of the pass *is* the majority element.
+
+  ```javascript
+  function majorityElement(nums) {
+      let candidate = 0, count = 0;
+      for (const x of nums) {
+          if (count === 0) candidate = x;
+          count += (x === candidate) ? 1 : -1;
+      }
+      return candidate;
+  }
+  ```
+
+  ```python
+  def majority_element(nums):
+      candidate, count = 0, 0
+      for x in nums:
+          if count == 0:
+              candidate = x
+          count += 1 if x == candidate else -1
+      return candidate
+  ```
+
+  This runs in `O(n)` time with `O(1)` extra space — the optimal answer for the follow-up.

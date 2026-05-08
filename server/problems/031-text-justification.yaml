@@ -1,0 +1,154 @@
+id: problem-031-text-justification
+title: Text Justification
+difficulty: HARD
+tags:
+  - strings
+  - greedy
+  - simulation
+description: |
+  Given an array of strings `words` and a width `maxWidth`, format the text such that each line has **exactly** `maxWidth` characters and is **fully (left and right) justified**.
+
+  Pack words greedily — fit as many words as possible per line. Pad with **extra spaces** between words so each line is exactly `maxWidth` characters long.
+
+  Extra spaces between words should be distributed as evenly as possible. If the number of spaces does not divide evenly, the **empty slots on the left** will receive more spaces than the slots on the right.
+
+  For the **last line of text**, it should be left-justified, and **no extra space is inserted between words**. The last line is padded with trailing spaces only.
+
+  Notes:
+  - A single word per line should be left-justified with the rest of the line filled with spaces (no different from the last-line rule).
+  - Each `words[i]` is guaranteed to be `<= maxWidth` so it fits on its own line.
+
+  **Example 1:**
+  ```
+  Input: words = ["This", "is", "an", "example", "of", "text", "justification."], maxWidth = 16
+  Output:
+  [
+     "This    is    an",
+     "example  of text",
+     "justification.  "
+  ]
+  ```
+
+  **Example 2:**
+  ```
+  Input: words = ["What","must","be","acknowledgment","shall","be"], maxWidth = 16
+  Output:
+  [
+    "What   must   be",
+    "acknowledgment  ",
+    "shall be        "
+  ]
+  ```
+
+  **Constraints:**
+  - `1 <= words.length <= 300`
+  - `1 <= words[i].length <= 20`
+  - `1 <= maxWidth <= 100`
+  - `words[i].length <= maxWidth`
+signature:
+  name:
+    javascript: fullJustify
+    python: full_justify
+  params:
+    - { name: words,    type: 'string[]' }
+    - { name: maxWidth, type: int }
+  returns: 'string[]'
+starter:
+  javascript: |
+    function fullJustify(words, maxWidth) {
+      // Your code here
+      return [];
+    }
+  python: |
+    def full_justify(words, maxWidth):
+        # Your code here
+        return []
+tests:
+  - args: [["This", "is", "an", "example", "of", "text", "justification."], 16]
+    expected: ["This    is    an", "example  of text", "justification.  "]
+  - args: [["What", "must", "be", "acknowledgment", "shall", "be"], 16]
+    expected: ["What   must   be", "acknowledgment  ", "shall be        "]
+  - args: [["Science","is","what","we","understand","well","enough","to","explain","to","a","computer.","Art","is","everything","else","we","do"], 20]
+    expected: ["Science  is  what we", "understand      well", "enough to explain to", "a  computer.  Art is", "everything  else  we", "do                  "]
+    hidden: true
+hints:
+  - Solve it in two phases. **Phase 1 (greedy line packing)** — pick as many consecutive words as fit on the current line, accounting for at least one space between them.
+  - For the second phase (justify the line) — once you know the words and the leftover space budget, distribute the spaces. Be careful with the two special cases — a line containing a single word, and the very last line.
+  - For the special cases, build the line by joining words with one space and padding the right with spaces to reach `maxWidth`.
+solution: |
+  Greedy line packing followed by per-line justification:
+
+  1. **Pack** — walk the words and collect as many as fit. A line of `k` words has minimum width `sum(len(words)) + (k - 1)` (one space between every pair).
+  2. **Justify** — once a line is decided:
+     - If it's the last line **or** has a single word, join with single spaces and right-pad to `maxWidth`.
+     - Otherwise, compute `slots = k - 1` and `extra = maxWidth - sum(len(words))`. Each gap gets `extra // slots` spaces; the leftmost `extra % slots` gaps get one more.
+
+  ```javascript
+  function fullJustify(words, maxWidth) {
+      const result = [];
+      let i = 0;
+      while (i < words.length) {
+          // Phase 1: pack as many words as fit on this line.
+          let j = i, lineLen = words[i].length;
+          while (j + 1 < words.length && lineLen + 1 + words[j + 1].length <= maxWidth) {
+              j++;
+              lineLen += 1 + words[j].length;
+          }
+
+          // Phase 2: justify words[i..j] into a single line.
+          const lineWords = words.slice(i, j + 1);
+          const isLastLine = j === words.length - 1;
+          if (isLastLine || lineWords.length === 1) {
+              const joined = lineWords.join(' ');
+              result.push(joined + ' '.repeat(maxWidth - joined.length));
+          } else {
+              const totalChars = lineWords.reduce((a, w) => a + w.length, 0);
+              const slots = lineWords.length - 1;
+              const baseSpace = Math.floor((maxWidth - totalChars) / slots);
+              const extra = (maxWidth - totalChars) % slots;
+              let line = '';
+              for (let k = 0; k < lineWords.length; k++) {
+                  line += lineWords[k];
+                  if (k < slots) {
+                      line += ' '.repeat(baseSpace + (k < extra ? 1 : 0));
+                  }
+              }
+              result.push(line);
+          }
+          i = j + 1;
+      }
+      return result;
+  }
+  ```
+
+  ```python
+  def full_justify(words, maxWidth):
+      result = []
+      i = 0
+      n = len(words)
+      while i < n:
+          j = i
+          line_len = len(words[i])
+          while j + 1 < n and line_len + 1 + len(words[j + 1]) <= maxWidth:
+              j += 1
+              line_len += 1 + len(words[j])
+          line_words = words[i:j + 1]
+          is_last = (j == n - 1)
+          if is_last or len(line_words) == 1:
+              joined = ' '.join(line_words)
+              result.append(joined + ' ' * (maxWidth - len(joined)))
+          else:
+              total_chars = sum(len(w) for w in line_words)
+              slots = len(line_words) - 1
+              base, extra = divmod(maxWidth - total_chars, slots)
+              parts = []
+              for k, w in enumerate(line_words):
+                  parts.append(w)
+                  if k < slots:
+                      parts.append(' ' * (base + (1 if k < extra else 0)))
+              result.append(''.join(parts))
+          i = j + 1
+      return result
+  ```
+
+  Each character of each word is examined a constant number of times — `O(total length of words)` overall.

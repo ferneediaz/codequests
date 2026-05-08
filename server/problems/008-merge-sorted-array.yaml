@@ -1,0 +1,90 @@
+id: problem-008-merge-sorted-array
+title: Merge Sorted Array
+difficulty: EASY
+tags:
+  - arrays
+  - two-pointers
+description: |
+  You are given two integer arrays `nums1` and `nums2`, sorted in **non-decreasing** order, and two integers `m` and `n` representing the number of elements in each array.
+
+  Merge `nums2` into `nums1` so that the merged array is also sorted in non-decreasing order.
+
+  The final array should not be returned by the function — instead it must be stored *inside* `nums1`. To accommodate this, `nums1` has length `m + n`: the first `m` slots hold the actual elements and the last `n` are placeholder zeroes that should be ignored.
+
+  **Example 1:**
+  ```
+  Input: nums1 = [1,2,3,0,0,0], m = 3, nums2 = [2,5,6], n = 3
+  Output: [1,2,2,3,5,6]
+  ```
+
+  **Example 2:**
+  ```
+  Input: nums1 = [1], m = 1, nums2 = [], n = 0
+  Output: [1]
+  ```
+
+  **Constraints:**
+  - `nums1.length == m + n`
+  - `nums2.length == n`
+  - `0 <= m, n <= 200`
+  - `1 <= m + n <= 200`
+signature:
+  name:
+    javascript: merge
+    python: merge
+  params:
+    - { name: nums1, type: 'int[]' }
+    - { name: m,     type: int }
+    - { name: nums2, type: 'int[]' }
+    - { name: n,     type: int }
+  returns: 'int[]'
+  mutatesArg: 0
+starter:
+  javascript: |
+    function merge(nums1, m, nums2, n) {
+      // Modify nums1 in-place. Return value is ignored.
+    }
+  python: |
+    def merge(nums1, m, nums2, n):
+        # Modify nums1 in-place. Return value is ignored.
+        pass
+tests:
+  - { args: [[1, 2, 3, 0, 0, 0], 3, [2, 5, 6], 3], expected: [1, 2, 2, 3, 5, 6] }
+  - { args: [[1], 1, [], 0],                       expected: [1] }
+  - { args: [[0], 0, [1], 1],                      expected: [1] }
+  - { args: [[4, 5, 6, 0, 0, 0], 3, [1, 2, 3], 3], expected: [1, 2, 3, 4, 5, 6], hidden: true }
+  - { args: [[2, 0], 1, [1], 1],                   expected: [1, 2], hidden: true }
+hints:
+  - Filling `nums1` from the front means you'd have to shift elements out of the way every time you copy from `nums2`. Could you fill from a direction where there's nothing to overwrite?
+  - Walk three pointers from the end — `i = m-1` into `nums1`'s real values, `j = n-1` into `nums2`, and `k = m+n-1` into the slot you're about to write.
+  - At each step, write the larger of `nums1[i]` and `nums2[j]` into `nums1[k]` and step the source pointer back. When `nums2` runs out you're done; when `nums1` runs out, copy the rest of `nums2` into the front.
+solution: |
+  Walk backward. Keep three pointers — `i` pointing at the last real element of `nums1` (`m - 1`), `j` pointing at the last element of `nums2` (`n - 1`), and `k` pointing at the last write slot (`m + n - 1`). At each step pick the larger of `nums1[i]` and `nums2[j]`, place it at `nums1[k]`, and step that source pointer and `k` back. When `j` falls below 0 we're done. When `i` falls below 0 first, the remaining `nums2` elements still need to be copied into `nums1[0..j]`.
+
+  ```javascript
+  function merge(nums1, m, nums2, n) {
+      let i = m - 1, j = n - 1, k = m + n - 1;
+      while (j >= 0) {
+          if (i >= 0 && nums1[i] > nums2[j]) {
+              nums1[k--] = nums1[i--];
+          } else {
+              nums1[k--] = nums2[j--];
+          }
+      }
+  }
+  ```
+
+  ```python
+  def merge(nums1, m, nums2, n):
+      i, j, k = m - 1, n - 1, m + n - 1
+      while j >= 0:
+          if i >= 0 and nums1[i] > nums2[j]:
+              nums1[k] = nums1[i]
+              i -= 1
+          else:
+              nums1[k] = nums2[j]
+              j -= 1
+          k -= 1
+  ```
+
+  Each element is written exactly once, so the algorithm runs in `O(m + n)` time and uses `O(1)` extra space.

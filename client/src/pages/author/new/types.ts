@@ -12,6 +12,10 @@ export type ParamType =
     | 'int[][]'
     | 'float[][]'
     | 'string[][]'
+    | 'linked-list'
+    | 'linked-list[]'
+    | 'binary-tree'
+    | 'binary-tree[]'
     | 'any';
 
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';

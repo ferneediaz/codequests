@@ -1,0 +1,89 @@
+id: problem-015-best-time-to-buy-and-sell-stock-ii
+title: Best Time to Buy and Sell Stock II
+difficulty: MEDIUM
+tags:
+  - arrays
+  - dynamic-programming
+  - greedy
+description: |
+  You are given an integer array `prices` where `prices[i]` is the price of a given stock on day `i`.
+
+  On each day, you may buy and/or sell the stock. You can only hold **at most one** share of the stock at any time. (You may also buy and immediately sell on the same day.)
+
+  Return the **maximum profit** you can achieve.
+
+  **Example 1:**
+  ```
+  Input: prices = [7,1,5,3,6,4]
+  Output: 7
+  Explanation: Buy on day 2 (1) and sell on day 3 (5), profit 4.
+               Buy on day 4 (3) and sell on day 5 (6), profit 3.
+               Total = 7.
+  ```
+
+  **Example 2:**
+  ```
+  Input: prices = [1,2,3,4,5]
+  Output: 4
+  Explanation: Buy on day 1 (1) and sell on day 5 (5), profit 4.
+  ```
+
+  **Example 3:**
+  ```
+  Input: prices = [7,6,4,3,1]
+  Output: 0
+  ```
+
+  **Constraints:**
+  - `1 <= prices.length <= 3 * 10^4`
+  - `0 <= prices[i] <= 10^4`
+signature:
+  name:
+    javascript: maxProfit
+    python: max_profit
+  params:
+    - { name: prices, type: 'int[]' }
+  returns: int
+starter:
+  javascript: |
+    function maxProfit(prices) {
+      // Your code here
+      return 0;
+    }
+  python: |
+    def max_profit(prices):
+        # Your code here
+        return 0
+tests:
+  - { args: [[7, 1, 5, 3, 6, 4]],   expected: 7 }
+  - { args: [[1, 2, 3, 4, 5]],      expected: 4 }
+  - { args: [[7, 6, 4, 3, 1]],      expected: 0 }
+  - { args: [[1]],                   expected: 0, hidden: true }
+  - { args: [[2, 1, 4, 5, 2, 9, 7]], expected: 11, hidden: true }
+hints:
+  - Multiple transactions are allowed, so you don't need to find the single biggest swing — just sum up all the upward moves you can spot.
+  - Any time `prices[i] > prices[i-1]`, you could have bought yesterday and sold today for a profit of `prices[i] - prices[i-1]`. Add that.
+  - Skipping any positive day-over-day step would only hurt — a longer rise can always be decomposed into the same daily steps.
+solution: |
+  Greedy: capture every positive day-over-day delta. Selling on each up-day and re-buying the same day is mathematically the same as holding through the entire upswing — the sum telescopes — but it's much easier to compute.
+
+  ```javascript
+  function maxProfit(prices) {
+      let profit = 0;
+      for (let i = 1; i < prices.length; i++) {
+          if (prices[i] > prices[i - 1]) profit += prices[i] - prices[i - 1];
+      }
+      return profit;
+  }
+  ```
+
+  ```python
+  def max_profit(prices):
+      profit = 0
+      for i in range(1, len(prices)):
+          if prices[i] > prices[i - 1]:
+              profit += prices[i] - prices[i - 1]
+      return profit
+  ```
+
+  One linear scan, no extra space — `O(n)` time and `O(1)` space.

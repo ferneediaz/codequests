@@ -1,23 +1,36 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { SubmissionResult } from '@/types/api';
-import type { TestDraft } from '../types';
+import type { ParamDef, ParamType, TestDraft } from '../types';
 
 interface TestsSectionProps {
     tests: TestDraft[];
+    params: ParamDef[];
+    returns: ParamType;
     result: SubmissionResult | null;
     addTest: () => void;
     removeTest: (id: string) => void;
     updateTest: (id: string, patch: Partial<TestDraft>) => void;
 }
 
+const LIST_TYPES: ParamType[] = ['linked-list', 'linked-list[]'];
+const TREE_TYPES: ParamType[] = ['binary-tree', 'binary-tree[]'];
+
+function usesType(types: ParamType[], params: ParamDef[], returns: ParamType): boolean {
+    return types.includes(returns) || params.some((p) => types.includes(p.type));
+}
+
 export function TestsSection({
     tests,
+    params,
+    returns,
     result,
     addTest,
     removeTest,
     updateTest,
 }: TestsSectionProps) {
+    const hasList = usesType(LIST_TYPES, params, returns);
+    const hasTree = usesType(TREE_TYPES, params, returns);
     return (
         <div className="flex flex-col overflow-hidden border-t border-border">
             <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
@@ -35,6 +48,24 @@ export function TestsSection({
                     </Button>
                 </div>
             </div>
+            {(hasList || hasTree) && (
+                <div className="border-b border-border bg-muted/30 px-3 py-1.5 text-[10px] leading-relaxed text-muted-foreground">
+                    {hasList && (
+                        <div>
+                            <span className="font-mono text-foreground">linked-list</span>: flat array, e.g.{' '}
+                            <span className="font-mono">[1,2,3,4]</span> (empty list ={' '}
+                            <span className="font-mono">[]</span>)
+                        </div>
+                    )}
+                    {hasTree && (
+                        <div>
+                            <span className="font-mono text-foreground">binary-tree</span>: level-order with nulls, e.g.{' '}
+                            <span className="font-mono">[3,9,20,null,null,15,7]</span> (empty tree ={' '}
+                            <span className="font-mono">[]</span>)
+                        </div>
+                    )}
+                </div>
+            )}
             <div className="flex-1 overflow-y-auto">
                 {tests.map((row, i) => {
                     const res = result?.results.find(

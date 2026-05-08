@@ -65,6 +65,10 @@ export const PARAM_TYPES = [
     'int[][]',
     'float[][]',
     'string[][]',
+    'linked-list',
+    'linked-list[]',
+    'binary-tree',
+    'binary-tree[]',
     'any',
 ] as const;
 export type ParamType = (typeof PARAM_TYPES)[number];

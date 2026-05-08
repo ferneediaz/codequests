@@ -1,0 +1,93 @@
+id: problem-153-reverse-linked-list
+title: Reverse Linked List
+difficulty: EASY
+tags:
+  - linked-list
+  - recursion
+description: |
+  Given the `head` of a singly linked list, reverse the list and return the new head.
+
+  Each node has the shape `{ val, next }`. The harness deserializes the input array into a `ListNode` chain before calling your function, and reserializes your returned `ListNode` back to a flat array for grading — you only need to reason about node objects.
+
+  **Example 1:**
+
+  **Input:** `head = [1,2,3,4,5]`
+
+  **Output:** `[5,4,3,2,1]`
+
+  **Example 2:**
+
+  **Input:** `head = [1,2]`
+
+  **Output:** `[2,1]`
+
+  **Example 3:**
+
+  **Input:** `head = []`
+
+  **Output:** `[]`
+
+  **Constraints:**
+
+  - The number of nodes in the list is in the range `[0, 5000]`.
+  - `-5000 <= Node.val <= 5000`
+signature:
+  name:
+    javascript: reverseList
+    python: reverse_list
+  params:
+    - { name: head, type: 'linked-list' }
+  returns: 'linked-list'
+starter:
+  javascript: |
+    function reverseList(head) {
+      // Your code here
+      return head;
+    }
+  python: |
+    def reverse_list(head):
+        # Your code here
+        return head
+tests:
+  - { args: [[1, 2, 3, 4, 5]], expected: [5, 4, 3, 2, 1] }
+  - { args: [[1, 2]],          expected: [2, 1] }
+  - { args: [[]],              expected: [] }
+  - { args: [[42]],            expected: [42] }
+  - { args: [[1, 2, 3]],       expected: [3, 2, 1], hidden: true }
+  - { args: [[-5, 0, 5]],      expected: [5, 0, -5], hidden: true }
+hints:
+  - Walk the list once, redirecting each node's `next` pointer to point at the node you just came from.
+  - You'll need three pointers — the previous node, the current node, and a saved reference to the next node so you don't lose the rest of the list.
+  - Initially `prev = null`. After processing every node, `prev` *is* the new head.
+solution: |
+  Iterative pointer rewiring is the cleanest approach. Walk through the list once with two pointers: `prev` (initially `null`) and `cur` (initially `head`). At each step, save `cur.next` first so the rest of the list isn't lost, then point `cur.next` backwards at `prev`, then advance both pointers.
+
+  When `cur` falls off the end, `prev` is the new head.
+
+  ```javascript
+  function reverseList(head) {
+    let prev = null;
+    let cur = head;
+    while (cur !== null) {
+      const next = cur.next;
+      cur.next = prev;
+      prev = cur;
+      cur = next;
+    }
+    return prev;
+  }
+  ```
+
+  ```python
+  def reverse_list(head):
+      prev = None
+      cur = head
+      while cur is not None:
+          nxt = cur.next
+          cur.next = prev
+          prev = cur
+          cur = nxt
+      return prev
+  ```
+
+  Both solutions are `O(n)` time and `O(1)` extra space.

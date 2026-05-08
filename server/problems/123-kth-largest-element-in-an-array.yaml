@@ -1,0 +1,90 @@
+id: problem-123-kth-largest-element-in-an-array
+title: Kth Largest Element in an Array
+difficulty: MEDIUM
+tags:
+  - arrays
+  - heap
+  - sorting
+description: |
+  Given an integer array `nums` and an integer `k`, return the `k`-th largest element in the array.
+
+  Note that this is the `k`-th largest element in **sorted order**, not the `k`-th distinct element.
+
+  **Example 1:**
+
+  **Input:** `nums = [3,2,1,5,6,4]`, `k = 2`
+
+  **Output:** `5`
+
+  **Example 2:**
+
+  **Input:** `nums = [3,2,3,1,2,4,5,5,6]`, `k = 4`
+
+  **Output:** `4`
+
+  **Constraints:**
+
+  - `1 <= k <= nums.length <= 10^5`
+  - `-10^4 <= nums[i] <= 10^4`
+
+  **JavaScript:** the harness exposes `MinHeap` and `MaxHeap` classes with `push(v)`, `pop()`, `peek()`, and `size()`. Both accept an optional initial array and an optional `(a, b) => number` comparator.
+
+  **Python:** use the built-in `heapq` module.
+signature:
+  name:
+    javascript: findKthLargest
+    python: find_kth_largest
+  params:
+    - { name: nums, type: 'int[]' }
+    - { name: k, type: int }
+  returns: int
+starter:
+  javascript: |
+    function findKthLargest(nums, k) {
+      // Your code here
+      return 0;
+    }
+  python: |
+    def find_kth_largest(nums, k):
+        # Your code here
+        return 0
+tests:
+  - { args: [[3, 2, 1, 5, 6, 4], 2],             expected: 5 }
+  - { args: [[3, 2, 3, 1, 2, 4, 5, 5, 6], 4],    expected: 4 }
+  - { args: [[1], 1],                            expected: 1 }
+  - { args: [[7, 7, 7, 7], 2],                   expected: 7 }
+  - { args: [[-1, -2, -3, -4], 2],               expected: -2, hidden: true }
+  - { args: [[5, 3, 8, 1, 9, 2, 7], 3],          expected: 7, hidden: true }
+hints:
+  - Sorting and indexing works in `O(n log n)` — that's a fine first answer, but a heap can be a tighter fit.
+  - Maintain a **min-heap of size `k`**. Push every element; whenever the heap exceeds size `k`, pop the smallest. The root at the end is the `k`-th largest.
+  - In JavaScript the harness provides `MinHeap`. In Python use `heapq.heappush` / `heapq.heappop` (it's a min-heap by default).
+solution: |
+  Maintain a min-heap of size `k`. After processing the whole array, the heap holds the `k` largest elements with the smallest of them at the top — that root is the `k`-th largest.
+
+  Time: `O(n log k)`. Space: `O(k)`.
+
+  ```javascript
+  function findKthLargest(nums, k) {
+    const heap = new MinHeap();
+    for (const x of nums) {
+      heap.push(x);
+      if (heap.size() > k) heap.pop();
+    }
+    return heap.peek();
+  }
+  ```
+
+  ```python
+  import heapq
+
+  def find_kth_largest(nums, k):
+      heap = []
+      for x in nums:
+          heapq.heappush(heap, x)
+          if len(heap) > k:
+              heapq.heappop(heap)
+      return heap[0]
+  ```
+
+  An alternative is `O(n)` average-case Quickselect — partition around a pivot until the pivot lands at index `n - k` from the start. The heap version is simpler and is the canonical "this is a heap problem" pattern.

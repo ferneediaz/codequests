@@ -1,0 +1,85 @@
+id: problem-027-longest-common-prefix
+title: Longest Common Prefix
+difficulty: EASY
+tags:
+  - strings
+description: |
+  Write a function to find the longest common prefix string amongst an array of strings.
+
+  If there is no common prefix, return an empty string `""`.
+
+  **Example 1:**
+  ```
+  Input: strs = ["flower","flow","flight"]
+  Output: "fl"
+  ```
+
+  **Example 2:**
+  ```
+  Input: strs = ["dog","racecar","car"]
+  Output: ""
+  Explanation: There is no common prefix among the input strings.
+  ```
+
+  **Constraints:**
+  - `1 <= strs.length <= 200`
+  - `0 <= strs[i].length <= 200`
+  - `strs[i]` consists only of lowercase English letters.
+signature:
+  name:
+    javascript: longestCommonPrefix
+    python: longest_common_prefix
+  params:
+    - { name: strs, type: 'string[]' }
+  returns: string
+starter:
+  javascript: |
+    function longestCommonPrefix(strs) {
+      // Your code here
+      return "";
+    }
+  python: |
+    def longest_common_prefix(strs):
+        # Your code here
+        return ""
+tests:
+  - { args: [["flower", "flow", "flight"]],                       expected: "fl" }
+  - { args: [["dog", "racecar", "car"]],                          expected: "" }
+  - { args: [["interspecies", "interstellar", "interstate"]],     expected: "inters" }
+  - { args: [["a"]],                                              expected: "a", hidden: true }
+  - { args: [["abc", "abcd", "abce"]],                            expected: "abc", hidden: true }
+hints:
+  - The longest common prefix is bounded by the **shortest** string in the array — you can never extend past its length.
+  - Try a **vertical scan** — fix a column index `j`. Look at character `j` of every string; the moment one differs (or one runs out), `j` is your answer length.
+  - Alternatively, sort the array and compare just the first and last strings — every other string is between them lexicographically, so their common prefix is the answer.
+solution: |
+  The cleanest approach is the **vertical scan**: iterate `j` over column indices and check that every string has the same character at column `j`. The first mismatch (or string that's too short) gives you the answer length.
+
+  ```javascript
+  function longestCommonPrefix(strs) {
+      if (strs.length === 0) return "";
+      for (let j = 0; j < strs[0].length; j++) {
+          const ch = strs[0][j];
+          for (let i = 1; i < strs.length; i++) {
+              if (j >= strs[i].length || strs[i][j] !== ch) {
+                  return strs[0].slice(0, j);
+              }
+          }
+      }
+      return strs[0];
+  }
+  ```
+
+  ```python
+  def longest_common_prefix(strs):
+      if not strs:
+          return ""
+      for j in range(len(strs[0])):
+          ch = strs[0][j]
+          for i in range(1, len(strs)):
+              if j >= len(strs[i]) or strs[i][j] != ch:
+                  return strs[0][:j]
+      return strs[0]
+  ```
+
+  In the worst case every character of every string is examined: `O(S)` where `S` is the total number of characters across all strings.

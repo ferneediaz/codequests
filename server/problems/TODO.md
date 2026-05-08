@@ -13,43 +13,77 @@ Number `NNN` is the next free slot when you add a problem; rows that already hav
 - [x] Valid Palindrome — `005-palindrome.yaml`
 - [x] Merge Intervals — `006-merge-intervals.yaml`
 - [x] Longest Substring Without Repeating Characters — `007-longest-substring.yaml`
+- [x] Merge Sorted Array — `008-merge-sorted-array.yaml`
+- [x] Remove Element — `009-remove-element.yaml`
+- [x] Remove Duplicates from Sorted Array — `010-remove-duplicates-from-sorted-array.yaml`
+- [x] Remove Duplicates from Sorted Array II — `011-remove-duplicates-from-sorted-array-ii.yaml`
+- [x] Majority Element — `012-majority-element.yaml`
+- [x] Rotate Array — `013-rotate-array.yaml`
+- [x] Best Time to Buy and Sell Stock — `014-best-time-to-buy-and-sell-stock.yaml`
+- [x] Best Time to Buy and Sell Stock II — `015-best-time-to-buy-and-sell-stock-ii.yaml`
+- [x] Jump Game — `016-jump-game.yaml`
+- [x] Jump Game II — `017-jump-game-ii.yaml`
+- [x] H-Index — `018-h-index.yaml`
+- [x] Product of Array Except Self — `020-product-of-array-except-self.yaml`
+- [x] Gas Station — `021-gas-station.yaml`
+- [x] Candy — `022-candy.yaml`
+- [x] Trapping Rain Water — `023-trapping-rain-water.yaml`
+- [x] Roman to Integer — `024-roman-to-integer.yaml`
+- [x] Integer to Roman — `025-integer-to-roman.yaml`
+- [x] Length of Last Word — `026-length-of-last-word.yaml`
+- [x] Longest Common Prefix — `027-longest-common-prefix.yaml`
+- [x] Reverse Words in a String — `028-reverse-words-in-a-string.yaml`
+- [x] Zigzag Conversion — `029-zigzag-conversion.yaml`
+- [x] Find the Index of the First Occurrence in a String — `030-find-the-index-of-the-first-occurrence-in-a-string.yaml`
+- [x] Text Justification — `031-text-justification.yaml`
+- [x] Is Subsequence — `032-is-subsequence.yaml`
+- [x] Two Sum II - Input Array Is Sorted — `033-two-sum-ii-input-array-is-sorted.yaml`
+- [x] Container With Most Water — `034-container-with-most-water.yaml`
+- [x] 3Sum — `035-3sum.yaml`
+- [x] Maximum Depth of Binary Tree — `070-maximum-depth-of-binary-tree.yaml`
+- [x] Kth Largest Element in an Array — `123-kth-largest-element-in-an-array.yaml`
+- [x] Reverse Linked List — `153-reverse-linked-list.yaml` _(extra; not in Top Interview 150 — added as the canonical `linked-list` type demo)_
+
+> Slot **019 Insert Delete GetRandom O(1)** is intentionally skipped — it's a multi-method
+> design problem that doesn't fit the v2 single-function signature schema. Reserve the slot
+> if/when the schema grows class-based support.
 
 ## Top Interview 150 (list order)
 
 ### Array / String
 
-- Merge Sorted Array — `008-merge-sorted-array.yaml`
-- Remove Element — `009-remove-element.yaml`
-- Remove Duplicates from Sorted Array — `010-remove-duplicates-from-sorted-array.yaml`
-- Remove Duplicates from Sorted Array II — `011-remove-duplicates-from-sorted-array-ii.yaml`
-- Majority Element — `012-majority-element.yaml`
-- Rotate Array — `013-rotate-array.yaml`
-- Best Time to Buy and Sell Stock — `014-best-time-to-buy-and-sell-stock.yaml`
-- Best Time to Buy and Sell Stock II — `015-best-time-to-buy-and-sell-stock-ii.yaml`
-- Jump Game — `016-jump-game.yaml`
-- Jump Game II — `017-jump-game-ii.yaml`
-- H-Index — `018-h-index.yaml`
-- Insert Delete GetRandom O(1) — `019-insert-delete-getrandom-o1.yaml`
-- Product of Array Except Self — `020-product-of-array-except-self.yaml`
-- Gas Station — `021-gas-station.yaml`
-- Candy — `022-candy.yaml`
-- Trapping Rain Water — `023-trapping-rain-water.yaml`
-- Roman to Integer — `024-roman-to-integer.yaml`
-- Integer to Roman — `025-integer-to-roman.yaml`
-- Length of Last Word — `026-length-of-last-word.yaml`
-- Longest Common Prefix — `027-longest-common-prefix.yaml`
-- Reverse Words in a String — `028-reverse-words-in-a-string.yaml`
-- Zigzag Conversion — `029-zigzag-conversion.yaml`
-- Find the Index of the First Occurrence in a String — `030-find-the-index-of-the-first-occurrence-in-a-string.yaml`
-- Text Justification — `031-text-justification.yaml`
+- [x] Merge Sorted Array — `008-merge-sorted-array.yaml`
+- [x] Remove Element — `009-remove-element.yaml`
+- [x] Remove Duplicates from Sorted Array — `010-remove-duplicates-from-sorted-array.yaml`
+- [x] Remove Duplicates from Sorted Array II — `011-remove-duplicates-from-sorted-array-ii.yaml`
+- [x] Majority Element — `012-majority-element.yaml`
+- [x] Rotate Array — `013-rotate-array.yaml`
+- [x] Best Time to Buy and Sell Stock — `014-best-time-to-buy-and-sell-stock.yaml`
+- [x] Best Time to Buy and Sell Stock II — `015-best-time-to-buy-and-sell-stock-ii.yaml`
+- [x] Jump Game — `016-jump-game.yaml`
+- [x] Jump Game II — `017-jump-game-ii.yaml`
+- [x] H-Index — `018-h-index.yaml`
+- Insert Delete GetRandom O(1) — `019-insert-delete-getrandom-o1.yaml` _(skipped — design problem, doesn't fit v2 signature schema)_
+- [x] Product of Array Except Self — `020-product-of-array-except-self.yaml`
+- [x] Gas Station — `021-gas-station.yaml`
+- [x] Candy — `022-candy.yaml`
+- [x] Trapping Rain Water — `023-trapping-rain-water.yaml`
+- [x] Roman to Integer — `024-roman-to-integer.yaml`
+- [x] Integer to Roman — `025-integer-to-roman.yaml`
+- [x] Length of Last Word — `026-length-of-last-word.yaml`
+- [x] Longest Common Prefix — `027-longest-common-prefix.yaml`
+- [x] Reverse Words in a String — `028-reverse-words-in-a-string.yaml`
+- [x] Zigzag Conversion — `029-zigzag-conversion.yaml`
+- [x] Find the Index of the First Occurrence in a String — `030-find-the-index-of-the-first-occurrence-in-a-string.yaml`
+- [x] Text Justification — `031-text-justification.yaml`
 
 ### Two Pointers
 
 - [x] Valid Palindrome — `005-palindrome.yaml`
-- Is Subsequence — `032-is-subsequence.yaml`
-- Two Sum II - Input Array Is Sorted — `033-two-sum-ii-input-array-is-sorted.yaml`
-- Container With Most Water — `034-container-with-most-water.yaml`
-- 3Sum — `035-3sum.yaml`
+- [x] Is Subsequence — `032-is-subsequence.yaml`
+- [x] Two Sum II - Input Array Is Sorted — `033-two-sum-ii-input-array-is-sorted.yaml`
+- [x] Container With Most Water — `034-container-with-most-water.yaml`
+- [x] 3Sum — `035-3sum.yaml`
 
 ### Sliding Window
 
@@ -109,7 +143,7 @@ Number `NNN` is the next free slot when you add a problem; rows that already hav
 
 ### Binary Tree General
 
-- Maximum Depth of Binary Tree — `070-maximum-depth-of-binary-tree.yaml`
+- [x] Maximum Depth of Binary Tree — `070-maximum-depth-of-binary-tree.yaml`
 - Same Tree — `071-same-tree.yaml`
 - Invert Binary Tree — `072-invert-binary-tree.yaml`
 - Symmetric Tree — `073-symmetric-tree.yaml`
@@ -192,7 +226,7 @@ Number `NNN` is the next free slot when you add a problem; rows that already hav
 
 ### Heap
 
-- Kth Largest Element in an Array — `123-kth-largest-element-in-an-array.yaml`
+- [x] Kth Largest Element in an Array — `123-kth-largest-element-in-an-array.yaml`
 - IPO — `124-ipo.yaml`
 - Find K Pairs with Smallest Sums — `125-find-k-pairs-with-smallest-sums.yaml`
 - Find Median from Data Stream — `126-find-median-from-data-stream.yaml`

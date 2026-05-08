@@ -1,0 +1,93 @@
+id: problem-021-gas-station
+title: Gas Station
+difficulty: MEDIUM
+tags:
+  - arrays
+  - greedy
+description: |
+  There are `n` gas stations along a circular route, where `gas[i]` is the gas available at station `i` and `cost[i]` is the gas needed to travel from station `i` to station `i + 1`.
+
+  You begin the journey with an **empty tank** at one of the stations. Return the **starting gas station's index** if you can travel around the circuit once in the clockwise direction; otherwise return `-1`. If a solution exists, it is guaranteed to be **unique**.
+
+  **Example 1:**
+  ```
+  Input: gas = [1,2,3,4,5], cost = [3,4,5,1,2]
+  Output: 3
+  ```
+
+  **Example 2:**
+  ```
+  Input: gas = [2,3,4], cost = [3,4,3]
+  Output: -1
+  ```
+
+  **Constraints:**
+  - `n == gas.length == cost.length`
+  - `1 <= n <= 10^5`
+  - `0 <= gas[i], cost[i] <= 10^4`
+signature:
+  name:
+    javascript: canCompleteCircuit
+    python: can_complete_circuit
+  params:
+    - { name: gas,  type: 'int[]' }
+    - { name: cost, type: 'int[]' }
+  returns: int
+starter:
+  javascript: |
+    function canCompleteCircuit(gas, cost) {
+      // Your code here
+      return -1;
+    }
+  python: |
+    def can_complete_circuit(gas, cost):
+        # Your code here
+        return -1
+tests:
+  - { args: [[1, 2, 3, 4, 5], [3, 4, 5, 1, 2]],     expected: 3 }
+  - { args: [[2, 3, 4], [3, 4, 3]],                  expected: -1 }
+  - { args: [[5], [4]],                              expected: 0 }
+  - { args: [[5, 1, 2, 3, 4], [4, 4, 1, 5, 1]],     expected: 4, hidden: true }
+  - { args: [[3, 1, 1], [1, 2, 2]],                  expected: 0, hidden: true }
+hints:
+  - First, a sanity check — if the **total gas** is less than the **total cost**, no starting point can possibly complete the loop.
+  - When the cumulative tank goes negative starting from station `start`, none of the stations between `start` and the failure point can be a valid starting position either. Skip past the failure index.
+  - Walk once with two running sums — `total` over the whole array (decides feasibility) and `tank` from the current candidate start (resets `start` to `i + 1` whenever it dips below 0).
+solution: |
+  Two key observations:
+
+  1. If `sum(gas) < sum(cost)` the loop is impossible — return `-1`.
+  2. Otherwise the answer exists and is unique. As you walk forward keeping a running tank, every time the tank goes negative the candidate start must move past the current index. (No station you've passed could itself be a valid start, because each one only made things harder for the next.)
+
+  This collapses to a single linear pass.
+
+  ```javascript
+  function canCompleteCircuit(gas, cost) {
+      let total = 0, tank = 0, start = 0;
+      for (let i = 0; i < gas.length; i++) {
+          const diff = gas[i] - cost[i];
+          total += diff;
+          tank += diff;
+          if (tank < 0) {
+              start = i + 1;
+              tank = 0;
+          }
+      }
+      return total >= 0 ? start : -1;
+  }
+  ```
+
+  ```python
+  def can_complete_circuit(gas, cost):
+      total = tank = start = 0
+      for i, (g, c) in enumerate(zip(gas, cost)):
+          diff = g - c
+          total += diff
+          tank += diff
+          if tank < 0:
+              start = i + 1
+              tank = 0
+      return start if total >= 0 else -1
+  ```
+
+  One linear scan, `O(1)` extra space — `O(n)` time overall.

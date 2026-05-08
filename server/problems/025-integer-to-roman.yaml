@@ -1,0 +1,98 @@
+id: problem-025-integer-to-roman
+title: Integer to Roman
+difficulty: MEDIUM
+tags:
+  - strings
+  - math
+  - greedy
+description: |
+  Roman numerals are represented by seven different symbols: `I`, `V`, `X`, `L`, `C`, `D` and `M` (worth `1, 5, 10, 50, 100, 500, 1000`). Six special **subtractive** combinations are also valid: `IV (4)`, `IX (9)`, `XL (40)`, `XC (90)`, `CD (400)` and `CM (900)`.
+
+  Given an integer `num` in the range `[1, 3999]`, return its Roman numeral representation.
+
+  **Example 1:**
+  ```
+  Input: num = 3
+  Output: "III"
+  ```
+
+  **Example 2:**
+  ```
+  Input: num = 58
+  Output: "LVIII"
+  ```
+
+  **Example 3:**
+  ```
+  Input: num = 1994
+  Output: "MCMXCIV"
+  ```
+
+  **Constraints:**
+  - `1 <= num <= 3999`
+signature:
+  name:
+    javascript: intToRoman
+    python: int_to_roman
+  params:
+    - { name: num, type: int }
+  returns: string
+starter:
+  javascript: |
+    function intToRoman(num) {
+      // Your code here
+      return "";
+    }
+  python: |
+    def int_to_roman(num):
+        # Your code here
+        return ""
+tests:
+  - { args: [3],     expected: "III" }
+  - { args: [58],    expected: "LVIII" }
+  - { args: [1994],  expected: "MCMXCIV" }
+  - { args: [9],     expected: "IX", hidden: true }
+  - { args: [3749],  expected: "MMMDCCXLIX", hidden: true }
+hints:
+  - Greedy works because Roman numerals always emit the largest possible symbol first. Build a sorted list of `(value, symbol)` pairs from `1000` down to `1`.
+  - Crucially, include the six subtractive pairs (`CM = 900`, `CD = 400`, `XC = 90`, `XL = 40`, `IX = 9`, `IV = 4`) in the list so they're picked greedily rather than handled as a special case.
+  - Iterate the list. Append the symbol while subtracting its value from `num` until you can't anymore — then move to the next pair.
+solution: |
+  The greedy table approach. List every value/symbol pair, including the six subtractive shortcuts, in **descending order**. Walk the list; for each pair, append its symbol to the output as many times as the value fits into `num`, subtracting along the way.
+
+  ```javascript
+  function intToRoman(num) {
+      const pairs = [
+          [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+          [100, 'C'],  [90, 'XC'],  [50, 'L'],  [40, 'XL'],
+          [10, 'X'],   [9, 'IX'],   [5, 'V'],   [4, 'IV'],
+          [1, 'I'],
+      ];
+      const out = [];
+      for (const [value, symbol] of pairs) {
+          while (num >= value) {
+              out.push(symbol);
+              num -= value;
+          }
+      }
+      return out.join('');
+  }
+  ```
+
+  ```python
+  def int_to_roman(num):
+      pairs = [
+          (1000, 'M'), (900, 'CM'), (500, 'D'), (400, 'CD'),
+          (100, 'C'),  (90, 'XC'),  (50, 'L'),  (40, 'XL'),
+          (10, 'X'),   (9, 'IX'),   (5, 'V'),   (4, 'IV'),
+          (1, 'I'),
+      ]
+      out = []
+      for value, symbol in pairs:
+          while num >= value:
+              out.append(symbol)
+              num -= value
+      return ''.join(out)
+  ```
+
+  Because `num` shrinks by at least the smallest pair (1) each iteration but in practice the loop bodies fire at most a constant number of times per pair (e.g. you can only emit `M` up to 3 times), the algorithm is `O(1)` for this fixed-range problem.

@@ -1,0 +1,80 @@
+id: problem-009-remove-element
+title: Remove Element
+difficulty: EASY
+tags:
+  - arrays
+  - two-pointers
+description: |
+  Given an integer array `nums` and an integer `val`, remove every occurrence of `val` from `nums` and return the resulting array. The relative order of the surviving elements should be preserved.
+
+  > **Note:** the original LeetCode prompt asks you to mutate `nums` in place and return only the new length. To keep grading deterministic this version asks you to return the surviving elements directly. The algorithm — a two-pointer "write index" walk — is the same.
+
+  **Example 1:**
+  ```
+  Input: nums = [3,2,2,3], val = 3
+  Output: [2,2]
+  ```
+
+  **Example 2:**
+  ```
+  Input: nums = [0,1,2,2,3,0,4,2], val = 2
+  Output: [0,1,3,0,4]
+  ```
+
+  **Constraints:**
+  - `0 <= nums.length <= 100`
+  - `0 <= nums[i], val <= 100`
+signature:
+  name:
+    javascript: removeElement
+    python: remove_element
+  params:
+    - { name: nums, type: 'int[]' }
+    - { name: val, type: int }
+  returns: 'int[]'
+starter:
+  javascript: |
+    function removeElement(nums, val) {
+      // Your code here
+      return [];
+    }
+  python: |
+    def remove_element(nums, val):
+        # Your code here
+        return []
+tests:
+  - { args: [[3, 2, 2, 3], 3],                expected: [2, 2] }
+  - { args: [[0, 1, 2, 2, 3, 0, 4, 2], 2],    expected: [0, 1, 3, 0, 4] }
+  - { args: [[1], 1],                         expected: [] }
+  - { args: [[4, 5], 5],                      expected: [4], hidden: true }
+  - { args: [[2, 2, 2], 2],                   expected: [], hidden: true }
+hints:
+  - You don't actually need to build a new list — you can use a single "write index" that moves more slowly than the read index.
+  - Walk a fast pointer through `nums`. Whenever `nums[fast]` is something you want to keep, copy it to `nums[slow]` and advance `slow`.
+  - At the end, the first `slow` elements of `nums` are exactly the ones you need to return.
+solution: |
+  The two-pointer "write index" pattern is the canonical solution. A `slow` pointer marks where the next surviving element should live, while a `fast` pointer scans forward looking for keepers. Anything not equal to `val` gets copied to `nums[slow]`, and `slow` advances. At the end, `nums[0..slow]` contains the kept elements in their original order.
+
+  ```javascript
+  function removeElement(nums, val) {
+      let slow = 0;
+      for (let fast = 0; fast < nums.length; fast++) {
+          if (nums[fast] !== val) {
+              nums[slow++] = nums[fast];
+          }
+      }
+      return nums.slice(0, slow);
+  }
+  ```
+
+  ```python
+  def remove_element(nums, val):
+      slow = 0
+      for fast in range(len(nums)):
+          if nums[fast] != val:
+              nums[slow] = nums[fast]
+              slow += 1
+      return nums[:slow]
+  ```
+
+  Time complexity is `O(n)` and the auxiliary space is `O(1)` (the returned slice is unavoidable, but the work itself is in place).

@@ -1,0 +1,83 @@
+id: problem-011-remove-duplicates-from-sorted-array-ii
+title: Remove Duplicates from Sorted Array II
+difficulty: MEDIUM
+tags:
+  - arrays
+  - two-pointers
+description: |
+  Given an integer array `nums` sorted in **non-decreasing** order, remove duplicates so that each unique element appears **at most twice**. The relative order of elements should stay the same.
+
+  > **Note:** the original LeetCode prompt asks you to mutate `nums` in place and return the new length. To keep grading deterministic this version asks you to return the trimmed array directly. The algorithm is identical.
+
+  **Example 1:**
+  ```
+  Input: nums = [1,1,1,2,2,3]
+  Output: [1,1,2,2,3]
+  ```
+
+  **Example 2:**
+  ```
+  Input: nums = [0,0,1,1,1,1,2,3,3]
+  Output: [0,0,1,1,2,3,3]
+  ```
+
+  **Constraints:**
+  - `1 <= nums.length <= 3 * 10^4`
+  - `-10^4 <= nums[i] <= 10^4`
+  - `nums` is sorted in non-decreasing order.
+signature:
+  name:
+    javascript: removeDuplicates
+    python: remove_duplicates
+  params:
+    - { name: nums, type: 'int[]' }
+  returns: 'int[]'
+starter:
+  javascript: |
+    function removeDuplicates(nums) {
+      // Your code here
+      return [];
+    }
+  python: |
+    def remove_duplicates(nums):
+        # Your code here
+        return []
+tests:
+  - { args: [[1, 1, 1, 2, 2, 3]],                expected: [1, 1, 2, 2, 3] }
+  - { args: [[0, 0, 1, 1, 1, 1, 2, 3, 3]],       expected: [0, 0, 1, 1, 2, 3, 3] }
+  - { args: [[1]],                               expected: [1] }
+  - { args: [[1, 1]],                            expected: [1, 1], hidden: true }
+  - { args: [[1, 1, 1, 1, 1]],                   expected: [1, 1], hidden: true }
+hints:
+  - Generalize the dedupe-once trick. Instead of comparing `nums[fast]` to its immediate predecessor, compare it to the element two slots back in the kept region.
+  - Start the write pointer at index 2. For each `fast >= 2`, write `nums[fast]` only if it differs from `nums[slow - 2]`.
+  - This keeps at most two copies of every value because the third copy would equal `nums[slow - 2]` and therefore get skipped.
+solution: |
+  The trick is to compare against `nums[slow - 2]` rather than `nums[slow - 1]`. If the new element equals the second-most-recent kept element, that means we've already kept two copies of this value, so we skip it. Anything else gets written at `nums[slow]` and `slow` advances. The first two elements always survive because there's no way they could already exceed the "twice" budget.
+
+  ```javascript
+  function removeDuplicates(nums) {
+      if (nums.length <= 2) return nums.slice();
+      let slow = 2;
+      for (let fast = 2; fast < nums.length; fast++) {
+          if (nums[fast] !== nums[slow - 2]) {
+              nums[slow++] = nums[fast];
+          }
+      }
+      return nums.slice(0, slow);
+  }
+  ```
+
+  ```python
+  def remove_duplicates(nums):
+      if len(nums) <= 2:
+          return nums[:]
+      slow = 2
+      for fast in range(2, len(nums)):
+          if nums[fast] != nums[slow - 2]:
+              nums[slow] = nums[fast]
+              slow += 1
+      return nums[:slow]
+  ```
+
+  Each index is touched at most once, giving `O(n)` time and `O(1)` extra space.

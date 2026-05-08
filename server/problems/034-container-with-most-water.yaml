@@ -1,0 +1,93 @@
+id: problem-034-container-with-most-water
+title: Container With Most Water
+difficulty: MEDIUM
+tags:
+  - arrays
+  - two-pointers
+  - greedy
+description: |
+  You are given an integer array `height` of length `n`. There are `n` vertical lines drawn such that the two endpoints of the `i`-th line are `(i, 0)` and `(i, height[i])`.
+
+  Find two lines that, together with the x-axis, form a container that holds the most water.
+
+  Return the **maximum amount of water** the container can store.
+
+  Notice that you may not slant the container.
+
+  **Example 1:**
+  ```
+  Input: height = [1,8,6,2,5,4,8,3,7]
+  Output: 49
+  ```
+
+  **Example 2:**
+  ```
+  Input: height = [1,1]
+  Output: 1
+  ```
+
+  **Constraints:**
+  - `n == height.length`
+  - `2 <= n <= 10^5`
+  - `0 <= height[i] <= 10^4`
+signature:
+  name:
+    javascript: maxArea
+    python: max_area
+  params:
+    - { name: height, type: 'int[]' }
+  returns: int
+starter:
+  javascript: |
+    function maxArea(height) {
+      // Your code here
+      return 0;
+    }
+  python: |
+    def max_area(height):
+        # Your code here
+        return 0
+tests:
+  - { args: [[1, 8, 6, 2, 5, 4, 8, 3, 7]],   expected: 49 }
+  - { args: [[1, 1]],                          expected: 1 }
+  - { args: [[4, 3, 2, 1, 4]],                 expected: 16, hidden: true }
+  - { args: [[1, 2, 1]],                       expected: 2, hidden: true }
+  - { args: [[2, 3, 4, 5, 18, 17, 6]],         expected: 17, hidden: true }
+hints:
+  - The brute force is `O(n^2)` — every pair of lines. Two pointers cut it down to `O(n)`.
+  - Start with `left = 0` and `right = n - 1`. The area is `min(height[left], height[right]) * (right - left)`.
+  - At each step, move the pointer at the **shorter** line inward. Moving the taller one can never increase the area — the height is bounded by the shorter wall, and the width only shrinks.
+solution: |
+  Two pointers from the ends. The width starts at its maximum; the height is bounded by the shorter wall. Moving the **shorter** wall inward is the only move that could possibly find a taller bottleneck — moving the taller wall guarantees a smaller area because the width shrinks and the bottleneck is still capped by the unchanged shorter wall.
+
+  ```javascript
+  function maxArea(height) {
+      let l = 0, r = height.length - 1;
+      let best = 0;
+      while (l < r) {
+          const h = Math.min(height[l], height[r]);
+          const area = h * (r - l);
+          if (area > best) best = area;
+          if (height[l] < height[r]) l++;
+          else r--;
+      }
+      return best;
+  }
+  ```
+
+  ```python
+  def max_area(height):
+      l, r = 0, len(height) - 1
+      best = 0
+      while l < r:
+          area = min(height[l], height[r]) * (r - l)
+          if area > best:
+              best = area
+          if height[l] < height[r]:
+              l += 1
+          else:
+              r -= 1
+      return best
+  ```
+
+  Each pointer moves at most `n` steps total, so `O(n)` time and `O(1)` space.

@@ -1,0 +1,90 @@
+id: problem-024-roman-to-integer
+title: Roman to Integer
+difficulty: EASY
+tags:
+  - strings
+  - hash-table
+  - math
+description: |
+  Roman numerals are represented by seven different symbols: `I`, `V`, `X`, `L`, `C`, `D` and `M`.
+
+  | Symbol | Value |
+  | :----- | ----: |
+  | I      | 1     |
+  | V      | 5     |
+  | X      | 10    |
+  | L      | 50    |
+  | C      | 100   |
+  | D      | 500   |
+  | M      | 1000  |
+
+  Most numerals are written largest-to-smallest from left to right. The exceptions use **subtractive** notation:
+
+  - `I` placed before `V` (5) or `X` (10) makes 4 or 9.
+  - `X` placed before `L` (50) or `C` (100) makes 40 or 90.
+  - `C` placed before `D` (500) or `M` (1000) makes 400 or 900.
+
+  Given a Roman numeral string `s`, convert it to an integer.
+
+  **Constraints:**
+  - `1 <= s.length <= 15`
+  - `s` contains only the characters `('I', 'V', 'X', 'L', 'C', 'D', 'M')`.
+  - It is guaranteed that `s` is a valid Roman numeral in the range `[1, 3999]`.
+signature:
+  name:
+    javascript: romanToInt
+    python: roman_to_int
+  params:
+    - { name: s, type: string }
+  returns: int
+starter:
+  javascript: |
+    function romanToInt(s) {
+      // Your code here
+      return 0;
+    }
+  python: |
+    def roman_to_int(s):
+        # Your code here
+        return 0
+tests:
+  - { args: ["III"],         expected: 3 }
+  - { args: ["LVIII"],       expected: 58 }
+  - { args: ["MCMXCIV"],     expected: 1994 }
+  - { args: ["IX"],          expected: 9, hidden: true }
+  - { args: ["MMXXIV"],      expected: 2024, hidden: true }
+hints:
+  - Walk left to right and add the value of each symbol — but watch for the subtractive cases.
+  - A symbol contributes negatively when it is **strictly smaller than the symbol immediately after it** (e.g. the `I` in `IV` is `-1`, not `+1`).
+  - Sum all positive contributions, subtract the negative ones, and you have the answer in one pass.
+solution: |
+  Single-pass scan with a peek at the next character. If `value(s[i]) < value(s[i + 1])`, that symbol is part of a subtractive pair and gets subtracted; otherwise it's added.
+
+  ```javascript
+  function romanToInt(s) {
+      const map = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+      let total = 0;
+      for (let i = 0; i < s.length; i++) {
+          const cur = map[s[i]];
+          const next = map[s[i + 1]];
+          if (next !== undefined && cur < next) total -= cur;
+          else total += cur;
+      }
+      return total;
+  }
+  ```
+
+  ```python
+  def roman_to_int(s):
+      values = {'I': 1, 'V': 5, 'X': 10, 'L': 50, 'C': 100, 'D': 500, 'M': 1000}
+      total = 0
+      for i, ch in enumerate(s):
+          cur = values[ch]
+          if i + 1 < len(s) and cur < values[s[i + 1]]:
+              total -= cur
+          else:
+              total += cur
+      return total
+  ```
+
+  One linear scan and `O(1)` space (the alphabet is fixed at seven symbols).

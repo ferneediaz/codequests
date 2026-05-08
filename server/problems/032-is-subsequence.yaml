@@ -1,0 +1,79 @@
+id: problem-032-is-subsequence
+title: Is Subsequence
+difficulty: EASY
+tags:
+  - strings
+  - two-pointers
+  - dynamic-programming
+description: |
+  Given two strings `s` and `t`, return `true` if `s` is a **subsequence** of `t`, or `false` otherwise.
+
+  A subsequence of a string is a new string formed from the original string by deleting some (possibly none) of the characters without disturbing the relative positions of the remaining characters. For example `"ace"` is a subsequence of `"abcde"`, but `"aec"` is not.
+
+  **Example 1:**
+  ```
+  Input: s = "abc", t = "ahbgdc"
+  Output: true
+  ```
+
+  **Example 2:**
+  ```
+  Input: s = "axc", t = "ahbgdc"
+  Output: false
+  ```
+
+  **Constraints:**
+  - `0 <= s.length <= 100`
+  - `0 <= t.length <= 10^4`
+  - `s` and `t` consist only of lowercase English letters.
+signature:
+  name:
+    javascript: isSubsequence
+    python: is_subsequence
+  params:
+    - { name: s, type: string }
+    - { name: t, type: string }
+  returns: bool
+starter:
+  javascript: |
+    function isSubsequence(s, t) {
+      // Your code here
+      return false;
+    }
+  python: |
+    def is_subsequence(s, t):
+        # Your code here
+        return False
+tests:
+  - { args: ["abc", "ahbgdc"],     expected: true }
+  - { args: ["axc", "ahbgdc"],     expected: false }
+  - { args: ["", "ahbgdc"],        expected: true }
+  - { args: ["abc", "abc"],        expected: true, hidden: true }
+  - { args: ["abc", ""],           expected: false, hidden: true }
+hints:
+  - Walk both strings with two pointers. Move the `t` pointer every step; advance the `s` pointer only when the current characters match.
+  - If you reach the end of `s` first, every character was found in order — return `true`. If `t` runs out before `s` does, return `false`.
+  - The empty string is a subsequence of anything (including the empty string), which falls out of this logic naturally.
+solution: |
+  Classic two-pointer scan. Pointer `i` walks `s`; pointer `j` walks `t`. Whenever the characters match, advance `i` (we've found that letter). Always advance `j`. When `i` reaches the end of `s`, the answer is `true`.
+
+  ```javascript
+  function isSubsequence(s, t) {
+      let i = 0;
+      for (let j = 0; j < t.length && i < s.length; j++) {
+          if (s[i] === t[j]) i++;
+      }
+      return i === s.length;
+  }
+  ```
+
+  ```python
+  def is_subsequence(s, t):
+      i = 0
+      for ch in t:
+          if i < len(s) and s[i] == ch:
+              i += 1
+      return i == len(s)
+  ```
+
+  One pass over `t` — `O(len(t))` time and `O(1)` space.

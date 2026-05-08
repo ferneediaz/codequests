@@ -1,0 +1,84 @@
+id: problem-070-maximum-depth-of-binary-tree
+title: Maximum Depth of Binary Tree
+difficulty: EASY
+tags:
+  - trees
+  - recursion
+  - dfs
+  - bfs
+description: |
+  Given the `root` of a binary tree, return its **maximum depth** — the number of nodes along the longest path from the root down to a leaf.
+
+  The harness accepts trees in LeetCode level-order form (`null` marks a missing child) and converts the array into a `TreeNode` chain before your function runs. Each node has `val`, `left`, and `right`.
+
+  **Example 1:**
+
+  **Input:** `root = [3,9,20,null,null,15,7]`
+
+  **Output:** `3`
+
+  **Example 2:**
+
+  **Input:** `root = [1,null,2]`
+
+  **Output:** `2`
+
+  **Example 3:**
+
+  **Input:** `root = []`
+
+  **Output:** `0`
+
+  **Constraints:**
+
+  - The number of nodes is in the range `[0, 10^4]`.
+  - `-100 <= Node.val <= 100`
+signature:
+  name:
+    javascript: maxDepth
+    python: max_depth
+  params:
+    - { name: root, type: 'binary-tree' }
+  returns: int
+starter:
+  javascript: |
+    function maxDepth(root) {
+      // Your code here
+      return 0;
+    }
+  python: |
+    def max_depth(root):
+        # Your code here
+        return 0
+tests:
+  - { args: [[3, 9, 20, null, null, 15, 7]], expected: 3 }
+  - { args: [[1, null, 2]],                  expected: 2 }
+  - { args: [[]],                            expected: 0 }
+  - { args: [[1]],                           expected: 1 }
+  - { args: [[1, 2, 3, 4, 5]],               expected: 3, hidden: true }
+  - { args: [[1, 2, null, 3, null, 4]],      expected: 4, hidden: true }
+hints:
+  - Depth is naturally recursive — the depth of the empty tree is 0, and the depth of a non-empty tree is 1 plus the deeper of its two subtrees.
+  - The base case is `root === null` (or `root is None` in Python). Don't forget to handle it.
+  - You can also solve this iteratively with a BFS that counts levels, but the recursive form is one line of real work.
+solution: |
+  Recursion mirrors the recursive structure of the tree.
+
+  - If the node is `null`, depth is `0`.
+  - Otherwise, depth is `1 + max(depth(left), depth(right))`.
+
+  ```javascript
+  function maxDepth(root) {
+    if (!root) return 0;
+    return 1 + Math.max(maxDepth(root.left), maxDepth(root.right));
+  }
+  ```
+
+  ```python
+  def max_depth(root):
+      if root is None:
+          return 0
+      return 1 + max(max_depth(root.left), max_depth(root.right))
+  ```
+
+  Both run in `O(n)` time. Recursion uses `O(h)` stack space where `h` is the tree height — `O(log n)` for a balanced tree, `O(n)` worst case.

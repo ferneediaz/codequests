@@ -1,0 +1,83 @@
+id: problem-014-best-time-to-buy-and-sell-stock
+title: Best Time to Buy and Sell Stock
+difficulty: EASY
+tags:
+  - arrays
+  - dynamic-programming
+description: |
+  You are given an array `prices` where `prices[i]` is the price of a given stock on day `i`.
+
+  You want to maximize your profit by choosing a single day to buy one stock and a different, **later** day to sell that stock. Return the maximum profit you can achieve. If you can't make any profit, return `0`.
+
+  **Example 1:**
+  ```
+  Input: prices = [7,1,5,3,6,4]
+  Output: 5
+  Explanation: Buy on day 2 (price = 1) and sell on day 5 (price = 6); profit = 5.
+  ```
+
+  **Example 2:**
+  ```
+  Input: prices = [7,6,4,3,1]
+  Output: 0
+  Explanation: No transaction is done because prices only go down.
+  ```
+
+  **Constraints:**
+  - `1 <= prices.length <= 10^5`
+  - `0 <= prices[i] <= 10^4`
+signature:
+  name:
+    javascript: maxProfit
+    python: max_profit
+  params:
+    - { name: prices, type: 'int[]' }
+  returns: int
+starter:
+  javascript: |
+    function maxProfit(prices) {
+      // Your code here
+      return 0;
+    }
+  python: |
+    def max_profit(prices):
+        # Your code here
+        return 0
+tests:
+  - { args: [[7, 1, 5, 3, 6, 4]],     expected: 5 }
+  - { args: [[7, 6, 4, 3, 1]],        expected: 0 }
+  - { args: [[1]],                     expected: 0 }
+  - { args: [[2, 4, 1]],               expected: 2, hidden: true }
+  - { args: [[3, 2, 6, 5, 0, 3]],      expected: 4, hidden: true }
+hints:
+  - The brute-force `O(n^2)` is to try every (buy, sell) pair. Can you avoid the inner loop by remembering the cheapest price seen so far?
+  - Walk left to right. Keep `minPrice = min(minPrice, prices[i])` and update `bestProfit = max(bestProfit, prices[i] - minPrice)` along the way.
+  - Selling on day `i` is optimal at the day when `prices[i] - minPrice` is the largest — because the lowest valid buy day is exactly `minPrice`.
+solution: |
+  Single-pass tracking of the minimum-so-far is the canonical answer. For each day, the best profit you could possibly make if you sold *today* is `prices[i] - minPriceSoFar`. Keep the running maximum of that quantity.
+
+  ```javascript
+  function maxProfit(prices) {
+      let minPrice = Infinity;
+      let best = 0;
+      for (const p of prices) {
+          if (p < minPrice) minPrice = p;
+          else if (p - minPrice > best) best = p - minPrice;
+      }
+      return best;
+  }
+  ```
+
+  ```python
+  def max_profit(prices):
+      min_price = float('inf')
+      best = 0
+      for p in prices:
+          if p < min_price:
+              min_price = p
+          elif p - min_price > best:
+              best = p - min_price
+      return best
+  ```
+
+  One pass through `prices`, so `O(n)` time and `O(1)` space.

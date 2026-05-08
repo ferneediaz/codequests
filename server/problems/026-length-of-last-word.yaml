@@ -1,0 +1,91 @@
+id: problem-026-length-of-last-word
+title: Length of Last Word
+difficulty: EASY
+tags:
+  - strings
+description: |
+  Given a string `s` consisting of words and spaces, return the length of the **last** word in the string.
+
+  A "word" is a maximal substring consisting of non-space characters only.
+
+  **Example 1:**
+  ```
+  Input: s = "Hello World"
+  Output: 5
+  ```
+
+  **Example 2:**
+  ```
+  Input: s = "   fly me   to   the moon  "
+  Output: 4
+  ```
+
+  **Example 3:**
+  ```
+  Input: s = "luffy is still joyboy"
+  Output: 6
+  ```
+
+  **Constraints:**
+  - `1 <= s.length <= 10^4`
+  - `s` consists only of English letters and spaces ` `.
+  - There will be at least one word in `s`.
+signature:
+  name:
+    javascript: lengthOfLastWord
+    python: length_of_last_word
+  params:
+    - { name: s, type: string }
+  returns: int
+starter:
+  javascript: |
+    function lengthOfLastWord(s) {
+      // Your code here
+      return 0;
+    }
+  python: |
+    def length_of_last_word(s):
+        # Your code here
+        return 0
+tests:
+  - { args: ["Hello World"],                          expected: 5 }
+  - { args: ["   fly me   to   the moon  "],           expected: 4 }
+  - { args: ["luffy is still joyboy"],                 expected: 6 }
+  - { args: ["a"],                                     expected: 1, hidden: true }
+  - { args: ["day "],                                  expected: 3, hidden: true }
+hints:
+  - Beware of trailing whitespace — `"day "` ends in a space, but the answer is the length of `"day"`.
+  - Walk the string from the **end**. Skip trailing spaces first, then count non-space characters until you hit another space (or run out of characters).
+  - This avoids splitting the whole string and uses `O(1)` extra space.
+solution: |
+  Walk backward in two phases:
+
+  1. Skip trailing whitespace.
+  2. Count consecutive non-space characters.
+
+  ```javascript
+  function lengthOfLastWord(s) {
+      let i = s.length - 1;
+      while (i >= 0 && s[i] === ' ') i--;
+      let length = 0;
+      while (i >= 0 && s[i] !== ' ') {
+          length++;
+          i--;
+      }
+      return length;
+  }
+  ```
+
+  ```python
+  def length_of_last_word(s):
+      i = len(s) - 1
+      while i >= 0 and s[i] == ' ':
+          i -= 1
+      length = 0
+      while i >= 0 and s[i] != ' ':
+          length += 1
+          i -= 1
+      return length
+  ```
+
+  At most one pass over the string — `O(n)` time and `O(1)` space.

@@ -1,0 +1,85 @@
+id: problem-016-jump-game
+title: Jump Game
+difficulty: MEDIUM
+tags:
+  - arrays
+  - greedy
+  - dynamic-programming
+description: |
+  You are given an integer array `nums`. You start at the first index, and `nums[i]` represents your **maximum** jump length at that position.
+
+  Return `true` if you can reach the last index, `false` otherwise.
+
+  **Example 1:**
+  ```
+  Input: nums = [2,3,1,1,4]
+  Output: true
+  Explanation: Jump 1 from index 0 to 1, then 3 from index 1 to the last index.
+  ```
+
+  **Example 2:**
+  ```
+  Input: nums = [3,2,1,0,4]
+  Output: false
+  Explanation: You will always arrive at index 3 (value 0), and can never go further.
+  ```
+
+  **Constraints:**
+  - `1 <= nums.length <= 10^4`
+  - `0 <= nums[i] <= 10^5`
+signature:
+  name:
+    javascript: canJump
+    python: can_jump
+  params:
+    - { name: nums, type: 'int[]' }
+  returns: bool
+starter:
+  javascript: |
+    function canJump(nums) {
+      // Your code here
+      return false;
+    }
+  python: |
+    def can_jump(nums):
+        # Your code here
+        return False
+tests:
+  - { args: [[2, 3, 1, 1, 4]],    expected: true }
+  - { args: [[3, 2, 1, 0, 4]],    expected: false }
+  - { args: [[0]],                 expected: true }
+  - { args: [[2, 0, 0]],           expected: true, hidden: true }
+  - { args: [[1, 1, 0, 1]],        expected: false, hidden: true }
+hints:
+  - Track the **furthest index reachable** so far as you walk left to right. If you ever stand on an index past that frontier, you're stuck.
+  - At index `i`, your reach can be extended to `i + nums[i]`. Keep `maxReach = max(maxReach, i + nums[i])`.
+  - If `maxReach >= nums.length - 1` at any point, return `true`. If you reach an index `i` with `i > maxReach`, return `false`.
+solution: |
+  Greedy from left to right. Maintain the furthest index reachable. For every index you visit, extend the reach to `i + nums[i]`. The answer is `true` iff the reach grows to (or past) the last index before you walk off the edge of what's currently reachable.
+
+  ```javascript
+  function canJump(nums) {
+      let maxReach = 0;
+      for (let i = 0; i < nums.length; i++) {
+          if (i > maxReach) return false;
+          if (i + nums[i] > maxReach) maxReach = i + nums[i];
+          if (maxReach >= nums.length - 1) return true;
+      }
+      return true;
+  }
+  ```
+
+  ```python
+  def can_jump(nums):
+      max_reach = 0
+      for i, step in enumerate(nums):
+          if i > max_reach:
+              return False
+          if i + step > max_reach:
+              max_reach = i + step
+          if max_reach >= len(nums) - 1:
+              return True
+      return True
+  ```
+
+  One pass, constant extra space — `O(n)` time and `O(1)` space.

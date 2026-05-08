@@ -1,0 +1,98 @@
+id: problem-013-rotate-array
+title: Rotate Array
+difficulty: MEDIUM
+tags:
+  - arrays
+  - two-pointers
+  - in-place
+description: |
+  Given an integer array `nums`, rotate the array to the right by `k` steps, where `k` is non-negative.
+
+  You must mutate `nums` in place.
+
+  **Example 1:**
+  ```
+  Input: nums = [1,2,3,4,5,6,7], k = 3
+  Output: [5,6,7,1,2,3,4]
+  ```
+
+  **Example 2:**
+  ```
+  Input: nums = [-1,-100,3,99], k = 2
+  Output: [3,99,-1,-100]
+  ```
+
+  **Constraints:**
+  - `1 <= nums.length <= 10^5`
+  - `-2^31 <= nums[i] <= 2^31 - 1`
+  - `0 <= k <= 10^5`
+
+  **Follow-up:** Can you do it in `O(1)` extra space?
+signature:
+  name:
+    javascript: rotate
+    python: rotate
+  params:
+    - { name: nums, type: 'int[]' }
+    - { name: k,    type: int }
+  returns: 'int[]'
+  mutatesArg: 0
+starter:
+  javascript: |
+    function rotate(nums, k) {
+      // Modify nums in-place. Return value is ignored.
+    }
+  python: |
+    def rotate(nums, k):
+        # Modify nums in-place. Return value is ignored.
+        pass
+tests:
+  - { args: [[1, 2, 3, 4, 5, 6, 7], 3],     expected: [5, 6, 7, 1, 2, 3, 4] }
+  - { args: [[-1, -100, 3, 99], 2],         expected: [3, 99, -1, -100] }
+  - { args: [[1, 2], 3],                    expected: [2, 1] }
+  - { args: [[1], 0],                       expected: [1], hidden: true }
+  - { args: [[1, 2, 3], 4],                 expected: [3, 1, 2], hidden: true }
+hints:
+  - First normalize `k` with `k % nums.length` — rotating by `length` brings you back to the starting array, and `k` may exceed the array's length.
+  - The trick is to think about reversal. Reversing the whole array, then reversing each half separately, lands every element exactly where the rotation would put it.
+  - Concretely; reverse `nums[0..n-1]`, then `nums[0..k-1]`, then `nums[k..n-1]`. All three reversals are `O(1)` extra space.
+solution: |
+  Three in-place reversals do the job in `O(n)` time and `O(1)` extra space:
+
+  1. Reverse the entire array.
+  2. Reverse the first `k` elements.
+  3. Reverse the rest.
+
+  Why does this work? After step 1 the last `k` elements are now at the front but in reversed order. Step 2 puts them in the correct order. Step 3 fixes the back half the same way.
+
+  ```javascript
+  function rotate(nums, k) {
+      const n = nums.length;
+      k = k % n;
+      const reverse = (l, r) => {
+          while (l < r) {
+              [nums[l], nums[r]] = [nums[r], nums[l]];
+              l++; r--;
+          }
+      };
+      reverse(0, n - 1);
+      reverse(0, k - 1);
+      reverse(k, n - 1);
+  }
+  ```
+
+  ```python
+  def rotate(nums, k):
+      n = len(nums)
+      k %= n
+      def reverse(l, r):
+          while l < r:
+              nums[l], nums[r] = nums[r], nums[l]
+              l += 1
+              r -= 1
+      reverse(0, n - 1)
+      reverse(0, k - 1)
+      reverse(k, n - 1)
+  ```
+
+  Each of the three reversals is `O(n)` in the worst case, but together they touch each element a constant number of times.

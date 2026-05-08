@@ -1,0 +1,91 @@
+id: problem-017-jump-game-ii
+title: Jump Game II
+difficulty: MEDIUM
+tags:
+  - arrays
+  - greedy
+  - bfs
+description: |
+  You are given a 0-indexed array `nums` of length `n`. You start at `nums[0]`. Each element `nums[i]` represents the **maximum** jump length from that index — you may jump to any index in `[i + 1, i + nums[i]]` (within bounds).
+
+  Return the **minimum number of jumps** to reach `nums[n - 1]`. The test cases are generated so that you can always reach the last index.
+
+  **Example 1:**
+  ```
+  Input: nums = [2,3,1,1,4]
+  Output: 2
+  Explanation: Jump 1 step from index 0 to 1, then 3 steps to the last index.
+  ```
+
+  **Example 2:**
+  ```
+  Input: nums = [2,3,0,1,4]
+  Output: 2
+  ```
+
+  **Constraints:**
+  - `1 <= nums.length <= 10^4`
+  - `0 <= nums[i] <= 1000`
+  - You can always reach `nums[n - 1]`.
+signature:
+  name:
+    javascript: jump
+    python: jump
+  params:
+    - { name: nums, type: 'int[]' }
+  returns: int
+starter:
+  javascript: |
+    function jump(nums) {
+      // Your code here
+      return 0;
+    }
+  python: |
+    def jump(nums):
+        # Your code here
+        return 0
+tests:
+  - { args: [[2, 3, 1, 1, 4]],    expected: 2 }
+  - { args: [[2, 3, 0, 1, 4]],    expected: 2 }
+  - { args: [[1]],                 expected: 0 }
+  - { args: [[1, 2, 3]],           expected: 2, hidden: true }
+  - { args: [[1, 1, 1, 1]],        expected: 3, hidden: true }
+hints:
+  - Think of this as BFS over an implicit graph — each index is a node, and you have edges to every index within jumping distance. The answer is the BFS depth of the last index.
+  - You don't need an explicit queue. Track two boundaries — `currentEnd` is the farthest index reachable in the current jump count, `farthest` is the farthest reachable from any index in `[0..currentEnd]`.
+  - Whenever `i` reaches `currentEnd`, you've exhausted everything reachable in the current number of jumps — bump the jump count and set `currentEnd = farthest`.
+solution: |
+  This is BFS in disguise. The "level" is the jump count, and a level contains every index you can reach with that many jumps. Two pointers track the level boundary:
+
+  - `currentEnd` — the rightmost index in the current level.
+  - `farthest` — the rightmost index any node in this level can reach.
+
+  As `i` walks forward, when it hits `currentEnd` we conclude this level and advance to the next: `currentEnd = farthest` and `jumps++`.
+
+  ```javascript
+  function jump(nums) {
+      let jumps = 0, currentEnd = 0, farthest = 0;
+      for (let i = 0; i < nums.length - 1; i++) {
+          if (i + nums[i] > farthest) farthest = i + nums[i];
+          if (i === currentEnd) {
+              jumps++;
+              currentEnd = farthest;
+          }
+      }
+      return jumps;
+  }
+  ```
+
+  ```python
+  def jump(nums):
+      jumps = current_end = farthest = 0
+      for i in range(len(nums) - 1):
+          if i + nums[i] > farthest:
+              farthest = i + nums[i]
+          if i == current_end:
+              jumps += 1
+              current_end = farthest
+      return jumps
+  ```
+
+  We iterate up to `n - 1` (no need to leap off the last index), giving `O(n)` time and `O(1)` space.

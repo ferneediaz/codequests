@@ -1,0 +1,124 @@
+id: problem-035-3sum
+title: 3Sum
+difficulty: MEDIUM
+tags:
+  - arrays
+  - two-pointers
+  - sorting
+description: |
+  Given an integer array `nums`, return all the triplets `[nums[i], nums[j], nums[k]]` such that `i != j`, `i != k`, and `j != k`, and `nums[i] + nums[j] + nums[k] == 0`.
+
+  Notice that the solution set must **not contain duplicate** triplets.
+
+  > **Output ordering (grading):** to keep the auto-grader deterministic, return each triplet with its values in non-decreasing order, and sort the outer list lexicographically. The canonical "sort + two pointer" solution produces exactly this ordering automatically.
+
+  **Example 1:**
+  ```
+  Input: nums = [-1,0,1,2,-1,-4]
+  Output: [[-1,-1,2],[-1,0,1]]
+  ```
+
+  **Example 2:**
+  ```
+  Input: nums = [0,1,1]
+  Output: []
+  ```
+
+  **Example 3:**
+  ```
+  Input: nums = [0,0,0]
+  Output: [[0,0,0]]
+  ```
+
+  **Constraints:**
+  - `3 <= nums.length <= 3000`
+  - `-10^5 <= nums[i] <= 10^5`
+signature:
+  name:
+    javascript: threeSum
+    python: three_sum
+  params:
+    - { name: nums, type: 'int[]' }
+  returns: 'int[][]'
+starter:
+  javascript: |
+    function threeSum(nums) {
+      // Your code here
+      return [];
+    }
+  python: |
+    def three_sum(nums):
+        # Your code here
+        return []
+tests:
+  - { args: [[-1, 0, 1, 2, -1, -4]],     expected: [[-1, -1, 2], [-1, 0, 1]] }
+  - { args: [[0, 1, 1]],                  expected: [] }
+  - { args: [[0, 0, 0]],                  expected: [[0, 0, 0]] }
+  - { args: [[-2, 0, 1, 1, 2]],           expected: [[-2, 0, 2], [-2, 1, 1]], hidden: true }
+  - { args: [[1, 2, -2, -1]],             expected: [], hidden: true }
+hints:
+  - Sort first. Sortedness lets you (a) deduplicate triplets by skipping equal neighbors and (b) use two pointers for the inner search.
+  - Fix the first element `nums[i]` and run a classic two-pointer search on the rest of the array for two values summing to `-nums[i]`. That makes 3Sum an `n` × 2Sum-on-sorted.
+  - To avoid duplicate triplets, skip `i` past any equal previous value (`if i > 0 && nums[i] === nums[i - 1]`), and after recording a triplet skip both inner pointers past their duplicates.
+solution: |
+  Sort, then for each `i` run a two-pointer search over the suffix `nums[i + 1..n - 1]` looking for two numbers that sum to `-nums[i]`. Three sources of duplicates to skip:
+
+  - The outer loop — don't reprocess the same `nums[i]` twice in a row.
+  - The inner pointers — after recording a triplet, advance `left` past every duplicate of `nums[left]` and `right` past every duplicate of `nums[right]`.
+
+  Sorting also gives the deterministic output order the grader expects.
+
+  ```javascript
+  function threeSum(nums) {
+      nums.sort((a, b) => a - b);
+      const result = [];
+      const n = nums.length;
+      for (let i = 0; i < n - 2; i++) {
+          if (i > 0 && nums[i] === nums[i - 1]) continue;
+          let left = i + 1, right = n - 1;
+          while (left < right) {
+              const sum = nums[i] + nums[left] + nums[right];
+              if (sum === 0) {
+                  result.push([nums[i], nums[left], nums[right]]);
+                  while (left < right && nums[left] === nums[left + 1]) left++;
+                  while (left < right && nums[right] === nums[right - 1]) right--;
+                  left++;
+                  right--;
+              } else if (sum < 0) {
+                  left++;
+              } else {
+                  right--;
+              }
+          }
+      }
+      return result;
+  }
+  ```
+
+  ```python
+  def three_sum(nums):
+      nums.sort()
+      result = []
+      n = len(nums)
+      for i in range(n - 2):
+          if i > 0 and nums[i] == nums[i - 1]:
+              continue
+          left, right = i + 1, n - 1
+          while left < right:
+              total = nums[i] + nums[left] + nums[right]
+              if total == 0:
+                  result.append([nums[i], nums[left], nums[right]])
+                  while left < right and nums[left] == nums[left + 1]:
+                      left += 1
+                  while left < right and nums[right] == nums[right - 1]:
+                      right -= 1
+                  left += 1
+                  right -= 1
+              elif total < 0:
+                  left += 1
+              else:
+                  right -= 1
+      return result
+  ```
+
+  Sorting is `O(n log n)`, the nested two-pointer search is `O(n^2)` overall, dominating the runtime. Space is `O(1)` aside from the output (and whatever the language's sort uses).

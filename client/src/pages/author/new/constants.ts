@@ -18,6 +18,10 @@ export const PARAM_TYPES: ParamType[] = [
     'int[][]',
     'float[][]',
     'string[][]',
+    'linked-list',
+    'linked-list[]',
+    'binary-tree',
+    'binary-tree[]',
     'any',
 ];
 

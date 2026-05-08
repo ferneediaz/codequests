@@ -115,6 +115,8 @@ export default function AuthorNew({ mode = 'yaml-copy' }: AuthorNewProps) {
                     />
                     <TestsSection
                         tests={form.state.tests}
+                        params={form.state.params}
+                        returns={form.state.returns}
                         result={form.result}
                         addTest={form.addTest}
                         removeTest={form.removeTest}

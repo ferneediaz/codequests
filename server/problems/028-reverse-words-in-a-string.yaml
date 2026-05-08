@@ -1,0 +1,113 @@
+id: problem-028-reverse-words-in-a-string
+title: Reverse Words in a String
+difficulty: MEDIUM
+tags:
+  - strings
+  - two-pointers
+description: |
+  Given an input string `s`, reverse the order of the **words**.
+
+  A word is defined as a maximal sequence of non-space characters. The words in `s` will be separated by at least one space.
+
+  Return a string of the words in reverse order, joined by a **single** space. The returned string should **not** contain any leading or trailing spaces and **must not** include consecutive spaces between words.
+
+  **Example 1:**
+  ```
+  Input: s = "the sky is blue"
+  Output: "blue is sky the"
+  ```
+
+  **Example 2:**
+  ```
+  Input: s = "  hello world  "
+  Output: "world hello"
+  ```
+
+  **Example 3:**
+  ```
+  Input: s = "a good   example"
+  Output: "example good a"
+  ```
+
+  **Constraints:**
+  - `1 <= s.length <= 10^4`
+  - `s` contains English letters (upper- and lower-case), digits, and spaces.
+  - There is at least one word in `s`.
+signature:
+  name:
+    javascript: reverseWords
+    python: reverse_words
+  params:
+    - { name: s, type: string }
+  returns: string
+starter:
+  javascript: |
+    function reverseWords(s) {
+      // Your code here
+      return "";
+    }
+  python: |
+    def reverse_words(s):
+        # Your code here
+        return ""
+tests:
+  - { args: ["the sky is blue"],          expected: "blue is sky the" }
+  - { args: ["  hello world  "],          expected: "world hello" }
+  - { args: ["a good   example"],         expected: "example good a" }
+  - { args: ["  Bob    Loves  Alice   "], expected: "Alice Loves Bob", hidden: true }
+  - { args: ["single"],                   expected: "single", hidden: true }
+hints:
+  - The simplest approach is to split the string on whitespace, drop empty pieces (those come from runs of multiple spaces), reverse, and rejoin with a single space.
+  - In JavaScript `s.trim().split(/\s+/)` collapses runs of whitespace; in Python `s.split()` (no argument) does the same.
+  - For an in-place / `O(1)` extra-space twist, reverse the entire string, then reverse each word individually.
+solution: |
+  The clean built-in approach: split on whitespace (collapsing repeated spaces), reverse the list, and rejoin.
+
+  ```javascript
+  function reverseWords(s) {
+      return s.trim().split(/\s+/).reverse().join(' ');
+  }
+  ```
+
+  ```python
+  def reverse_words(s):
+      return ' '.join(s.split()[::-1])
+  ```
+
+  Each character is read at most a constant number of times, so this is `O(n)` time and `O(n)` space (for the split).
+
+  ```python
+  def reverse_words(s):
+      # In-place style: reverse the whole string, then reverse each word.
+      chars = list(s)
+      def reverse(l, r):
+          while l < r:
+              chars[l], chars[r] = chars[r], chars[l]
+              l += 1
+              r -= 1
+      reverse(0, len(chars) - 1)
+      n = len(chars)
+      i = 0
+      out, write = [], 0
+      while i < n:
+          while i < n and chars[i] == ' ':
+              i += 1
+          if i == n:
+              break
+          if write != 0:
+              chars[write] = ' '
+              write += 1
+          j = i
+          while j < n and chars[j] != ' ':
+              chars[write] = chars[j]
+              write += 1
+              j += 1
+          # Now reverse this word in place inside chars[write - (j - i):write].
+          l, r = write - (j - i), write - 1
+          while l < r:
+              chars[l], chars[r] = chars[r], chars[l]
+              l += 1
+              r -= 1
+          i = j
+      return ''.join(chars[:write])
+  ```
