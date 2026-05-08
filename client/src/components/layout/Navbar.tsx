@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppDispatch } from '@/store/hooks';
@@ -44,6 +44,8 @@ import {
 
 export function Navbar() {
     const { user, isAuthenticated, logout } = useAuth();
+    const location = useLocation();
+    const onAuthRoute = location.pathname.startsWith('/login') || location.pathname.startsWith('/auth/');
     const { pendingRequests } = useFriends();
     const unreadDms = useUnreadDms();
     const {
@@ -261,9 +263,11 @@ export function Navbar() {
                             </DropdownMenu>
                         </>
                     ) : (
-                        <Link to="/login">
-                            <Button size="sm">Sign In</Button>
-                        </Link>
+                        !onAuthRoute && (
+                            <Link to="/login">
+                                <Button size="sm">Sign In</Button>
+                            </Link>
+                        )
                     )}
                 </div>
             </div>

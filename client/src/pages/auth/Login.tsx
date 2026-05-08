@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,12 @@ import { consumePendingInvite, peekPendingInvite } from '@/lib/pendingInvite';
 
 export default function Login() {
     const { isAuthenticated, isLoading, loginWithGithub, loginWithGoogle, user } = useAuth();
+    const [searchParams] = useSearchParams();
+    const nextParam = searchParams.get('next');
+    // Only allow same-origin paths to prevent open-redirect.
+    const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
+        ? nextParam
+        : null;
 
     if (isLoading) {
         return (
@@ -33,7 +39,7 @@ export default function Login() {
             ? `/invite/${pendingInvite}`
             : user?.needsOnboarding
                 ? '/onboarding'
-                : '/dashboard';
+                : safeNext ?? '/dashboard';
         return <Navigate to={destination} replace />;
     }
 

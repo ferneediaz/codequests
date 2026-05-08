@@ -17,10 +17,20 @@ api.interceptors.response.use(
     (response) => response,
     async (error) => {
         if (error.response?.status === 401) {
+            // Don't sign out unauthenticated visitors — public routes
+            // (e.g. /profile/:username) call endpoints that may 401 for
+            // anonymous viewers. Just let the query reject so the page
+            // can render its empty state.
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                return Promise.reject(error);
+            }
             const { error: refreshError } = await supabase.auth.refreshSession();
             if (refreshError) {
                 await supabase.auth.signOut();
-                window.location.href = '/login';
+                const { pathname, search } = window.location;
+                const next = pathname === '/login' ? '' : `?next=${encodeURIComponent(pathname + search)}`;
+                window.location.href = `/login${next}`;
             }
         }
         return Promise.reject(error);

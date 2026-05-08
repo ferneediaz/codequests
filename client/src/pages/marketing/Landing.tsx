@@ -311,7 +311,7 @@ function HowItWorks() {
 function Features() {
     const features = [
         {
-            icon: Zap,
+            icon: Terminal,
             title: 'Real-Time Code Execution',
             desc: 'Your code runs instantly against our test suite powered by Piston. No waiting — instant feedback on every submission.',
         },

@@ -40,6 +40,7 @@ export function RootLayout() {
     const onMessagesRoute = location.pathname.startsWith('/messages');
 
     const friendsSidebarHidden = useMemo(() => {
+        if (!user) return true;
         const path = location.pathname;
         return (
             path.startsWith('/battle/') ||
@@ -49,7 +50,7 @@ export function RootLayout() {
             path.startsWith('/auth/callback') ||
             path.startsWith('/invite/')
         );
-    }, [location.pathname]);
+    }, [location.pathname, user]);
 
     const toggleFriendsSidebar = useCallback(() => {
         setFriendsSidebarOpen((open) => !open);
