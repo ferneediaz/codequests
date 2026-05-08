@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { getChatSocket, getSocket } from '@/services/socket';
 import type {
     AchievementUnlockedPayload,
+    BattleRematchCreatedPayload,
     ChatMessagePayload,
 } from '@/types/socket';
 import { queryKeys } from '@/lib/queryKeys';
@@ -155,6 +156,28 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
                     : '/contribute/mine',
             });
         };
+        const onRematchCreated = (data: BattleRematchCreatedPayload) => {
+            // Both original participants get this; the clicker is already
+            // navigating from Results.tsx so this is mostly for the OTHER
+            // player. Only auto-navigate if they're still on a page tied to
+            // the original battle — if they've already moved on (Dashboard,
+            // Practice, etc.) we don't want to teleport them.
+            const onOriginal = window.location.pathname.startsWith(
+                `/battle/${data.originalBattleId}`,
+            );
+            const onRematch = window.location.pathname.startsWith(
+                `/battle/${data.rematchBattleId}`,
+            );
+            if (onOriginal || onRematch) {
+                navigate(`/battle/${data.rematchBattleId}`);
+            } else {
+                push({
+                    kind: 'MATCH_FOUND',
+                    title: 'Rematch ready',
+                    href: `/battle/${data.rematchBattleId}`,
+                });
+            }
+        };
         const onAchievementUnlocked = (data: AchievementUnlockedPayload) => {
             // Invalidate so the dashboard / profile grids re-fetch and the
             // newly unlocked badge flips from greyscale to colored.
@@ -185,6 +208,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         socket.on('submission.rejected', onSubmissionRejected);
         socket.on('submission.changes_requested', onSubmissionChangesRequested);
         socket.on('achievement.unlocked', onAchievementUnlocked);
+        socket.on('battle.rematch_created', onRematchCreated);
         return () => {
             socket.off('friend.request_received', onFriendRequest);
             socket.off('clan.challenge_received', onClanChallenge);
@@ -196,8 +220,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             socket.off('submission.rejected', onSubmissionRejected);
             socket.off('submission.changes_requested', onSubmissionChangesRequested);
             socket.off('achievement.unlocked', onAchievementUnlocked);
+            socket.off('battle.rematch_created', onRematchCreated);
         };
-    }, [push, queryClient]);
+    }, [navigate, push, queryClient]);
 
     useEffect(() => {
         const socket = getChatSocket();

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Dialog } from 'radix-ui';
 import {
     MoreHorizontal,
     MessageSquare,
@@ -34,6 +35,7 @@ export function FriendRow({ friend, online }: FriendRowProps) {
     const { remove } = useFriends();
     const { openDm } = useSocialLayout();
     const [busy, setBusy] = useState<'dm' | 'challenge' | 'remove' | null>(null);
+    const [confirmRemove, setConfirmRemove] = useState(false);
 
     const handleMessage = async () => {
         setBusy('dm');
@@ -71,11 +73,10 @@ export function FriendRow({ friend, online }: FriendRowProps) {
     };
 
     const handleRemove = async () => {
-        const confirmed = window.confirm(`Remove ${friend.username} as a friend?`);
-        if (!confirmed) return;
         setBusy('remove');
         try {
             await remove(friend.id);
+            setConfirmRemove(false);
         } finally {
             setBusy(null);
         }
@@ -135,7 +136,7 @@ export function FriendRow({ friend, online }: FriendRowProps) {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             variant="destructive"
-                            onClick={() => void handleRemove()}
+                            onClick={() => setConfirmRemove(true)}
                         >
                             <Trash2 className="h-4 w-4" />
                             Remove friend
@@ -143,6 +144,41 @@ export function FriendRow({ friend, online }: FriendRowProps) {
                     </DropdownMenuContent>
                 </DropdownMenu>
             )}
+
+            <Dialog.Root open={confirmRemove} onOpenChange={setConfirmRemove}>
+                <Dialog.Portal>
+                    <Dialog.Overlay className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+                    <Dialog.Content
+                        className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-6 shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+                    >
+                        <Dialog.Title className="mb-2 text-lg font-semibold">
+                            Remove {friend.username}?
+                        </Dialog.Title>
+                        <Dialog.Description className="mb-6 text-sm text-muted-foreground">
+                            They'll need to send a new friend request to reconnect.
+                        </Dialog.Description>
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                variant="ghost"
+                                onClick={() => setConfirmRemove(false)}
+                                disabled={busy === 'remove'}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={() => void handleRemove()}
+                                disabled={busy === 'remove'}
+                            >
+                                {busy === 'remove' && (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                )}
+                                Remove
+                            </Button>
+                        </div>
+                    </Dialog.Content>
+                </Dialog.Portal>
+            </Dialog.Root>
         </div>
     );
 }

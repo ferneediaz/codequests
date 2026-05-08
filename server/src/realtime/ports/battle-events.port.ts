@@ -83,9 +83,19 @@ export interface ClanWarsPlayerReadyNextRoundPayload {
     allReady: boolean;
 }
 
+export interface BattleRematchCreatedPayload {
+    originalBattleId: string;
+    rematchBattleId: string;
+    initiatedByUserId: string;
+}
+
 export interface BattleEventsPort {
     emitBattleSubmission(battleId: string, data: SubmissionPayload): void;
     emitBattleCompleted(battleId: string, battle: unknown): void;
+    emitBattleRematchCreated(
+        participantUserIds: string[],
+        data: BattleRematchCreatedPayload,
+    ): void;
     emitRoyaleRoundStart(battleId: string, data: RoyaleRoundStartPayload): void;
     emitRoyaleRoundEnd(battleId: string, data: RoyaleRoundEndPayload): void;
     emitRoyaleElimination(battleId: string, data: RoyaleEliminationPayload): void;

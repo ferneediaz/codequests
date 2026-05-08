@@ -36,6 +36,7 @@ describe('BattlesService', () => {
         emitBattleSubmission: jest.Mock;
         emitBattleCompleted: jest.Mock;
         emitBattleStatusUpdate: jest.Mock;
+        emitBattleRematchCreated: jest.Mock;
     };
     let achievementsService: { runChecks: jest.Mock };
 
@@ -206,6 +207,7 @@ describe('BattlesService', () => {
                         emitBattleSubmission: jest.fn(),
                         emitBattleCompleted: jest.fn(),
                         emitBattleStatusUpdate: jest.fn(),
+                        emitBattleRematchCreated: jest.fn(),
                     },
                 },
                 {
@@ -3826,6 +3828,109 @@ describe('BattlesService', () => {
 
             expect(completeSpy).toHaveBeenCalledWith('stale-1');
             expect(completeSpy).toHaveBeenCalledWith('waiting-1');
+        });
+
+        it('forceFinalizeActiveBattlesForUser finalizes ALL active battles regardless of age', async () => {
+            // Fresh IN_PROGRESS battle (started 10s ago — well within time
+            // limit). The age-gated `finalizeStaleBattlesForUser` would skip
+            // this; the force variant must finalize it anyway.
+            prisma.battle.findMany.mockResolvedValueOnce([
+                { id: 'fresh-1' },
+                { id: 'waiting-1' },
+            ]);
+
+            const completeSpy = jest
+                .spyOn(service, 'completeBattle')
+                .mockResolvedValue({} as any);
+
+            const changed =
+                await service.forceFinalizeActiveBattlesForUser('user-1');
+
+            expect(changed).toBe(2);
+            expect(completeSpy).toHaveBeenCalledWith('fresh-1');
+            expect(completeSpy).toHaveBeenCalledWith('waiting-1');
+        });
+
+        it('forceFinalizeActiveBattlesForUser swallows races on already-completed battles', async () => {
+            prisma.battle.findMany.mockResolvedValueOnce([{ id: 'racy-1' }]);
+
+            jest.spyOn(service, 'completeBattle').mockRejectedValue(
+                new BadRequestException('Battle is already completed'),
+            );
+
+            const changed =
+                await service.forceFinalizeActiveBattlesForUser('user-1');
+
+            expect(changed).toBe(0);
+        });
+    });
+
+    // ==========================================
+    // Rematch
+    // ==========================================
+    describe('createRematch', () => {
+        const baseOriginal = {
+            id: 'orig-1',
+            mode: BattleMode.ONE_V_ONE,
+            status: BattleStatus.COMPLETED,
+            problemId: 'problem-1',
+            teamSize: null,
+            timeLimitMinutes: 5,
+            autoBalance: false,
+            enabledSkills: [],
+            problem: { testCases: [{ id: 't1' }, { id: 't2' }] },
+            problemPool: null,
+            participants: [
+                { userId: 'user-1', teamId: null },
+                { userId: 'user-2', teamId: null },
+            ],
+        } as any;
+
+        it('returns the existing rematch when one is already in WAITING — both clicks land on the same battle', async () => {
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(baseOriginal) // original lookup
+                .mockResolvedValueOnce({ id: 'rematch-1', participants: [] }); // getBattleDetails
+
+            prisma.battle.findFirst.mockResolvedValueOnce({
+                id: 'rematch-1',
+                rematchOfBattleId: 'orig-1',
+                status: BattleStatus.WAITING,
+                createdAt: new Date(),
+            });
+
+            const result = await service.createRematch('user-2', 'orig-1');
+
+            expect(prisma.battle.create).not.toHaveBeenCalled();
+            expect(result.id).toBe('rematch-1');
+            expect(battlesGateway.emitBattleRematchCreated).toHaveBeenCalledWith(
+                ['user-1', 'user-2'],
+                expect.objectContaining({
+                    originalBattleId: 'orig-1',
+                    rematchBattleId: 'rematch-1',
+                    initiatedByUserId: 'user-2',
+                }),
+            );
+        });
+
+        it('creates a new rematch and emits to all participants', async () => {
+            prisma.battle.findUnique
+                .mockResolvedValueOnce(baseOriginal)
+                .mockResolvedValueOnce({ id: 'rematch-new', participants: [] });
+
+            prisma.battle.findFirst.mockResolvedValueOnce(null);
+            prisma.battle.create.mockResolvedValueOnce({ id: 'rematch-new' });
+
+            await service.createRematch('user-1', 'orig-1');
+
+            expect(prisma.battle.create).toHaveBeenCalledTimes(1);
+            expect(battlesGateway.emitBattleRematchCreated).toHaveBeenCalledWith(
+                ['user-1', 'user-2'],
+                expect.objectContaining({
+                    originalBattleId: 'orig-1',
+                    rematchBattleId: 'rematch-new',
+                    initiatedByUserId: 'user-1',
+                }),
+            );
         });
     });
 });

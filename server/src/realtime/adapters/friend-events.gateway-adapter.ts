@@ -3,6 +3,7 @@ import { BattlesGateway } from '../../websockets/battles.gateway';
 import {
     FriendEventsPort,
     FriendRequestAcceptedPayload,
+    FriendRequestCancelledPayload,
     FriendRequestDeclinedPayload,
     FriendRequestReceivedPayload,
 } from '../ports/friend-events.port';
@@ -30,5 +31,12 @@ export class FriendEventsGatewayAdapter implements FriendEventsPort {
         data: FriendRequestDeclinedPayload,
     ): boolean {
         return this.gateway.emitFriendRequestDeclined(requesterId, data);
+    }
+
+    emitFriendRequestCancelled(
+        addresseeId: string,
+        data: FriendRequestCancelledPayload,
+    ): boolean {
+        return this.gateway.emitFriendRequestCancelled(addresseeId, data);
     }
 }

@@ -12,6 +12,7 @@ import { BattleChat } from '@/components/battle/BattleChat';
 import { ArrowLeft, Loader2, Trophy, RotateCcw, Flame, Share2 } from 'lucide-react';
 import { battlesApi } from '@/services/battles';
 import { queryKeys } from '@/lib/queryKeys';
+import { ShareDialog } from '@/components/share/ShareDialog';
 import type {
     BattleParticipant,
     BattleRoundEndReason,
@@ -34,7 +35,9 @@ export default function Results() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const userId = useAppSelector((state) => state.auth.user?.id);
+    const myUsername = useAppSelector((state) => state.auth.user?.username);
     const [rematching, setRematching] = useState(false);
+    const [shareOpen, setShareOpen] = useState(false);
 
     const battleQuery = useQuery({
         queryKey: queryKeys.battle(id ?? ''),
@@ -373,24 +376,40 @@ export default function Results() {
                 {iWon && (
                     <Button
                         variant="outline"
-                        onClick={async () => {
-                            const apiBase =
-                                import.meta.env.VITE_API_URL ||
-                                'http://localhost:3000/api';
-                            const shareUrl = `${apiBase.replace(/\/$/, '')}/share/battles/${battle.id}`;
-                            try {
-                                await navigator.clipboard.writeText(shareUrl);
-                                toast.success('Share link copied — go roast them.');
-                            } catch {
-                                toast.error('Could not copy share link.');
-                            }
-                        }}
+                        onClick={() => setShareOpen(true)}
+                        className="border-amber-500/40 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400"
                     >
                         <Share2 className="mr-2 h-4 w-4" />
-                        Share
+                        Share the W
                     </Button>
                 )}
             </div>
+
+            {iWon && (() => {
+                const apiBase =
+                    import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+                const trimmedBase = apiBase.replace(/\/$/, '');
+                const shareUrl = `${trimmedBase}/share/battles/${battle.id}`;
+                const imageUrl = `${trimmedBase}/share/battles/${battle.id}/og.png`;
+                const opponentName = opponent
+                    ? participantName(opponent)
+                    : 'someone';
+                const handle = myUsername ? `@${myUsername}` : 'I';
+                const text = `${handle} just sent ${opponentName} to the shadow realm on CodeQuest Battles. ⚔️ Settle yours:`;
+                return (
+                    <ShareDialog
+                        open={shareOpen}
+                        onOpenChange={setShareOpen}
+                        url={shareUrl}
+                        imageUrl={imageUrl}
+                        text={text}
+                        headline={`You cooked ${opponentName}.`}
+                        subhead="Drop the meme so they never forget."
+                        redditTitle={`I beat ${opponentName} on CodeQuest Battles`}
+                        tone="win"
+                    />
+                );
+            })()}
             {userId && (
                 <BattleChat
                     battleId={battle.id}

@@ -222,6 +222,52 @@ export class FriendsService {
     }
 
     /**
+     * Cancel a pending outgoing friend request. Only the original
+     * requester can cancel; the addressee gets a best-effort socket
+     * event so their incoming list updates without a refetch.
+     */
+    async cancelOutgoingRequest(userId: string, friendshipId: string) {
+        const friendship = await this.prisma.friendship.findUnique({
+            where: { id: friendshipId },
+        });
+
+        if (!friendship) {
+            throw new NotFoundException('Friend request not found');
+        }
+
+        if (friendship.requesterId !== userId) {
+            throw new BadRequestException('You can only cancel requests you sent');
+        }
+
+        if (friendship.status !== FriendshipStatus.PENDING) {
+            throw new BadRequestException('This request is not pending');
+        }
+
+        await this.prisma.friendship.delete({ where: { id: friendshipId } });
+
+        try {
+            const requester = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: { id: true, username: true },
+            });
+            if (requester) {
+                this.friendEvents.emitFriendRequestCancelled(
+                    friendship.addresseeId,
+                    {
+                        friendshipId,
+                        requesterId: requester.id,
+                        requesterUsername: requester.username,
+                    },
+                );
+            }
+        } catch {
+            // best-effort
+        }
+
+        return { success: true };
+    }
+
+    /**
      * Remove a friend by their user ID
      */
     async removeFriend(userId: string, friendId: string) {

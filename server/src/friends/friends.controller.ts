@@ -77,6 +77,25 @@ export class FriendsController {
     }
 
     /**
+     * Cancel a pending outgoing friend request. Declared before
+     * `DELETE /:id` so Nest matches the static segment first.
+     */
+    @Delete('sent/:id')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Cancel a pending outgoing friend request' })
+    @ApiParam({ name: 'id', description: 'Friendship ID' })
+    @ApiResponse({ status: 200, description: 'Friend request cancelled' })
+    @ApiResponse({ status: 400, description: 'Request is not yours or not pending' })
+    @ApiResponse({ status: 404, description: 'Request not found' })
+    cancelOutgoingRequest(
+        @Param('id') id: string,
+        @Req() req: AuthedRequest,
+    ) {
+        return this.friendsService.cancelOutgoingRequest(req.user.id, id);
+    }
+
+    /**
      * Remove a friend
      */
     @Delete(':id')

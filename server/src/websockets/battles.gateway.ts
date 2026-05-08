@@ -702,6 +702,28 @@ export class BattlesGateway
     }
 
     /**
+     * Emit rematch-created event to every original participant. Goes per-user
+     * because by the time a rematch is created, players are typically on
+     * /battle/<id>/results and have already left the original battle's
+     * Socket.IO room — so a room broadcast wouldn't reach them.
+     */
+    emitBattleRematchCreated(
+        participantUserIds: string[],
+        data: {
+            originalBattleId: string;
+            rematchBattleId: string;
+            initiatedByUserId: string;
+        },
+    ) {
+        for (const userId of participantUserIds) {
+            const socket = this.getSocketByUserId(userId);
+            if (socket) {
+                socket.emit('battle.rematch_created', data);
+            }
+        }
+    }
+
+    /**
      * Emit match found event to matched players
      */
     emitMatchFound(
@@ -884,6 +906,25 @@ export class BattlesGateway
         const socket = this.getSocketByUserId(requesterId);
         if (!socket) return false;
         socket.emit('friend.request_declined', data);
+        return true;
+    }
+
+    /**
+     * Notify the addressee that a pending friend request from `requesterId`
+     * was cancelled by the requester. Lets the recipient's UI quietly drop
+     * the row without needing a refetch.
+     */
+    emitFriendRequestCancelled(
+        addresseeId: string,
+        data: {
+            friendshipId: string;
+            requesterId: string;
+            requesterUsername: string;
+        },
+    ): boolean {
+        const socket = this.getSocketByUserId(addresseeId);
+        if (!socket) return false;
+        socket.emit('friend.request_cancelled', data);
         return true;
     }
 

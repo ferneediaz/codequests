@@ -28,13 +28,29 @@ export function ProblemRow({
                 onClick={onClick}
                 className="group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-card/60"
             >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center">
+                <div
+                    className="flex h-8 w-8 shrink-0 items-center justify-center"
+                    title={
+                        !isTracked
+                            ? 'Upgrade to Pro to track your progress on this problem'
+                            : problem.solved
+                                ? 'Solved'
+                                : 'Not yet solved'
+                    }
+                    aria-label={
+                        !isTracked
+                            ? 'Locked — upgrade to track progress'
+                            : problem.solved
+                                ? 'Solved'
+                                : 'Not yet solved'
+                    }
+                >
                     {!isTracked ? (
-                        <Lock className="h-4 w-4 text-muted-foreground/50" />
+                        <Lock className="h-4 w-4 text-muted-foreground/50" aria-hidden />
                     ) : problem.solved ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        <CheckCircle2 className="h-5 w-5 text-green-500" aria-hidden />
                     ) : (
-                        <Circle className="h-5 w-5 text-muted-foreground/40" />
+                        <Circle className="h-5 w-5 text-muted-foreground/40" aria-hidden />
                     )}
                 </div>
 

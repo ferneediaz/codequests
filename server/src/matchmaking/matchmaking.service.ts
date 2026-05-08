@@ -51,63 +51,34 @@ export class MatchmakingService {
             throw new BadRequestException('User not found');
         }
 
-        // Check not already in queue
+        // Always wipe any existing entry. Previously we threw "already in
+        // matchmaking queue" when the user re-clicked Find Match, but that
+        // strands anyone whose Cancel call failed or whose entry got stuck
+        // QUEUED after a tab close. Re-clicking Find Match is an unambiguous
+        // "I want to (re)queue" signal — honor it by replacing the entry.
         const existing = await this.prisma.matchmakingEntry.findUnique({
             where: { userId },
         });
-
-        if (existing && existing.status === MatchmakingStatus.QUEUED) {
-            throw new BadRequestException('Already in matchmaking queue');
-        }
-
-        // If there's a stale entry (MATCHED/EXPIRED), delete it first
         if (existing) {
             await this.prisma.matchmakingEntry.delete({
                 where: { userId },
             });
         }
 
-        // Active battle guard with targeted cleanup.
-        //
-        // If the previous battle timed out while every participant was away
-        // (e.g. tab closed, browser crash), the client-driven /complete call
-        // never landed and the battle is stuck IN_PROGRESS. Same story for
-        // expired invite lobbies and abandoned public 1v1 WAITING rows.
-        // Finalize those for this user first so a genuinely abandoned battle
-        // doesn't block a fresh queue attempt.
+        // Force-finalize ANY active battle this user is in. Clicking Find
+        // Match is an explicit "I'm done with my current game" signal — we
+        // honor it by ending the lingering battle as a draw (no MMR movement
+        // for unsubmitted battles). The other participant, if any, gets a
+        // `battle.completed` event and bounces to /results. This replaces
+        // the old "you are already in an active battle" hard-block, which
+        // stranded users whose previous /complete call never landed (tab
+        // closed mid-game, websocket dropped, etc.).
         try {
-            await this.battlesService.finalizeStaleBattlesForUser(userId);
+            await this.battlesService.forceFinalizeActiveBattlesForUser(userId);
         } catch (error) {
             this.logger.warn(
-                `Stale battle cleanup before joinQueue failed for user ${userId}: ${(error as Error).message}`,
+                `Active-battle cleanup before joinQueue failed for user ${userId}: ${(error as Error).message}`,
             );
-        }
-
-        const activeBattle = await this.prisma.battleParticipant.findFirst({
-            where: {
-                userId,
-                battle: {
-                    status: { in: ['WAITING', 'IN_PROGRESS'] },
-                },
-            },
-            include: {
-                battle: {
-                    select: { id: true, status: true, mode: true },
-                },
-            },
-        });
-
-        if (activeBattle) {
-            // Return a structured payload so the UI can render an actionable
-            // error instead of bouncing the user silently back to /play.
-            throw new BadRequestException({
-                code: 'ACTIVE_BATTLE',
-                message:
-                    'You are already in an active battle. Resume or finish it before queueing again.',
-                battleId: activeBattle.battle.id,
-                battleStatus: activeBattle.battle.status,
-                battleMode: activeBattle.battle.mode,
-            });
         }
 
         // Create queue entry
@@ -219,10 +190,15 @@ export class MatchmakingService {
         const now = new Date();
         const mmrRange = this.calculateMmrRange(entry.queuedAt, now);
 
-        // Find potential matches: same mode, QUEUED, within MMR range, not same user
+        // Find potential matches: same mode, QUEUED, within MMR range, not same user.
+        // Belt-and-suspenders userId guard: a unique constraint on userId
+        // already enforces "one entry per user", but explicitly excluding
+        // entry.userId means a self-match is impossible even if a duplicate
+        // row ever sneaks in (migration drift, manual DB writes, etc.).
         const candidates = await this.prisma.matchmakingEntry.findMany({
             where: {
                 id: { not: entry.id },
+                userId: { not: entry.userId },
                 mode: entry.mode,
                 status: MatchmakingStatus.QUEUED,
                 mmrAtQueue: {
@@ -308,12 +284,45 @@ export class MatchmakingService {
             return null;
         }
 
-        // Mark both entries as matched (claim them to prevent double-matching)
+        // Atomically claim both entries: only flip QUEUED -> MATCHED.
+        // If a concurrent matcher already grabbed either side, count != 2
+        // and we bail out so we don't create a phantom battle on top of
+        // the first matcher's. The previous version updated unconditionally,
+        // which let two concurrent matchers each spin up a battle and split
+        // the players across them.
         const now = new Date();
-        await this.prisma.matchmakingEntry.updateMany({
-            where: { id: { in: [entry1.id, entry2.id] } },
+        const claim = await this.prisma.matchmakingEntry.updateMany({
+            where: {
+                id: { in: [entry1.id, entry2.id] },
+                status: MatchmakingStatus.QUEUED,
+            },
             data: { status: MatchmakingStatus.MATCHED, matchedAt: now },
         });
+        if (claim.count !== 2) {
+            // Partial claim: we grabbed one entry but not the other (the
+            // peer was already MATCHED by a concurrent caller). Revert
+            // *only* the row(s) we just flipped — the `matchedAt: now`
+            // filter pins us to our own write so we don't clobber the
+            // other matcher's claim. Without this, a losing partial-claim
+            // strands an entry in MATCHED forever.
+            if (claim.count > 0) {
+                await this.prisma.matchmakingEntry.updateMany({
+                    where: {
+                        id: { in: [entry1.id, entry2.id] },
+                        status: MatchmakingStatus.MATCHED,
+                        matchedAt: now,
+                    },
+                    data: {
+                        status: MatchmakingStatus.QUEUED,
+                        matchedAt: null,
+                    },
+                });
+            }
+            this.logger.warn(
+                `Matchmaking claim race: tried to match ${entry1.id} & ${entry2.id} but only ${claim.count} were still QUEUED — backing off`,
+            );
+            return null;
+        }
 
         try {
             // Create battle via BattlesService

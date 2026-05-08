@@ -1502,5 +1502,39 @@ describe('BattlesGateway', () => {
                 payload,
             );
         });
+
+        it('emitFriendRequestCancelled sends event to online addressee', async () => {
+            const addresseeSocket = createMockSocket('user-2', 'socket-2');
+            mockJwtVerificationService.verifyAndGetUser.mockResolvedValueOnce({
+                ...mockUser,
+                id: 'user-2',
+            });
+            mockFriendsService.getFriendIds.mockResolvedValueOnce([]);
+            await gateway.handleConnection(addresseeSocket);
+
+            const payload = {
+                friendshipId: 'friendship-1',
+                requesterId: 'user-1',
+                requesterUsername: 'alice',
+            };
+
+            const delivered = gateway.emitFriendRequestCancelled('user-2', payload);
+
+            expect(delivered).toBe(true);
+            expect(addresseeSocket.emit).toHaveBeenCalledWith(
+                'friend.request_cancelled',
+                payload,
+            );
+        });
+
+        it('emitFriendRequestCancelled returns false for offline addressee', () => {
+            const delivered = gateway.emitFriendRequestCancelled('user-offline', {
+                friendshipId: 'friendship-1',
+                requesterId: 'user-1',
+                requesterUsername: 'alice',
+            });
+
+            expect(delivered).toBe(false);
+        });
     });
 });

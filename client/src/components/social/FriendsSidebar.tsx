@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFriends } from '@/hooks/useFriends';
 import { useSocialLayout } from '@/hooks/useSocialLayout';
+import { useUnreadDms } from '@/hooks/useUnreadDms';
 import { AddFriendPopover } from './AddFriendPopover';
 import { FriendRow } from './FriendRow';
 import { IncomingRequestRow } from './IncomingRequestRow';
@@ -19,6 +20,7 @@ export function FriendsSidebar() {
         isFriendOnline,
     } = useFriends();
     const { setFriendsSidebarOpen } = useSocialLayout();
+    const unreadDms = useUnreadDms();
 
     const onlineFriends = friends.filter((friend) => isFriendOnline(friend.id));
     const offlineFriends = friends.filter((friend) => !isFriendOnline(friend.id));
@@ -41,13 +43,22 @@ export function FriendsSidebar() {
                 </div>
                 <div className="flex items-center gap-1.5">
                     <AddFriendPopover />
-                    <Link to="/messages" aria-label="Open inbox">
+                    <Link
+                        to="/messages"
+                        aria-label={unreadDms > 0 ? `Open inbox (${unreadDms} unread)` : 'Open inbox'}
+                        title={unreadDms > 0 ? `${unreadDms} unread message${unreadDms === 1 ? '' : 's'}` : 'Open inbox'}
+                    >
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className="relative h-8 w-8"
                         >
                             <MessageSquare className="h-4 w-4" />
+                            {unreadDms > 0 && (
+                                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground">
+                                    {unreadDms > 9 ? '9+' : unreadDms}
+                                </span>
+                            )}
                         </Button>
                     </Link>
                     <Button

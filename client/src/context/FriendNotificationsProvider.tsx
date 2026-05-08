@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { getSocket } from '@/services/socket';
 import {
     acceptFriendRequest,
+    cancelOutgoingRequest as cancelOutgoingRequestApi,
     declineFriendRequest,
     listFriends,
     listPendingRequests,
@@ -25,6 +26,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import type { LobbyUser } from '@/types/lobby';
 import type {
     FriendRequestAcceptedPayload,
+    FriendRequestCancelledPayload,
     FriendRequestDeclinedPayload,
     FriendRequestReceivedPayload,
 } from '@/types/socket';
@@ -220,6 +222,15 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
                 toast.message(`${data.addresseeUsername} declined your friend request.`);
             };
 
+            const handleCancelled = (data: FriendRequestCancelledPayload) => {
+                // Recipient side: requester withdrew the pending request.
+                // Drop the row from the incoming list and decrement the
+                // unseen badge if we hadn't seen it yet. No toast — this
+                // is a quiet retraction, not a positive event.
+                removeIncomingRequest(data.friendshipId);
+                setUnseenPending((n) => Math.max(0, n - 1));
+            };
+
             const handlePresenceOnline = (data: { userId: string }) => {
                 setOnlineFriendIds((prev) => {
                     if (prev.has(data.userId)) return prev;
@@ -245,6 +256,7 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
             socket.on('friend.request_received', handleReceived);
             socket.on('friend.request_accepted', handleAccepted);
             socket.on('friend.request_declined', handleDeclined);
+            socket.on('friend.request_cancelled', handleCancelled);
             socket.on('presence.online', handlePresenceOnline);
             socket.on('presence.offline', handlePresenceOffline);
             socket.on('disconnect', handleDisconnect);
@@ -254,6 +266,7 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
                 socket.off('friend.request_received', handleReceived);
                 socket.off('friend.request_accepted', handleAccepted);
                 socket.off('friend.request_declined', handleDeclined);
+                socket.off('friend.request_cancelled', handleCancelled);
                 socket.off('presence.online', handlePresenceOnline);
                 socket.off('presence.offline', handlePresenceOffline);
                 socket.off('disconnect', handleDisconnect);
@@ -394,6 +407,28 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
         }
     }, []);
 
+    const cancelOutgoingRequest = useCallback(
+        async (friendshipId: string) => {
+            // Optimistic remove; restore on failure so the row reappears
+            // and the user can retry.
+            const previous = outgoingRequests;
+            removeOutgoingRequest(friendshipId);
+            try {
+                await cancelOutgoingRequestApi(friendshipId);
+                toast.success('Friend request cancelled.');
+            } catch (err: unknown) {
+                setOutgoingRequests(previous);
+                const message =
+                    (err as { response?: { data?: { message?: string } } })
+                        ?.response?.data?.message ??
+                    'Failed to cancel friend request.';
+                toast.error(message);
+                throw err;
+            }
+        },
+        [outgoingRequests, removeOutgoingRequest],
+    );
+
     const seedOutgoingRequest = useCallback((target: LobbyUser) => {
         const friendshipId = target.friendshipId;
         if (!friendshipId) return;
@@ -439,6 +474,7 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
             decline,
             remove,
             sendRequestByUsername,
+            cancelOutgoingRequest,
             seedOutgoingRequest,
             isFriendOnline,
             markAllSeen,
@@ -458,6 +494,7 @@ export function FriendNotificationsProvider({ children }: { children: ReactNode 
             decline,
             remove,
             sendRequestByUsername,
+            cancelOutgoingRequest,
             seedOutgoingRequest,
             isFriendOnline,
             markAllSeen,

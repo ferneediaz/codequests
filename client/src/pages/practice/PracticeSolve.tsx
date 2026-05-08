@@ -97,7 +97,11 @@ export default function PracticeSolve() {
             setRunResult(result);
         } catch (error) {
             console.error('Run failed:', error);
-            toast.error('Run failed. Check your code and try again.');
+            const message =
+                (error as { response?: { data?: { message?: string } } })
+                    ?.response?.data?.message ??
+                'Run failed. Check your code and try again.';
+            toast.error(message);
         } finally {
             setIsRunning(false);
         }
@@ -130,7 +134,10 @@ export default function PracticeSolve() {
             }
         } catch (error) {
             console.error('Submit failed:', error);
-            toast.error('Submission failed. Try again.');
+            const message =
+                (error as { response?: { data?: { message?: string } } })
+                    ?.response?.data?.message ?? 'Submission failed. Try again.';
+            toast.error(message);
         } finally {
             setIsSubmitting(false);
         }
@@ -180,6 +187,7 @@ export default function PracticeSolve() {
                         disabled={isRunning || isSubmitting || !code.trim()}
                         variant="outline"
                         size="sm"
+                        title={!code.trim() ? 'Write some code first' : 'Run against sample tests'}
                     >
                         {isRunning ? (
                             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -192,6 +200,7 @@ export default function PracticeSolve() {
                         onClick={handleSubmit}
                         disabled={isSubmitting || isRunning || !code.trim()}
                         size="sm"
+                        title={!code.trim() ? 'Write some code first' : 'Submit against all tests'}
                     >
                         {isSubmitting ? (
                             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -210,7 +219,7 @@ export default function PracticeSolve() {
                         Your attempts aren't saved on the free plan.
                     </span>
                     <button
-                        onClick={() => navigate('/dashboard')}
+                        onClick={() => navigate('/pricing')}
                         className="ml-auto font-semibold text-yellow-500 hover:underline"
                     >
                         Upgrade to track progress →

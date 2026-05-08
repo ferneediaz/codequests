@@ -11,6 +11,12 @@ export interface MatchFoundPayload {
     matchedAt: string;
 }
 
+export interface BattleRematchCreatedPayload {
+    originalBattleId: string;
+    rematchBattleId: string;
+    initiatedByUserId: string;
+}
+
 export interface BattleStartedPayload {
     battleId: string;
     status: BattleStatus;
@@ -126,6 +132,12 @@ export interface FriendRequestDeclinedPayload {
     friendshipId: string;
     addresseeId: string;
     addresseeUsername: string;
+}
+
+export interface FriendRequestCancelledPayload {
+    friendshipId: string;
+    requesterId: string;
+    requesterUsername: string;
 }
 
 export interface AchievementUnlockedPayload {

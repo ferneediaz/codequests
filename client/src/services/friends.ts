@@ -76,3 +76,12 @@ export async function removeFriend(
     );
     return data;
 }
+
+export async function cancelOutgoingRequest(
+    friendshipId: string,
+): Promise<{ success: true }> {
+    const { data } = await api.delete<{ success: true }>(
+        `/friends/sent/${friendshipId}`,
+    );
+    return data;
+}

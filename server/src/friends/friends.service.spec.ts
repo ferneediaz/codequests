@@ -19,6 +19,7 @@ describe('FriendsService', () => {
         emitFriendRequestReceived: jest.Mock;
         emitFriendRequestAccepted: jest.Mock;
         emitFriendRequestDeclined: jest.Mock;
+        emitFriendRequestCancelled: jest.Mock;
     };
 
     const mockUser1 = {
@@ -53,6 +54,7 @@ describe('FriendsService', () => {
             emitFriendRequestReceived: jest.fn().mockReturnValue(true),
             emitFriendRequestAccepted: jest.fn().mockReturnValue(true),
             emitFriendRequestDeclined: jest.fn().mockReturnValue(true),
+            emitFriendRequestCancelled: jest.fn().mockReturnValue(true),
         };
 
         const module: TestingModule = await Test.createTestingModule({
@@ -342,6 +344,82 @@ describe('FriendsService', () => {
 
             await expect(service.removeFriend('user-1', 'user-3'))
                 .rejects.toThrow(NotFoundException);
+        });
+    });
+
+    // ============================
+    // cancelOutgoingRequest
+    // ============================
+
+    describe('cancelOutgoingRequest', () => {
+        it('should cancel a pending request and notify the addressee', async () => {
+            prisma.friendship.findUnique.mockResolvedValue(mockFriendship);
+            prisma.friendship.delete.mockResolvedValue(mockFriendship);
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+
+            const result = await service.cancelOutgoingRequest(
+                'user-1',
+                'friendship-1',
+            );
+
+            expect(prisma.friendship.delete).toHaveBeenCalledWith({
+                where: { id: 'friendship-1' },
+            });
+            expect(mockBattlesGateway.emitFriendRequestCancelled).toHaveBeenCalledWith(
+                'user-2',
+                {
+                    friendshipId: 'friendship-1',
+                    requesterId: 'user-1',
+                    requesterUsername: 'alice',
+                },
+            );
+            expect(result).toEqual({ success: true });
+        });
+
+        it('should throw NotFoundException when request does not exist', async () => {
+            prisma.friendship.findUnique.mockResolvedValue(null);
+
+            await expect(
+                service.cancelOutgoingRequest('user-1', 'missing'),
+            ).rejects.toThrow(NotFoundException);
+            expect(prisma.friendship.delete).not.toHaveBeenCalled();
+        });
+
+        it('should reject when caller is not the requester', async () => {
+            prisma.friendship.findUnique.mockResolvedValue(mockFriendship);
+
+            await expect(
+                service.cancelOutgoingRequest('user-2', 'friendship-1'),
+            ).rejects.toThrow(BadRequestException);
+            expect(prisma.friendship.delete).not.toHaveBeenCalled();
+        });
+
+        it('should reject when request is no longer pending', async () => {
+            prisma.friendship.findUnique.mockResolvedValue({
+                ...mockFriendship,
+                status: 'ACCEPTED',
+            });
+
+            await expect(
+                service.cancelOutgoingRequest('user-1', 'friendship-1'),
+            ).rejects.toThrow(BadRequestException);
+            expect(prisma.friendship.delete).not.toHaveBeenCalled();
+        });
+
+        it('should swallow realtime emit failures', async () => {
+            prisma.friendship.findUnique.mockResolvedValue(mockFriendship);
+            prisma.friendship.delete.mockResolvedValue(mockFriendship);
+            prisma.user.findUnique.mockResolvedValue(mockUser1);
+            mockBattlesGateway.emitFriendRequestCancelled.mockImplementation(() => {
+                throw new Error('socket boom');
+            });
+
+            const result = await service.cancelOutgoingRequest(
+                'user-1',
+                'friendship-1',
+            );
+
+            expect(result).toEqual({ success: true });
         });
     });
 

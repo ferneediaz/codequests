@@ -16,7 +16,7 @@ describe('MatchmakingService', () => {
     let battlesService: {
         createBattle: jest.Mock;
         joinBattle: jest.Mock;
-        finalizeStaleBattlesForUser: jest.Mock;
+        forceFinalizeActiveBattlesForUser: jest.Mock;
     };
     let battlesGateway: { emitMatchFound: jest.Mock };
 
@@ -105,7 +105,7 @@ describe('MatchmakingService', () => {
         const mockBattlesService = {
             createBattle: jest.fn(),
             joinBattle: jest.fn(),
-            finalizeStaleBattlesForUser: jest.fn().mockResolvedValue(0),
+            forceFinalizeActiveBattlesForUser: jest.fn().mockResolvedValue(0),
         };
 
         const mockBattlesGateway = {
@@ -226,16 +226,29 @@ describe('MatchmakingService', () => {
             );
         });
 
-        it('should throw BadRequestException if already in queue', async () => {
+        it('replaces an existing QUEUED entry instead of erroring (idempotent re-queue)', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser1);
-            prisma.matchmakingEntry.findUnique.mockResolvedValue({
+
+            const staleQueued = {
                 ...baseQueueEntry,
                 status: MatchmakingStatus.QUEUED,
-            });
+            };
+            prisma.matchmakingEntry.findUnique
+                .mockResolvedValueOnce(staleQueued) // existing-entry check
+                .mockResolvedValueOnce({ ...baseQueueEntry, id: 'entry-fresh' }); // tryFindMatch fetch
 
-            await expect(
-                service.joinQueue(mockUser1.id, {}),
-            ).rejects.toThrow(BadRequestException);
+            prisma.matchmakingEntry.delete.mockResolvedValue(staleQueued);
+
+            const freshEntry = { ...baseQueueEntry, id: 'entry-fresh' };
+            prisma.matchmakingEntry.create.mockResolvedValue(freshEntry);
+            prisma.matchmakingEntry.findMany.mockResolvedValue([]);
+
+            const result = await service.joinQueue(mockUser1.id, {});
+
+            expect(prisma.matchmakingEntry.delete).toHaveBeenCalledWith({
+                where: { userId: mockUser1.id },
+            });
+            expect(result.status).toBe('queued');
         });
 
         it('should delete stale MATCHED entry before creating new one', async () => {
@@ -265,38 +278,9 @@ describe('MatchmakingService', () => {
             expect(result.status).toBe('queued');
         });
 
-        it('should throw structured ACTIVE_BATTLE error if user is in active battle', async () => {
+        it('should force-finalize any lingering active battle before queueing', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser1);
             prisma.matchmakingEntry.findUnique.mockResolvedValue(null);
-            prisma.battleParticipant.findFirst.mockResolvedValue({
-                id: 'participant-1',
-                battleId: 'battle-1',
-                userId: mockUser1.id,
-                battle: {
-                    id: 'battle-1',
-                    status: BattleStatus.IN_PROGRESS,
-                    mode: BattleMode.ONE_V_ONE,
-                },
-            });
-
-            await expect(
-                service.joinQueue(mockUser1.id, {}),
-            ).rejects.toMatchObject({
-                response: {
-                    code: 'ACTIVE_BATTLE',
-                    battleId: 'battle-1',
-                    battleStatus: BattleStatus.IN_PROGRESS,
-                    battleMode: BattleMode.ONE_V_ONE,
-                },
-            });
-        });
-
-        it('should run stale battle cleanup before active-battle rejection', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockUser1);
-            prisma.matchmakingEntry.findUnique.mockResolvedValue(null);
-            // After the cleanup hook runs, the active battle is gone; the
-            // guard finds nothing and we proceed to queue.
-            prisma.battleParticipant.findFirst.mockResolvedValue(null);
 
             const createdEntry = { ...baseQueueEntry };
             prisma.matchmakingEntry.create.mockResolvedValue(createdEntry);
@@ -308,23 +292,15 @@ describe('MatchmakingService', () => {
             const result = await service.joinQueue(mockUser1.id, {});
 
             expect(
-                battlesService.finalizeStaleBattlesForUser,
+                battlesService.forceFinalizeActiveBattlesForUser,
             ).toHaveBeenCalledWith(mockUser1.id);
-            // Cleanup must happen before findFirst runs.
-            const cleanupCallOrder =
-                battlesService.finalizeStaleBattlesForUser.mock
-                    .invocationCallOrder[0];
-            const findFirstCallOrder =
-                prisma.battleParticipant.findFirst.mock.invocationCallOrder[0];
-            expect(cleanupCallOrder).toBeLessThan(findFirstCallOrder);
             expect(result.status).toBe('queued');
         });
 
-        it('should proceed to queue even if stale cleanup throws', async () => {
+        it('should proceed to queue even if force-finalize throws', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser1);
             prisma.matchmakingEntry.findUnique.mockResolvedValue(null);
-            prisma.battleParticipant.findFirst.mockResolvedValue(null);
-            battlesService.finalizeStaleBattlesForUser.mockRejectedValueOnce(
+            battlesService.forceFinalizeActiveBattlesForUser.mockRejectedValueOnce(
                 new Error('db hiccup'),
             );
 
@@ -626,7 +602,7 @@ describe('MatchmakingService', () => {
             expect(result!.player2Id).toBe('user-3');
         });
 
-        it('should query candidates filtered by mode and MMR range', async () => {
+        it('should query candidates filtered by mode, MMR range, and same-user exclusion', async () => {
             const entry = {
                 ...baseQueueEntry,
                 mode: BattleMode.BATTLE_ROYALE,
@@ -642,6 +618,7 @@ describe('MatchmakingService', () => {
             expect(prisma.matchmakingEntry.findMany).toHaveBeenCalledWith({
                 where: {
                     id: { not: entry.id },
+                    userId: { not: entry.userId },
                     mode: BattleMode.BATTLE_ROYALE,
                     status: MatchmakingStatus.QUEUED,
                     mmrAtQueue: {
@@ -651,6 +628,75 @@ describe('MatchmakingService', () => {
                 },
                 orderBy: [{ queuedAt: 'asc' }],
             });
+        });
+
+        it('bails out and reverts our partial claim when a concurrent matcher won the race', async () => {
+            const entry = {
+                ...baseQueueEntry,
+                status: MatchmakingStatus.QUEUED,
+            };
+            const candidate = {
+                ...baseQueueEntry,
+                id: 'entry-2',
+                userId: 'user-2',
+                status: MatchmakingStatus.QUEUED,
+            };
+
+            prisma.matchmakingEntry.findUnique.mockResolvedValue(entry);
+            prisma.matchmakingEntry.findMany.mockResolvedValue([candidate]);
+            prisma.problem.count.mockResolvedValue(1);
+            prisma.problem.findFirst.mockResolvedValue(mockProblem);
+
+            // Simulate another matcher already grabbed one of the entries:
+            // only 1 of the 2 entries was still QUEUED when we tried to claim.
+            prisma.matchmakingEntry.updateMany.mockResolvedValue({ count: 1 });
+
+            const result = await service.tryFindMatch(entry.id);
+
+            expect(result).toBeNull();
+            // Must not fall through to creating a battle.
+            expect(battlesService.createBattle).not.toHaveBeenCalled();
+            expect(battlesService.joinBattle).not.toHaveBeenCalled();
+            // Must revert our own partial claim (the entry we did flip)
+            // back to QUEUED so it can re-enter the candidate pool.
+            expect(prisma.matchmakingEntry.updateMany).toHaveBeenCalledTimes(2);
+            expect(prisma.matchmakingEntry.updateMany).toHaveBeenLastCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        status: MatchmakingStatus.MATCHED,
+                    }),
+                    data: {
+                        status: MatchmakingStatus.QUEUED,
+                        matchedAt: null,
+                    },
+                }),
+            );
+        });
+
+        it('does NOT issue a revert when claim count is 0 (peer beat us by claiming both entries)', async () => {
+            const entry = {
+                ...baseQueueEntry,
+                status: MatchmakingStatus.QUEUED,
+            };
+            const candidate = {
+                ...baseQueueEntry,
+                id: 'entry-2',
+                userId: 'user-2',
+                status: MatchmakingStatus.QUEUED,
+            };
+
+            prisma.matchmakingEntry.findUnique.mockResolvedValue(entry);
+            prisma.matchmakingEntry.findMany.mockResolvedValue([candidate]);
+            prisma.problem.count.mockResolvedValue(1);
+            prisma.problem.findFirst.mockResolvedValue(mockProblem);
+
+            prisma.matchmakingEntry.updateMany.mockResolvedValue({ count: 0 });
+
+            const result = await service.tryFindMatch(entry.id);
+
+            expect(result).toBeNull();
+            // Only the original claim attempt; no revert (nothing to undo).
+            expect(prisma.matchmakingEntry.updateMany).toHaveBeenCalledTimes(1);
         });
 
         it('should return null when no problems are available', async () => {
@@ -960,9 +1006,14 @@ describe('MatchmakingService', () => {
 
             await service.tryFindMatch(entry.id);
 
-            // Should mark both entries as MATCHED
+            // Should atomically claim both entries (status: QUEUED filter
+            // is what prevents two concurrent matchers from each spinning
+            // up a phantom battle).
             expect(prisma.matchmakingEntry.updateMany).toHaveBeenCalledWith({
-                where: { id: { in: ['entry-1', 'entry-2'] } },
+                where: {
+                    id: { in: ['entry-1', 'entry-2'] },
+                    status: MatchmakingStatus.QUEUED,
+                },
                 data: {
                     status: MatchmakingStatus.MATCHED,
                     matchedAt: expect.any(Date),

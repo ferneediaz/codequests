@@ -21,6 +21,12 @@ export interface FriendRequestDeclinedPayload {
     addresseeUsername: string;
 }
 
+export interface FriendRequestCancelledPayload {
+    friendshipId: string;
+    requesterId: string;
+    requesterUsername: string;
+}
+
 export interface FriendEventsPort {
     emitFriendRequestReceived(
         addresseeId: string,
@@ -33,6 +39,10 @@ export interface FriendEventsPort {
     emitFriendRequestDeclined(
         requesterId: string,
         data: FriendRequestDeclinedPayload,
+    ): boolean;
+    emitFriendRequestCancelled(
+        addresseeId: string,
+        data: FriendRequestCancelledPayload,
     ): boolean;
 }
 

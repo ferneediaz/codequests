@@ -322,6 +322,31 @@ export class BattlesService {
             );
         }
 
+        // Idempotency: if both players click Rematch at the same time we must
+        // return the SAME new battle to both — otherwise each ends up in a
+        // different lobby, the ready-up gates wait on phantom opponents, and
+        // the lobby silently hangs (this is the "rematch is broken" bug).
+        const existing = await this.prisma.battle.findFirst({
+            where: {
+                rematchOfBattleId: original.id,
+                status: { in: [BattleStatus.WAITING, BattleStatus.IN_PROGRESS] },
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+        if (existing) {
+            // Defensive re-emit so the late caller's peers also navigate even
+            // if the original emit was missed (offline socket, race, etc).
+            this.gateway.emitBattleRematchCreated(
+                original.participants.map((p) => p.userId),
+                {
+                    originalBattleId: original.id,
+                    rematchBattleId: existing.id,
+                    initiatedByUserId: userId,
+                },
+            );
+            return this.getBattleDetails(existing.id);
+        }
+
         const activeSeason = await this.seasonsService.getActiveSeason();
         const rematch = await this.prisma.battle.create({
             data: {
@@ -360,6 +385,18 @@ export class BattlesService {
                 },
             });
         }
+
+        // Push every original participant onto the new battle URL — without
+        // this the non-clicker stays on the Results page and the rematch
+        // lobby never gets two sockets.
+        this.gateway.emitBattleRematchCreated(
+            original.participants.map((p) => p.userId),
+            {
+                originalBattleId: original.id,
+                rematchBattleId: rematch.id,
+                initiatedByUserId: userId,
+            },
+        );
 
         return this.getBattleDetails(rematch.id);
     }
@@ -1924,9 +1961,44 @@ export class BattlesService {
     }
 
     /**
+     * Force-finalize EVERY active battle this user is in, regardless of age.
+     * Called from matchmaking on requeue: the user is asking for a fresh game,
+     * so we treat any lingering WAITING/IN_PROGRESS battle as abandoned and
+     * end it as a draw (no winner, no MMR movement — completeBattle handles
+     * the zero-submission case). The other participant(s), if any, get a
+     * `battle.completed` event and bounce to /results.
+     *
+     * This is intentionally aggressive: previously we only cleaned up battles
+     * past their time limit, which left a "you are already in a battle" wall
+     * for users who closed a tab mid-game. The user explicitly opted into
+     * dropping their current game by clicking Find Match, so we honor that.
+     */
+    async forceFinalizeActiveBattlesForUser(userId: string): Promise<number> {
+        const active = await this.prisma.battle.findMany({
+            where: {
+                status: { in: [BattleStatus.WAITING, BattleStatus.IN_PROGRESS] },
+                participants: { some: { userId } },
+            },
+            select: { id: true },
+        });
+
+        let finalized = 0;
+        for (const battle of active) {
+            if (await this.finalizeBattleSafely(battle.id)) {
+                finalized += 1;
+                this.logger.log(
+                    `Force-finalized battle ${battle.id} as draw on user ${userId}'s requeue`,
+                );
+            }
+        }
+        return finalized;
+    }
+
+    /**
      * Targeted cleanup: finalize/expire any stale active battles for this
-     * specific user. Called synchronously from matchmaking before the active
-     * battle guard fires so an abandoned lobby doesn't block a fresh queue.
+     * specific user. Called from the global cleanup interval and as a
+     * defensive double-check; matchmaking uses the more aggressive
+     * `forceFinalizeActiveBattlesForUser` instead.
      * Returns the number of battles that were transitioned.
      */
     async finalizeStaleBattlesForUser(userId: string): Promise<number> {

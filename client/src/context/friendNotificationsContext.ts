@@ -25,6 +25,7 @@ export interface FriendNotificationsContextValue {
     decline: (friendshipId: string) => Promise<void>;
     remove: (friendUserId: string) => Promise<void>;
     sendRequestByUsername: (username: string) => Promise<void>;
+    cancelOutgoingRequest: (friendshipId: string) => Promise<void>;
     seedOutgoingRequest: (user: LobbyUser) => void;
     isFriendOnline: (friendUserId: string) => boolean;
     markAllSeen: () => void;

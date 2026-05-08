@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BattlesGateway } from '../../websockets/battles.gateway';
 import {
     BattleEventsPort,
+    BattleRematchCreatedPayload,
     ClanWarsPlayerReadyNextRoundPayload,
     ClanWarsRoundEndPayload,
     ClanWarsRoundIntermissionPayload,
@@ -24,6 +25,13 @@ export class BattleEventsGatewayAdapter implements BattleEventsPort {
 
     emitBattleCompleted(battleId: string, battle: unknown): void {
         this.gateway.emitBattleCompleted(battleId, battle);
+    }
+
+    emitBattleRematchCreated(
+        participantUserIds: string[],
+        data: BattleRematchCreatedPayload,
+    ): void {
+        this.gateway.emitBattleRematchCreated(participantUserIds, data);
     }
 
     emitRoyaleRoundStart(
